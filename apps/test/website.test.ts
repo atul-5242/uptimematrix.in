@@ -7,14 +7,10 @@ import { BACKEND_URL } from "./config";
 let BASE_URL = "http://localhost:3000";
 
 describe("Website gets created", () => {
-
-  let id_:String;
   let token:String;
-
 
   beforeAll(async()=>{
     const data = await createUser();
-    id_ = data.id;
     token =data.jwt ;
   })
 
@@ -63,4 +59,63 @@ describe("Website gets created", () => {
       console.log(error);
     }
   });
+});
+
+
+
+// New test are start:
+
+describe("Can fetch websites", () => {
+    let token1 : String;
+    let token2 : String;
+    let userId1 : String;
+    let userId2 : String;
+    beforeAll(async () => {
+        const data1 = await createUser();
+        const data2 = await createUser();
+        token1 = data1.jwt;
+        token2 = data2.jwt;
+        userId1 = data1.id;
+        userId2 = data2.id;
+    });
+
+    it("Is able to fetch a website that the user created",async () => {
+      // This websiteRepose part is done because we here create website and easily pass to the get request
+      // for getting the website response back easily. 
+      const websiteResponse = await axios.post(`${BACKEND_URL}/website`, {
+        url: "https://www.google.com"
+      }, {
+          headers: {
+              Authorization: `Bearer ${token1}`
+          }
+      });
+
+      const getWbesiteResponse = await axios.get(`${BACKEND_URL}/status/${websiteResponse.data.id}`, {
+          headers: {
+              Authorization: `Bearer ${token1}`
+          }
+      });
+      expect(getWbesiteResponse.data.id).toBe(websiteResponse.data.id);
+      expect(getWbesiteResponse.data.userId).toBe(userId1);
+    })
+
+    it("Can't access website created by other user",async () => {
+      const websiteResponse = await axios.post(`${BACKEND_URL}/website`, {
+        url: "https://www.google.com"
+      }, {
+          headers: {
+              Authorization: `Bearer ${token1}`
+          }
+      });
+      try {
+          const getWbesiteResponse = await axios.get(`${BACKEND_URL}/status/${websiteResponse.data.id}`, {
+            headers: {
+                Authorization: `Bearer ${token2}`
+            }
+          });
+          expect(false, "Should not be able to access website created by other user");
+      } catch (error) {
+        console.log(error);
+      }
+    })
 });

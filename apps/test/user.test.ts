@@ -51,10 +51,12 @@ describe("Signin end point", () => {
     
     it("Is able to signin if body is correct", async () => { 
         try {
+            console.log("username", USER_NAME_RANDOM);
             const respose = await axios.post(`${BACKEND_URL}/user/signin`, {
                 username: USER_NAME_RANDOM,//just writing wrong field here so test failed and that means this testing got succeded
                 password: "password"
             }) 
+            console.log("respose", respose);
             expect(respose.status).toBe(200);
             expect(respose.data.jwt).toBeDefined();  
             console.log("jwt__________________________________________________________", respose.data.jwt);  

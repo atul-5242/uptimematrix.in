@@ -55,9 +55,9 @@ app.get("/status/:websiteId",authMiddleware , async (req, res) => {
   res.json({
     message: "Website status fetched successfully",
     url: website.url,
-    status: website.ticks[0]!.status,
+    status: website.ticks[0]?.status,
     id: website.id,
-    user_id: website.user_id,
+    userId: website.user_id,
   })
 });
 
