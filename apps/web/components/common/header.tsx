@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Moon, Sun, Monitor, Link } from 'lucide-react'
+import { Menu, X, Moon, Sun, Monitor } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Logo } from '@/app/(landingpage)/(main)/logo'
 import { 
@@ -11,10 +11,14 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu'
+import { useAppSelector, RootState } from '@/store'
+import { useRouter } from 'next/navigation'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const { setTheme, theme } = useTheme()
+  const { setTheme } = useTheme()
+  const token = useAppSelector((state: RootState) => state.auth.token)
+  const router = useRouter()
 
   const navigation = [
     { name: 'Features', href: '#features' },
@@ -23,6 +27,11 @@ export function Header() {
     { name: 'Customers', href: '#testimonials' },
     { name: 'Docs', href: '#' },
   ]
+
+  const goCta = () => {
+    if (!token) router.push('/signin')
+    else router.push('/dashboard')
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -69,14 +78,10 @@ export function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-      
-              <Button variant="ghost">Sign in</Button>
-
-      
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+            <Button variant="ghost" onClick={goCta}>{token ? 'Dashboard' : 'Sign in'}</Button>
+            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700" onClick={goCta}>
               Start free trial
             </Button>
-    
           </div>
 
           {/* Mobile menu button */}
@@ -103,11 +108,7 @@ export function Header() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
           </div>
@@ -128,10 +129,10 @@ export function Header() {
                 </a>
               ))}
               <div className="px-3 py-2 space-y-2">
-                <Button variant="ghost" className="w-full justify-start">
-                  Sign in
+                <Button variant="ghost" className="w-full justify-start" onClick={() => { setIsMenuOpen(false); goCta(); }}>
+                  {token ? 'Dashboard' : 'Sign in'}
                 </Button>
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700">
+                <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700" onClick={() => { setIsMenuOpen(false); goCta(); }}>
                   Start free trial
                 </Button>
               </div>
