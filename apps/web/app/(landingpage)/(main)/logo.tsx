@@ -1,6 +1,7 @@
 "use client"
 
 import { Activity } from 'lucide-react'
+import Link from 'next/link'
 
 interface LogoProps {
   className?: string
@@ -11,7 +12,7 @@ interface LogoProps {
 export function Logo({ className = "", showText = true, size = 'md' }: LogoProps) {
   const sizeClasses = {
     sm: 'h-6 w-6',
-    md: 'h-8 w-8', 
+    md: 'h-8 w-8',
     lg: 'h-12 w-12'
   }
 
@@ -22,7 +23,7 @@ export function Logo({ className = "", showText = true, size = 'md' }: LogoProps
   }
 
   return (
-    <div className={`flex items-center ${className}`}>
+    <Link href="/" className={`flex items-center select-none cursor-pointer ${className}`}>
       <div className={`${sizeClasses[size]} bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg`}>
         <Activity className={`${size === 'sm' ? 'h-3 w-3' : size === 'md' ? 'h-5 w-5' : 'h-7 w-7'} text-white`} />
       </div>
@@ -31,6 +32,6 @@ export function Logo({ className = "", showText = true, size = 'md' }: LogoProps
           UptimeMatrix
         </span>
       )}
-    </div>
+    </Link>
   )
 }

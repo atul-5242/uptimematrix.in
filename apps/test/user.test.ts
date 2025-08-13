@@ -7,7 +7,7 @@ const USER_NAME_RANDOM = Math.random().toString(36).substring(2, 15);
 describe("Signup end point", () => {
     it("Is not able to signup if username and password", async () => { 
         try {
-            await axios.post(`${BACKEND_URL}/user/signup`, {
+            await axios.post(`${BACKEND_URL}/auth/user/signup`, {
                 email: USER_NAME_RANDOM,//just writing wrong field here so test failed and that means this testing got succeded
                 password: "password"
             })
@@ -19,7 +19,7 @@ describe("Signup end point", () => {
     
     it("Is able to signup if body is correct", async () => { 
         try {
-            const respose = await axios.post(`${BACKEND_URL}/user/signup`, {
+            const respose = await axios.post(`${BACKEND_URL}/auth/user/signup`, {
                 username: USER_NAME_RANDOM,//just writing wrong field here so test failed and that means this testing got succeded
                 password: "password"
             }) 

@@ -11,14 +11,16 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu'
-import { useAppSelector, RootState } from '@/store'
+import { useAppSelector, RootState, useAppDispatch } from '@/store'
 import { useRouter } from 'next/navigation'
+import { signOut } from '@/store/authSlice'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { setTheme } = useTheme()
   const token = useAppSelector((state: RootState) => state.auth.token)
   const router = useRouter()
+  const dispatch = useAppDispatch()
 
   const navigation = [
     { name: 'Features', href: '#features' },
@@ -79,6 +81,15 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="ghost" onClick={goCta}>{token ? 'Dashboard' : 'Sign in'}</Button>
+            {
+              token &&
+              <Button variant="ghost" onClick={()=>{
+                localStorage.removeItem('auth_token');
+                dispatch(signOut())
+                router.push('/');
+              }}>Logout</Button>
+            }
+            
             <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700" onClick={goCta}>
               Start free trial
             </Button>

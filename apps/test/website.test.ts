@@ -17,7 +17,7 @@ describe("Website gets created", () => {
   // URL is not present:
   it("Website not created if url is not present", async () => {
     try {
-        const response = await axios.post(`${BASE_URL}/website`, {
+        const response = await axios.post(`${BASE_URL}/website/websiteCreate`, {
           
         },{
             headers:{
@@ -34,7 +34,7 @@ describe("Website gets created", () => {
   // Authenticated URL present:
     it("Website is created if url is present", async () => {
       console.log("token------------------------------------------------------------------------------", token);
-      const response = await axios.post(`${BACKEND_URL}/website`, {
+      const response = await axios.post(`${BACKEND_URL}/website/websiteCreate`, {
           url: "https://google.com11"
       },{
           headers:{
@@ -50,7 +50,7 @@ describe("Website gets created", () => {
   // UnAthenticated
   it("Website is not created if Headers are not present", async () => {
     try {
-      const response = await axios.post(`${BASE_URL}/website`,{
+      const response = await axios.post(`${BASE_URL}/website/websiteCreate`,{
         
         url: "https://www.google.com"
       })
@@ -82,7 +82,7 @@ describe("Can fetch websites", () => {
     it("Is able to fetch a website that the user created",async () => {
       // This websiteRepose part is done because we here create website and easily pass to the get request
       // for getting the website response back easily. 
-      const websiteResponse = await axios.post(`${BACKEND_URL}/website`, {
+      const websiteResponse = await axios.post(`${BACKEND_URL}/website/websiteCreate`, {
         url: "https://www.google.com"
       }, {
           headers: {
@@ -90,7 +90,7 @@ describe("Can fetch websites", () => {
           }
       });
 
-      const getWbesiteResponse = await axios.get(`${BACKEND_URL}/status/${websiteResponse.data.id}`, {
+      const getWbesiteResponse = await axios.get(`/website/${BACKEND_URL}/status/${websiteResponse.data.id}`, {
           headers: {
               Authorization: `Bearer ${token1}`
           }
@@ -100,7 +100,7 @@ describe("Can fetch websites", () => {
     })
 
     it("Can't access website created by other user",async () => {
-      const websiteResponse = await axios.post(`${BACKEND_URL}/website`, {
+      const websiteResponse = await axios.post(`${BACKEND_URL}/website/websiteCreate`, {
         url: "https://www.google.com"
       }, {
           headers: {
@@ -108,7 +108,7 @@ describe("Can fetch websites", () => {
           }
       });
       try {
-          const getWbesiteResponse = await axios.get(`${BACKEND_URL}/status/${websiteResponse.data.id}`, {
+          const getWbesiteResponse = await axios.get(`/website/${BACKEND_URL}/status/${websiteResponse.data.id}`, {
             headers: {
                 Authorization: `Bearer ${token2}`
             }
