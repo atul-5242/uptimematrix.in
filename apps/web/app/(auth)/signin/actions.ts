@@ -1,6 +1,4 @@
 'use client';
-
-import { api } from '@/lib/api';
 import { AppDispatch } from '@/store';
 import { setCredentials } from '@/store/authSlice';
 
@@ -8,8 +6,18 @@ export async function signInAction(
   dispatch: AppDispatch,
   data: { username: string; password: string }
 ) {
-  const res = await api.post('/auth/user/signin', data);
-  const token: string = res.data?.jwt;
+  // Call app route to set httpOnly cookie
+  const res = await fetch('/api/auth/signin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Sign in failed');
+  }
+  const json = await res.json();
+  const token: string = json?.jwt;
   // Backend doesn't return userId explicitly; JWT contains sub. You may decode if needed.
   dispatch(setCredentials({ token }));
   return token;

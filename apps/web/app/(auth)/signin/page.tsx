@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppDispatch } from '@/store';
 import { signInAction } from './actions';
 
@@ -25,6 +25,7 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const searchParams = useSearchParams();
 
   const validateForm = (): boolean => {
     const errors: Partial<SignInFormData> = {};
@@ -40,7 +41,9 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
     setSubmitting(true);
     try {
       await signInAction(dispatch, { username: formData.username, password: formData.password });
-      router.push('/');
+      const redirect = searchParams.get('redirect');
+      const target = redirect && redirect.startsWith('/') ? redirect : '/dashboard';
+      router.replace(target);
     } catch (e) {
       // surface a simple error
       setValidationErrors({ username: 'Invalid credentials', password: 'Invalid credentials' });

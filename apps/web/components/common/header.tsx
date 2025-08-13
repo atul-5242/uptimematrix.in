@@ -83,7 +83,10 @@ export function Header() {
             <Button variant="ghost" onClick={goCta}>{token ? 'Dashboard' : 'Sign in'}</Button>
             {
               token &&
-              <Button variant="ghost" onClick={()=>{
+              <Button variant="ghost" onClick={async ()=>{
+                try {
+                  await fetch('/api/auth/signout', { method: 'POST' });
+                } catch {}
                 localStorage.removeItem('auth_token');
                 dispatch(signOut())
                 router.push('/');
