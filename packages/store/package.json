@@ -7,10 +7,12 @@
     "@types/bun": "latest"
   },
   "scripts": {
+    "generate": "bun prisma generate --schema prisma/schema.prisma",
     "db:seed":"bun prisma db seed"
   },
   "prisma": {
-    "seed": "bun prisma/seed.ts"
+    "seed": "bun prisma/seed.ts",
+    "schema": "prisma/schema.prisma"
   },
   "exports": {
     "./client": "./index.ts"
