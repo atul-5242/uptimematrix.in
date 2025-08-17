@@ -7,6 +7,7 @@ import {
   Command,
   Frame,
   LifeBuoy,
+  Bell,
   Map,
   PieChart,
   Send,
@@ -14,10 +15,10 @@ import {
   SquareTerminal,
 } from "lucide-react"
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/sidebar_assets/nav-main"
+// import { NavProjects } from "@/components/sidebar_assets/nav-projects"
+import { NavSecondary } from "@/components/sidebar_assets/nav-secondary"
+import { NavUser } from "@/components/sidebar_assets/nav-user"
 import {
   Sidebar,
   SidebarContent,
@@ -36,63 +37,56 @@ const data = {
   },
   navMain: [
     {
-      title: "Playground",
-      url: "#",
+      title: "Uptime",
+      url: "/dashboard/incidents",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Incidents",
+          url: "/dashboard/incidents",
         },
         {
-          title: "Starred",
-          url: "#",
+          title: "Who's on call",
+          url: "/dashboard/oncalls",
         },
         {
-          title: "Settings",
-          url: "#",
+          title: "Esclations policies",
+          url: "/dashboard/escalations-policies",
+        },
+        {
+          title: "Monitors",
+          url: "/dashboard/monitoring",
+        },
+        {
+          title: "Heartbeats",
+          url: "/dashboard/heartbeats",
+        },
+        {
+          title: "Status pages",
+          url: "/dashboard/status-pages",
+        },
+        {
+          title: "Integrations",
+          url: "/dashboard/integrations",
+        },
+        {
+          title: "Reporting",
+          url: "/dashboard/reporting",
         },
       ],
     },
     {
-      title: "Models",
+      title: "Telemetry",
       url: "#",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
+          title: "Alerts(upcoming)",
           url: "#",
         },
         {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
+          title: "Source(upcoming)",
           url: "#",
         },
       ],
@@ -103,7 +97,7 @@ const data = {
       icon: Settings2,
       items: [
         {
-          title: "General",
+          title: "Account Settings",
           url: "#",
         },
         {
@@ -114,14 +108,15 @@ const data = {
           title: "Billing",
           url: "#",
         },
-        {
-          title: "Limits",
-          url: "#",
-        },
       ],
     },
   ],
   navSecondary: [
+    {
+      title: "Notifications",
+      url: "#",
+      icon: Bell,
+    },
     {
       title: "Support",
       url: "#",
@@ -174,7 +169,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {/* <NavProjects projects={data.projects} /> */}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

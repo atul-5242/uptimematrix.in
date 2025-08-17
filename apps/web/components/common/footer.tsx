@@ -190,7 +190,7 @@ export function Footer() {
           </p>
           <div className="flex items-center space-x-4 mt-4 sm:mt-0">
             <span className="text-xs text-muted-foreground">
-              Built with ❤️ for developers and DevOps teams
+              Built with ❤️ for developers and DevOps teams - Atul Maurya
             </span>
           </div>
         </div>
