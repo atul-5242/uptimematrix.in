@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     revalidatePath('/dashboard/monitoring');
     return NextResponse.json({ success: true, websiteId: data.id }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) { // Explicitly type error as 'any' for better logging
     console.error("Monitor POST error:", error);
     return NextResponse.json(
       { message: "Failed to create monitor" },

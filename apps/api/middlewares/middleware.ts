@@ -14,6 +14,8 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         req.userId=decoded.sub as string;
         next();
     }catch (error) {
-        return res.status(401).json({message: "Unauthorized okay"});
+        return res.status(401).json({message: "Unauthorized okay",
+            error: error
+        });
     }
 }

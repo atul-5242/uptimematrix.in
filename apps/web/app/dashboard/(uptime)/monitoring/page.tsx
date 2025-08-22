@@ -23,8 +23,8 @@ export default function MonitorsPage() {
   useEffect(() => {
     async function fetchMonitors() {
       try {
-        const data = await getAllMonitorsAction();
-        setMonitors(data || []);
+        const data = await getAllMonitorsAction() || [];
+        setMonitors(data);
       } catch (err) {
         console.error("Error fetching monitors", err);
       } finally {
@@ -63,9 +63,9 @@ export default function MonitorsPage() {
                     <div className="flex items-center space-x-3 w-full sm:w-auto">
                       <span
                         className={`h-3 w-3 rounded-full ${
-                          monitor.status === "up"
+                          monitor.status === "online"
                             ? "bg-green-500"
-                            : monitor.status === "down"
+                            : monitor.status === "offline"
                             ? "bg-red-500"
                             : "bg-gray-400"
                         }`}
@@ -73,7 +73,7 @@ export default function MonitorsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{monitor.url}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {monitor.status === "up" ? "Up" : "Down"} · {monitor.uptimeDuration}
+                          {monitor.status === "online" ? "Online" : "Down"} · {monitor.uptimeDuration}
                         </div>
                       </div>
                     </div>

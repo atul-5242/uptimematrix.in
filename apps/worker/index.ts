@@ -7,6 +7,7 @@
 import axios from "axios";
 import { xAckBulk, xReadBulk } from "@uptimematrix/redisstream/client";
 import { prismaClient } from "@uptimematrix/store/client";
+import { WebsiteStatus } from "@uptimematrix/store/client"; // Added import for WebsiteStatus
 const GROUP_NAME = process.env.GROUP_NAME!;
 const CONSUMER_NAME = process.env.CONSUMER_NAME!;
 
@@ -94,7 +95,7 @@ const fetchWebsite = async (Websiteurl:string,Websiteid:string)=>{
                 await prismaClient.websiteTick.create({
                     data:{
                         response_time_ms:endTime-startTime,
-                        status:"Online",
+                        status:WebsiteStatus.Online, // Changed to use enum
                         Website_: { connect: { id: Websiteid } },
                         Region_: { connect: { id: region.id } },
                     }
@@ -106,7 +107,7 @@ const fetchWebsite = async (Websiteurl:string,Websiteid:string)=>{
                 await prismaClient.websiteTick.create({
                     data:{
                         response_time_ms:0,
-                        status:"Offline",
+                        status:WebsiteStatus.Offline, // Changed to use enum
                         Website_: { connect: { id: Websiteid } },
                         Region_: { connect: { id: region.id } },
                     }

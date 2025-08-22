@@ -9,7 +9,7 @@
     "build": "tsc"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts",
+    "seed": "tsc prisma/seed.ts && node prisma/seed.js",
     "schema": "prisma/schema.prisma"
   },
   "exports": {

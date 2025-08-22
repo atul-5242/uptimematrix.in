@@ -4,7 +4,7 @@ export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config:any) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('auth_token');
     if (token) {

@@ -77,19 +77,19 @@ export async function getWebsiteStatusAction(websiteId: string) {
   }
 
   const data = await res.json();
-  console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>", data.data.url);
+  console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------", data.data);
   // Transform API -> UI format
   return {
     id: data.data.id,
     incidents: 0, // backend doesn’t send yet
     lastChecked: new Date().toISOString(), // backend doesn’t send, so fake for now
-    responseData: data.ticks
-    ? data.ticks.map((tick: any) => ({
+    responseData: data.data.ticks
+    ? data.data.ticks.map((tick: any) => ({
         time: new Date(tick.createdAt).toLocaleTimeString(),
         ms: tick.response_time_ms,
       }))
       : [],
-    status: data.status?.toLowerCase() === "online"
+    status: data.data.status?.toLowerCase() === "online"
       ? "up"
       : data.status?.toLowerCase() === "offline"
         ? "down"

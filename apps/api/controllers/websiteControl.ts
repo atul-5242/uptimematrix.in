@@ -19,7 +19,6 @@ export const addWebsite = async (req: Request, res: Response) => {
             user_id: req.userId!,
         }
     })
-
     res.json({ message: "Website added successfully", id: website.id });
 };
 
@@ -27,7 +26,9 @@ export const getWebsiteStatus = async (req: Request, res: Response) => {
     const website = await prismaClient.website.findFirst({
       where: { user_id: req.userId!, id: req.params.websiteId },
       include: { ticks: { orderBy: [{ createdAt: "desc" }], take: 20 } }, // fetch more ticks
-    });
+      orderBy: { timeAdded: "desc" },
+    }
+  );
   
     if (!website) {
       res.status(409).json({ message: "Website not found" });
@@ -62,8 +63,6 @@ export const getAllWebsites = async (req: Request, res: Response) => {
       },
       orderBy: { timeAdded: "desc" },
     });
-
-    console.log("websites............................................", websites);
 
     res.json({
       message: "All Websites fetched successfully",

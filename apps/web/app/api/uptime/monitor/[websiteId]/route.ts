@@ -17,12 +17,21 @@ export async function GET(
 
     // Call your Express backend to get website status
     const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+    const authHeader =  req.headers.get("authorization") ||
+    `Bearer ${req.cookies.get("auth_token")?.value || ""}`;
+    const token = authHeader?.split(" ")[1];
+
+    if (!token) {
+      return NextResponse.json({ message: "Missing auth token" }, { status: 401 });
+    }
+
     const backendRes = await fetch(
       `${BACKEND_URL}/website/status/${websiteId}`,{ 
         method: "GET" ,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${req.cookies.get('auth_token')?.value}` // Forward auth token
+          "Authorization": `Bearer ${token}` // Forward auth token
         },
       }
     );
@@ -31,7 +40,7 @@ export async function GET(
       const error = await backendRes.json();
       return NextResponse.json(error, { status: backendRes.status });
     }
-
+    console.log("websiteIdbackendRes.json()------------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>", backendRes);
     const data = await backendRes.json();
     console.log("websiteId_____________________________________>>>>>>>>>>>>>>>>>>>>>>>>>>", data);
     return NextResponse.json({ success: true, data }, { status: 200 });
