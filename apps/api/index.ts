@@ -1,8 +1,10 @@
 import express from "express";
-import cors from 'cors';
-import authRouter from "./routes/authRoute/authroute";
-import websiteRouter from "./routes/websiteRoute/websiteroute";
+import cors from "cors";
+import authRouter from "./routes/authRoute/authroute.js";
+import websiteRouter from "./routes/websiteRoute/websiteroute.js";
+import dotenv from "dotenv";
 
+dotenv.config();
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*' }));
 
@@ -23,5 +25,5 @@ app.use("/website", websiteRouter);
 
 
 app.listen(process.env.PORT || 3001, () => {
-  console.log(`Server is running on port ${process.env.PORT || 3000}`);
+  console.log(`Server is running on port ${process.env.PORT || 3001}`);
 });

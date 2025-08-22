@@ -1,16 +1,21 @@
 {
   "name": "pusher",
-  "module": "index.ts",
+  "main": "index.ts",
   "type": "module",
   "private": true,
   "dependencies": {
-    "store":"*",
-    "redisstream":"*"
+    "@uptimematrix/store": "workspace:*",
+    "@uptimematrix/redisstream": "workspace:*",
+    "dotenv": "^17.2.1"
+  },
+  "scripts": {
+    "dev": "tsc --build && node -r dotenv/config dist/index.js",
+    "build": "tsc --build",
+    "start": "node dist/index.js"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5",
+    "ts-node": "^10.9.2",
+    "@types/node": "^20.14.10"
   }
 }

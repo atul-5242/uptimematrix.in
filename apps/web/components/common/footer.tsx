@@ -86,7 +86,7 @@ export function Footer() {
             <div className="space-y-2 mb-6">
               <div className="flex items-center text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 mr-2" />
-                hello@uptimematrix.com
+                atul.fzdlko2002@gmail.com
               </div>
               <div className="flex items-center text-sm text-muted-foreground">
                 <Phone className="h-4 w-4 mr-2" />

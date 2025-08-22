@@ -1,13 +1,35 @@
 import { createClient } from "redis";
-type WebsiteEvent = {url:string,id:string}
 
-const STREAM_NAME = "betteruptime::website";
+type WebsiteEvent = { url: string; id: string };
 
-const client = await createClient({})
-                .on("error", (err) => {
-                    console.error("Redis Client Error", err);
-                })
-                .connect();
+export const STREAM_NAME = "betteruptime::website";
+
+let client: ReturnType<typeof createClient>;
+
+async function initClient() {
+  client = createClient({url: process.env.REDIS_URL || 'redis://localhost:6379'})
+    .on("error", (err) => {
+      console.error("Redis Client Error", err);
+    });
+  await client.connect();
+}
+
+await initClient();
+console.log("Redis URL in redisstream:", process.env.REDIS_URL);
+
+export async function xGroupCreate(streamName: string, groupName: string) {
+  try {
+    console.log(`Attempting to create consumer group '${groupName}' for stream '${streamName}'`);
+    await client.xGroupCreate(streamName, groupName, '0', { MKSTREAM: true });
+    console.log(`Consumer group '${groupName}' created for stream '${streamName}'`);
+  } catch (error: any) {
+    if (error.message.includes("BUSYGROUP")) {
+      console.log(`Consumer group '${groupName}' already exists.`);
+    } else {
+      console.error("Error creating consumer group:", error);
+    }
+  }
+}
 
 export async function getStreamLength() {
     const length = await client.xLen(STREAM_NAME);

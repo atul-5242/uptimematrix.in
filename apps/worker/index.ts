@@ -5,8 +5,8 @@
 
 // import axios from "axios";
 import axios from "axios";
-import { xAckBulk, xReadBulk } from "redisstream/client";
-import { prismaClient } from "store/client";
+import { xAckBulk, xReadBulk } from "@uptimematrix/redisstream/client";
+import { prismaClient } from "@uptimematrix/store/client";
 const GROUP_NAME = process.env.GROUP_NAME!;
 const CONSUMER_NAME = process.env.CONSUMER_NAME!;
 
@@ -78,8 +78,10 @@ const fetchWebsite = async (Websiteurl:string,Websiteid:string)=>{
         const startTime = Date.now();
 
         // 1. Look up region UUID
-        const region = await prismaClient.region.findUnique({
+        const region = await prismaClient.region.upsert({
             where: { name: GROUP_NAME },
+            update: {},
+            create: { name: GROUP_NAME },
           });
           console.log("--------------=========================",region);
 
@@ -93,8 +95,8 @@ const fetchWebsite = async (Websiteurl:string,Websiteid:string)=>{
                     data:{
                         response_time_ms:endTime-startTime,
                         status:"Online",
-                        website_id:Websiteid,
-                        region_id:region?.id!
+                        Website_: { connect: { id: Websiteid } },
+                        Region_: { connect: { id: region.id } },
                     }
                 })
                 resolve();
@@ -105,8 +107,8 @@ const fetchWebsite = async (Websiteurl:string,Websiteid:string)=>{
                     data:{
                         response_time_ms:0,
                         status:"Offline",
-                        website_id:Websiteid,
-                        region_id:region?.id! // like: India
+                        Website_: { connect: { id: Websiteid } },
+                        Region_: { connect: { id: region.id } },
                     }
                 })
                 resolve();

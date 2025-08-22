@@ -11,8 +11,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
+import { useRouter } from "next/navigation"
 
 export default function MonitoringPage() {
+
+  const router = useRouter();
+
   // fake subscription state for now (later from redux)
   const [subscribed] = useState(false)
   const dispatch = useAppDispatch()
@@ -31,6 +35,9 @@ export default function MonitoringPage() {
   const [tags, setTags] = useState("")
   const [description, setDescription] = useState("")
 
+  // loading state
+  const [isLoading, setIsLoading] = useState(false)
+
   // handle notification change
   const handleNotificationChange = (type: string) => {
     if (!subscribed && type !== "email") return // block changes
@@ -42,6 +49,7 @@ export default function MonitoringPage() {
   // submit
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    setIsLoading(true) // start loader
 
     const body = {
       alertCondition,
@@ -59,12 +67,18 @@ export default function MonitoringPage() {
     }
 
     try {
-      // 🔗 use the action WITH dispatch (same style as your SignIn flow)
-      await createMonitorAction(body)
-      alert("Monitor created successfully!")
+      const res = await createMonitorAction(body);
+
+      if (res?.websiteId) {
+        router.push(`/dashboard/monitoring/${res.websiteId}`);
+      } else {
+        alert("Monitor created, but websiteId missing");
+      }
     } catch (err: any) {
-      console.error(err)
-      alert(err?.message || "Failed to create monitor")
+      console.error(err);
+      alert(err?.message || "Failed to create monitor");
+    } finally {
+      setIsLoading(false) // stop loader
     }
   }
 
@@ -142,17 +156,12 @@ export default function MonitoringPage() {
                 <div>
                   <Label className="mb-2 block">When there’s a new incident</Label>
                   <div className="flex flex-wrap gap-4">
-                    {[
-                      { id: "call", label: "Call" },
+                    {[{ id: "call", label: "Call" },
                       { id: "sms", label: "SMS" },
                       { id: "email", label: "E-mail" },
                       { id: "push", label: "Push notification" },
-                      { id: "critical", label: "Critical alert" },
-                    ].map(({ id, label }) => (
-                      <div
-                        key={id}
-                        className={`flex items-center space-x-2 ${!subscribed && id !== "email" ? "opacity-50" : ""}`}
-                      >
+                      { id: "critical", label: "Critical alert" }].map(({ id, label }) => (
+                      <div key={id} className={`flex items-center space-x-2 ${!subscribed && id !== "email" ? "opacity-50" : ""}`}>
                         <Checkbox
                           id={id}
                           checked={notifications.includes(id)}
@@ -220,7 +229,9 @@ export default function MonitoringPage() {
                 
                 {/* Submit Button */}
                 <div className="flex justify-end">
-                  <Button type="submit" className="px-8">Create monitor</Button>
+                  <Button type="submit" className="px-8" disabled={isLoading}>
+                    {isLoading ? "Creating monitor..." : "Create monitor"}
+                  </Button>
                 </div>
               </form>
             </CardContent>

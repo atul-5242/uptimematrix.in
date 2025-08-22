@@ -16,9 +16,15 @@ export async function GET(
     }
 
     // Call your Express backend to get website status
+    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
     const backendRes = await fetch(
-      `${process.env.BACKEND_URL}/website/${websiteId}`,
-      { method: "GET" }
+      `${BACKEND_URL}/website/status/${websiteId}`,{ 
+        method: "GET" ,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${req.cookies.get('auth_token')?.value}` // Forward auth token
+        },
+      }
     );
 
     if (!backendRes.ok) {
@@ -27,7 +33,7 @@ export async function GET(
     }
 
     const data = await backendRes.json();
-
+    console.log("websiteId_____________________________________>>>>>>>>>>>>>>>>>>>>>>>>>>", data);
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (error) {
     console.error("Monitor GET error:", error);

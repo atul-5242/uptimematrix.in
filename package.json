@@ -4,35 +4,26 @@
   "scripts": {
     "db:dev": "docker-compose up -d",
     "db:prod": "docker-compose up -d",
-
-    "migrate:linux": "./scripts/migrate.sh",
-    "migrate:win": "powershell ./scripts/migrate.ps1",
     "migrate": "node -e \"require('os').platform().startsWith('win') ? require('child_process').execSync('powershell ./scripts/migrate.ps1', {stdio:'inherit'}) : require('child_process').execSync('./scripts/migrate.sh', {stdio:'inherit'})\"",
-
-    "dev": "bun run db:dev && bun run migrate && cd packages/store && bun run generate && cd ../../ && turbo run dev",
-    "start": "bun run db:prod && bun run migrate && cd packages/store && bun run generate && cd ../../ && turbo run dev",
+    "dev": "pnpm run db:dev && pnpm run migrate && turbo run dev --parallel",
+    "start": "pnpm run db:prod && pnpm run migrate && turbo run dev --parallel",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
-
-    "postinstall": "chmod +x ./scripts/migrate.sh || echo 'Skipping chmod (Windows detected)'"
+    "postinstall": "node -e \"if (process.platform !== 'win32') require('child_process').execSync('chmod +x ./scripts/migrate.sh')\""
   },
-  "devDependencies": {
-    "prettier": "^3.6.2",
-    "turbo": "^2.5.5",
-    "typescript": "5.8.3"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "packageManager": "bun@1.2.9",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "dependencies": {
-    "@types/axios": "^0.14.4",
-    "axios": "^1.11.0"
+  "packageManager": "pnpm@9.0.0",
+  "devDependencies": {
+    "turbo": "^2.5.5",
+    "typescript": "5.9.2",
+    "prettier": "^3.6.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

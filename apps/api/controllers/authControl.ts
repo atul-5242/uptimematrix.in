@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
-import { AuthInput } from "../types";
-import jwt from "jsonwebtoken";
-import { prismaClient } from "store/client";
+import { AuthInput } from "../types.js";
+import jwt from "jsonwebtoken"; 
+import { prismaClient } from "@uptimematrix/store"; 
+
 
 export const signUp = async(req: Request, res: Response) => {
     const data = AuthInput.safeParse(req.body);

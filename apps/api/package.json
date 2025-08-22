@@ -1,23 +1,25 @@
 {
   "name": "api",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun index.ts"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5",
-    "store": "*"
+    "dev": "pnpm --filter @uptimematrix/store build && tsc --build && node dist/index.js",
+    "build": "tsc --build",
+    "start": "node dist/index.js"
   },
   "dependencies": {
+    "@prisma/client": "^5.8.3",
+    "@uptimematrix/store": "workspace:*",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^4.0.10"
+  },
+  "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "zod": "^4.0.10"
+    "@types/jsonwebtoken": "^9.0.10",
+    "typescript": "^5.9.2"
   }
 }

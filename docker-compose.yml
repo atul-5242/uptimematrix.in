@@ -12,6 +12,14 @@ services:
       - pgdata_base:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+  redis:
+    image: redis/redis-stack:latest
+    container_name: my_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata_base:/data
 
 volumes:
   pgdata_base:
+  redisdata_base:

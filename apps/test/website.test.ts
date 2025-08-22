@@ -1,5 +1,5 @@
 // we can also use supertest to test the API but with this we can not test the rust backend for testing.
-import {describe,it,expect,beforeAll} from "bun:test";
+import {describe,it,expect,beforeAll} from "vitest";
 import axios from "axios";
 import { createUser } from "./utils/user_creation";
 import { BACKEND_URL } from "./config";

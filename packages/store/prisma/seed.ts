@@ -1,4 +1,4 @@
-import {prismaClient} from './../index';
+import {prismaClient} from './../index.js';
 async function main() {
     const regions = ['1','India', 'Europe', 'North America', 'South America', 'Africa', 'Australia'];
   
@@ -13,11 +13,11 @@ async function main() {
     console.log('✅ Regions seeded successfully');
   }
   
-  main()
-    .catch((e) => {
-      console.error('❌ Error seeding regions:', e);
-      process.exit(1);
-    })
-    .finally(async () => {
-      await prismaClient.$disconnect();
-    });
+main()
+  .catch((e) => {
+    console.error('❌ Error seeding regions:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prismaClient.$disconnect();
+});
