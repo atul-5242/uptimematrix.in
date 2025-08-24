@@ -27,7 +27,7 @@ async function main() {
 
         if (!response || response.length === 0) {
             console.log("No new messages.");
-            await new Promise(r => setTimeout(r, 10000)); // wait before polling again
+            await new Promise(r => setTimeout(r, 180000)); // wait before polling again
             continue;
         }
 

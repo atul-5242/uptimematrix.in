@@ -24,6 +24,6 @@ async function main(){
 
 setInterval(()=>{
     main()
-},10000)
+},180000)
 
 main();
