@@ -3,46 +3,60 @@
 "use client";
 
 export interface MonitorFormData {
+  name: string;
   url: string;
+  monitorType: 'http';
+  checkInterval: number; // ms
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD';
+  regions: string[];
+  escalationPolicyId: string;
+  tags: string[];
 }
 
 export async function getAllMonitorsAction() {
   const nextAppBaseURL = process.env.NEXT_PUBLIC_VERCEL_URL || "http://localhost:3000";
   const token = localStorage.getItem("auth_token");
-
   const res = await fetch(`${nextAppBaseURL}/api/uptime/getallmonitors`, {
     method: "GET",
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    // credentials: "include", // Not needed when manually setting Authorization header
   });
 
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.message || "Failed to fetch monitors");
   }
-
   const data = await res.json();
-  console.log("res>>>>>>>>>>>>>>>>>>>>>>>>>>", data);
-
-  // Correct shape based on your backend
-  const websites = data?.monitors?.websites || [];
+  console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------from getallmonitorsAction", data);
+  const websites = data?.monitors?.monitors?.websites || [];
 
   return websites.map((w: any) => ({
     id: w.id,
+    name: w.name || w.url,
     url: w.url,
+    type: w.monitorType || "http", //-
+    checkInterval: w.checkInterval || 60000,
+    method: w.method || "GET",
+    uptime: w.uptime,
+    regions: w.regions || ['us-east-1', 'eu-west-1'],
+    escalationPolicyId: w.escalationPolicyId || "",
+    tags: w.tags || ["default"],
     status: w.status?.toLowerCase() || "unknown",
-    uptimeDuration: "3d 4h", // placeholder, calculate if needed
-    lastChecked: w.lastCheckedAt || new Date().toISOString(),
+    lastCheck: w.lastCheck,
+    incidents: w.incidents || 0,
+    timeAdded: w.timeAdded || new Date().toISOString(),
+    uptimeTrend: w.status?.toLowerCase() === "online" ? "online" : "offline",
+    avgResponseTime24h: w.avgResponseTime24h || 0,
+    responseTime: w.responseTime || 0,
+    isActive: true
   }));
 }
 
 export async function createMonitorAction(data: MonitorFormData) {
   try {
-    const token = localStorage.getItem("auth_token"); // Get token for createMonitorAction
-
+    const token = localStorage.getItem("auth_token");
     const res = await fetch("/api/uptime/monitor", {
       method: 'POST',
       headers: {
@@ -50,7 +64,6 @@ export async function createMonitorAction(data: MonitorFormData) {
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(data),
-      // credentials: "include", // Not needed when manually setting Authorization header
     });
 
     if (!res.ok) {
@@ -58,9 +71,8 @@ export async function createMonitorAction(data: MonitorFormData) {
       throw new Error(errorData.message || "Failed to create monitor");
     }
 
-    return res.json(); // revalidatePath is in the API route
+    return res.json();
   } catch (err: any) {
-    // Re-throw the error as it already contains the message from the API.
     throw err;
   }
 }

@@ -1,241 +1,431 @@
+
 "use client"
-
-import { useState, type FormEvent } from "react"
-import { useAppDispatch } from "@/store"
-import { createMonitorAction } from "./action"
-
+import React, { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"
-import { useRouter } from "next/navigation"
+import { 
+  Globe, 
+  MapPin, 
+  Bell, 
+  ArrowLeft, 
+  CheckCircle2,
+  Monitor,
+  Plus,
+  Info
+} from 'lucide-react'
 
-export default function MonitoringPage() {
+interface MonitorFormData {
+  name: string
+  url: string
+  monitorType: 'http'
+  checkInterval: number
+  timeout: number
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD'
+  regions: string[]
+  escalationPolicyId: string
+  tags: string[]
+}
 
-  const router = useRouter();
+interface FormErrors {
+  [key: string]: string
+}
 
-  // fake subscription state for now (later from redux)
-  const [subscribed] = useState(false)
-  const dispatch = useAppDispatch()
+export default function MonitorCreatePage() {
+  const [formData, setFormData] = useState<MonitorFormData>({
+    name: '',
+    url: '',
+    monitorType: 'http',
+    checkInterval: 60,
+    timeout: 30,
+    method: 'GET',
+    regions: ['ap-south-1'], // India selected by default
+    escalationPolicyId: 'default',
+    tags: []
+  })
 
-  // form state
-  const [alertCondition, setAlertCondition] = useState("ping")
-  const [url, setUrl] = useState("")
-  const [notifications, setNotifications] = useState<string[]>(["email"])
-  const [escalation, setEscalation] = useState("immediate")
+  const [loading, setLoading] = useState<boolean>(false)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [escalationPolicies, setEscalationPolicies] = useState<{id: string, name: string}[]>([])
 
-  // advanced settings
-  const [timeout, setTimeout] = useState("30")
-  const [retries, setRetries] = useState("3")
+  // Dummy fetch for Escalation Policies
+  useEffect(() => {
+    const loadPolicies = async () => {
+      try {
+        const token = localStorage.getItem('auth_token') || ''
+        const res = await fetch('/api/escalation-policies', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const list = (data.policies || []).map((p: any) => ({ id: p.id, name: p.name }))
+          setEscalationPolicies(list)
+          if (list.length && !formData.escalationPolicyId) {
+            setFormData(prev => ({ ...prev, escalationPolicyId: list[0].id }))
+          }
+        }
+      } catch (e) {
+        // ignore, keep empty list
+      }
+    }
+    loadPolicies()
+  }, [])
 
-  // metadata
-  const [tags, setTags] = useState("")
-  const [description, setDescription] = useState("")
+  const monitoringRegions = [
+    { value: 'ap-south-1', label: 'Mumbai (India)', flag: '🇮🇳', available: true }, // ✅ only available
+    { value: 'us-east-1', label: 'N. Virginia (US East)', flag: '🇺🇸', available: false },
+    { value: 'us-west-2', label: 'Oregon (US West)', flag: '🇺🇸', available: false },
+    { value: 'eu-west-1', label: 'Ireland (EU)', flag: '🇮🇪', available: false },
+    { value: 'eu-central-1', label: 'Frankfurt (EU)', flag: '🇩🇪', available: false },
+    { value: 'ap-southeast-1', label: 'Singapore (Asia)', flag: '🇸🇬', available: false },
+    { value: 'ap-northeast-1', label: 'Tokyo (Asia)', flag: '🇯🇵', available: false }
+  ]
 
-  // loading state
-  const [isLoading, setIsLoading] = useState(false)
+  const checkIntervals = [
+    { value: 30, label: '30 seconds' },
+    { value: 60, label: '1 minute' },
+    { value: 300, label: '5 minutes' },
+    { value: 600, label: '10 minutes' },
+    { value: 1800, label: '30 minutes' },
+    { value: 3600, label: '1 hour' }
+  ]
 
-  // handle notification change
-  const handleNotificationChange = (type: string) => {
-    if (!subscribed && type !== "email") return // block changes
-    setNotifications((prev) =>
-      prev.includes(type) ? prev.filter((n) => n !== type) : [...prev, type]
-    )
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Monitor name is required'
+    }
+    
+    if (!formData.url.trim()) {
+      newErrors.url = 'URL is required'
+    } else {
+      try {
+        new URL(formData.url)
+      } catch {
+        newErrors.url = 'Please enter a valid URL'
+      }
+    }
+
+    if (formData.regions.length === 0) {
+      newErrors.regions = 'At least one monitoring region is required'
+    }
+
+    if (formData.timeout >= formData.checkInterval) {
+      newErrors.timeout = 'Timeout must be less than check interval'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
-  // submit
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setIsLoading(true) // start loader
+  const handleSubmit = async (): Promise<void> => {
+    if (!validateForm()) return
 
-    const body = {
-      alertCondition,
-      url,
-      notifications,
-      escalation,
-      advanced: {
-        timeout,
-        retries,
-      },
-      metadata: {
-        tags,
-        description,
-      },
-    }
-
+    setLoading(true)
     try {
-      const res = await createMonitorAction(body);
+      // Combine checkInterval and timeout (both in seconds) to ms
+      const totalIntervalMs = (formData.checkInterval + formData.timeout) * 1000;
+      // Prepare data to send (only fields that exist in backend schema)
+      const dataToSend = {
+        name: formData.name,
+        url: formData.url,
+        monitorType: formData.monitorType,
+        checkInterval: totalIntervalMs,
+        method: formData.method,
+        regions: formData.regions,
+        escalationPolicyId: formData.escalationPolicyId || null,
+        tags: formData.tags,
+      };
+      const token = localStorage.getItem('auth_token') || ''
+      const response = await fetch('/api/uptime/monitor', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(dataToSend)
+      })
 
-      if (res?.websiteId) {
-        router.push(`/dashboard/monitoring/${res.websiteId}`);
-      } else {
-        alert("Monitor created, but websiteId missing");
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.message || 'Failed to create monitor')
       }
-    } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Failed to create monitor");
+
+      alert('Monitor created successfully!')
+    } catch (error) {
+      console.error('Error creating monitor:', error)
+      alert('Failed to create monitor. Please try again.')
     } finally {
-      setIsLoading(false) // stop loader
+      setLoading(false)
     }
+  }
+
+  const toggleRegion = (region: string, available: boolean): void => {
+    if (!available) return // prevent selecting disabled regions
+    setFormData(prev => ({
+      ...prev,
+      regions: prev.regions.includes(region)
+        ? prev.regions.filter(r => r !== region)
+        : [...prev.regions, region]
+    }))
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center py-12 px-4">
-      <div className="w-full max-w-4xl flex flex-col lg:flex-row gap-12">
-        {/* Left instructions panel */}
-        <div className="flex-1 pt-4">
-          <h1 className="text-3xl font-bold mb-8">Create monitor</h1>
-          <div className="mb-8">
-            <h2 className="text-base font-semibold mb-1">What to monitor</h2>
-            <p className="text-muted-foreground text-sm">
-              Configure the target website you want to monitor. Advanced configuration is available below.
-            </p>
-          </div>
-          <div>
-            <h2 className="text-base font-semibold mb-1">On-call escalation</h2>
-            <p className="text-muted-foreground text-sm">
-              Set up rules for who's going to be notified and how when an incident occurs.
-            </p>
-            <p className="text-muted-foreground text-sm mt-2">
-              Notify the <span className="underline">entire team</span> as a last resort option. 
-              Alternatively, set up an <span className="underline">advanced escalation policy</span>.
-            </p>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <div className="flex items-center gap-2">
+                <Monitor className="h-8 w-8 text-green-600" />
+                <h1 className="text-3xl font-bold text-gray-900">Create Monitor</h1>
+              </div>
+              <p className="text-gray-600 mt-1">Set up monitoring for your website or service</p>
+            </div>
           </div>
         </div>
-        
-        {/* Right form section */}
-        <div className="flex-1 max-w-lg">
+
+        <div className="space-y-8">
+          {/* Basic Configuration */}
           <Card>
-            <CardContent className="py-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Alert us when */}
-                <div>
-                  <Label className="mb-1 block">
-                    Alert us when 
-                    <span className="inline-block ml-2 px-2 py-0.5 rounded bg-gray-100 text-xs text-gray-600 align-middle">Billable</span>
-                  </Label>
-                  <Select value={alertCondition} onValueChange={setAlertCondition}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ping">Host doesn't respond to ping</SelectItem>
-                      <SelectItem value="unavailable" disabled={!subscribed} className={!subscribed ? "opacity-50" : ""}>
-                        URL becomes unavailable
-                      </SelectItem>
-                      <SelectItem value="slow" disabled={!subscribed} className={!subscribed ? "opacity-50" : ""}>
-                        URL is slow
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {!subscribed && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Only ping monitoring available. <span className="underline">Upgrade your account</span> to unlock more.
-                    </div>
-                  )}
-                </div>
-
-                {/* URL to monitor */}
-                <div>
-                  <Label htmlFor="monitor-url" className="mb-1 block">URL to monitor</Label>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-6 w-6 text-blue-600" />
+                Basic Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Monitor Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="name">Monitor Name *</Label>
                   <Input
-                    id="monitor-url"
-                    placeholder="https://"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    id="name"
+                    placeholder="e.g., My Website Homepage"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    className={errors.name ? 'border-red-500' : ''}
                   />
-                  <div className="text-xs text-muted-foreground mt-1">
-                    You can import multiple monitors <span className="underline">here</span>.
-                  </div>
+                  {errors.name && <p className="text-sm text-red-600">{errors.name}</p>}
                 </div>
-
-                {/* Notification method */}
-                <div>
-                  <Label className="mb-2 block">When there’s a new incident</Label>
-                  <div className="flex flex-wrap gap-4">
-                    {[{ id: "call", label: "Call" },
-                      { id: "sms", label: "SMS" },
-                      { id: "email", label: "E-mail" },
-                      { id: "push", label: "Push notification" },
-                      { id: "critical", label: "Critical alert" }].map(({ id, label }) => (
-                      <div key={id} className={`flex items-center space-x-2 ${!subscribed && id !== "email" ? "opacity-50" : ""}`}>
-                        <Checkbox
-                          id={id}
-                          checked={notifications.includes(id)}
-                          onCheckedChange={() => handleNotificationChange(id)}
-                          disabled={!subscribed && id !== "email"}
-                        />
-                        <Label htmlFor={id} className="text-sm">{label}</Label>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    The current on-call person
-                  </div>
-                </div>
-
-                {/* Escalation dropdown */}
-                <div>
-                  <Label htmlFor="escalate" className="mb-1 block">
-                    If the on-call person doesn't acknowledge the incident
-                  </Label>
-                  <Select value={escalation} onValueChange={setEscalation}>
+                
+                {/* Monitor Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="monitorType">Monitor Type</Label>
+                  <Select 
+                    value={formData.monitorType}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, monitorType: value as 'http' }))}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose escalation" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="immediate">Immediately alert all other team members</SelectItem>
-                      <SelectItem value="wait5min">Wait 5 mins, then alert all team members</SelectItem>
+                      <SelectItem value="http">HTTP/HTTPS</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* URL */}
+              <div className="space-y-2">
+                <Label htmlFor="url">URL/Target *</Label>
+                <Input
+                  id="url"
+                  placeholder="https://example.com"
+                  value={formData.url}
+                  onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
+                  className={errors.url ? 'border-red-500' : ''}
+                />
+                {errors.url && <p className="text-sm text-red-600">{errors.url}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Check Interval */}
+                <div className="space-y-2">
+                  <Label htmlFor="checkInterval">Check Interval</Label>
+                  <Select 
+                    value={formData.checkInterval.toString()} 
+                    onValueChange={(value) => 
+                      setFormData(prev => ({ ...prev, checkInterval: parseInt(value) }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {checkIntervals.map((interval) => (
+                        <SelectItem key={interval.value} value={interval.value.toString()}>
+                          {interval.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Accordions */}
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="item-1">
-                    <AccordionTrigger>Advanced settings</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor="timeout">Request timeout (sec)</Label>
-                          <Input id="timeout" type="number" value={timeout} onChange={(e) => setTimeout(e.target.value)} />
-                        </div>
-                        <div>
-                          <Label htmlFor="retries">Retry attempts</Label>
-                          <Input id="retries" type="number" value={retries} onChange={(e) => setRetries(e.target.value)} />
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                  <AccordionItem value="item-2">
-                    <AccordionTrigger>Metadata</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-3">
-                        <div>
-                          <Label htmlFor="tags">Tags (comma separated)</Label>
-                          <Input id="tags" value={tags} onChange={(e) => setTags(e.target.value)} />
-                        </div>
-                        <div>
-                          <Label htmlFor="description">Description</Label>
-                          <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                
-                {/* Submit Button */}
-                <div className="flex justify-end">
-                  <Button type="submit" className="px-8" disabled={isLoading}>
-                    {isLoading ? "Creating monitor..." : "Create monitor"}
-                  </Button>
+                {/* Timeout */}
+                <div className="space-y-2">
+                  <Label htmlFor="timeout">Timeout (seconds)</Label>
+                  <Input
+                    id="timeout"
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={formData.timeout}
+                    onChange={(e) => 
+                      setFormData(prev => ({ ...prev, timeout: parseInt(e.target.value) || 30 }))
+                    }
+                    className={errors.timeout ? 'border-red-500' : ''}
+                  />
+                  {errors.timeout && <p className="text-sm text-red-600">{errors.timeout}</p>}
                 </div>
-              </form>
+
+                {/* HTTP Method */}
+                <div className="space-y-2">
+                  <Label htmlFor="method">HTTP Method</Label>
+                  <Select
+                    value={formData.method}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, method: value as MonitorFormData['method'] }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GET">GET</SelectItem>
+                      <SelectItem value="POST">POST</SelectItem>
+                      <SelectItem value="PUT">PUT</SelectItem>
+                      <SelectItem value="DELETE">DELETE</SelectItem>
+                      <SelectItem value="HEAD">HEAD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Monitoring Regions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-6 w-6 text-green-600" />
+                Monitoring Regions
+              </CardTitle>
+              <p className="text-sm text-gray-600 flex items-center gap-2">
+                <Info className="h-4 w-4 text-blue-500" />
+                For now, only <strong>India (Mumbai)</strong> region is available
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {monitoringRegions.map((region) => (
+                  <div 
+                    key={region.value} 
+                    className={`flex items-center space-x-3 p-2 rounded-md ${!region.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <Checkbox
+                      id={region.value}
+                      checked={formData.regions.includes(region.value)}
+                      onCheckedChange={() => toggleRegion(region.value, region.available)}
+                      disabled={!region.available}
+                    />
+                    <Label htmlFor={region.value} className="flex items-center gap-2 cursor-pointer">
+                      <span className="text-lg">{region.flag}</span>
+                      <span>{region.label}</span>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              {errors.regions && <p className="text-sm text-red-600 mt-2">{errors.regions}</p>}
+            </CardContent>
+          </Card>
+
+          {/* Escalation Policies */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-6 w-6 text-red-600" />
+                Escalation Policies
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="space-y-2">
+                  <Label>Select Escalation Policy</Label>
+                  <Select
+                    value={formData.escalationPolicyId}
+                    onValueChange={(value) =>
+                      setFormData(prev => ({ ...prev, escalationPolicyId: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {escalationPolicies.map(policy => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Button variant="outline" className="w-full md:w-auto">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Escalation Policy
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="downtime">Alert after (minutes)</Label>
+                <Select 
+                  value="1"
+                  onValueChange={() => {}}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 minute</SelectItem>
+                    <SelectItem value="3">3 minutes</SelectItem>
+                    <SelectItem value="5">5 minutes</SelectItem>
+                    <SelectItem value="10">10 minutes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submit */}
+          <div className="flex items-center justify-end space-x-4">
+            <Button variant="outline">Cancel</Button>
+            <Button onClick={handleSubmit} disabled={loading} className="min-w-[140px]">
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Create Monitor
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import authRouter from "./routes/authRoute/authroute.js";
 import websiteRouter from "./routes/websiteRoute/websiteroute.js";
+import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -12,6 +13,8 @@ app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*' }));
 app.use(express.json());
 app.use("/auth", authRouter);
 app.use("/website", websiteRouter);
+
+app.use("/escalation-policies", escalationRouter);
 
 
 // Minimal request logger for auth routes

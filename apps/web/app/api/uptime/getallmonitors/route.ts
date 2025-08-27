@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await backendRes.json();
+    console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------from getallmonitorsAction next server page route.ts page.", data);
 
     return NextResponse.json({ success: true, monitors: data }, { status: 200 });
   } catch (error) {

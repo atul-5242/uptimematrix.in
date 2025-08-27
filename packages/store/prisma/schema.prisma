@@ -19,15 +19,134 @@ model User {
   username String    @unique
   password String
   websites website[]
+  escalationPolicies EscalationPolicy[]
+  teamMembers TeamMember[]
+  integrations Integration[]
 } 
 
 model website {
-  id        String        @id @default(uuid())
-  url       String        
-timeAdded DateTime      @default(now())
-  ticks     WebsiteTick[]
-  user      User          @relation(fields: [user_id], references: [id])
-  user_id   String
+  id            String        @id @default(uuid())
+  name          String        @default("Unnamed Monitor")
+  monitorType   MonitorType   @default(https)
+  url           String
+  checkInterval Int           @default(60000)  // this include min+sec(sec which is timeout in frontend).
+  method        Method        @default(GET)
+  regions       String[]      @default(["India"])
+  alertTime     Int           @default(0)
+  severity      Severity      @default(low)
+  timeAdded     DateTime      @default(now())
+  ticks         WebsiteTick[]
+  user          User          @relation(fields: [user_id], references: [id])
+  user_id       String
+  escalationPolicyId String?
+  escalationPolicy   EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id])
+  incidents     Int           @default(0)
+  lastChecked   DateTime      @default(now())
+  currently_upForIndays Int   @default(0)
+  tags String[] @default([])
+  nextCheckTime      DateTime?     // Add this field to store next check time
+}
+
+model EscalationPolicy {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  priorityLevel Priority @default(low)
+  tags        String[] @default([])
+  isActive    Boolean  @default(true)
+
+  // Trigger Conditions (embedded as JSON or separate fields)
+  monitorsDown          Boolean @default(true)
+  responseTimeThreshold Boolean @default(false)
+  responseTimeValue     Int?    @default(5000)
+  sslExpiry            Boolean @default(false)
+  sslExpiryDays        Int?    @default(30)
+  domainExpiry         Boolean @default(false)
+  domainExpiryDays     Int?    @default(30)
+  statusCodeErrors     Boolean @default(false)
+  statusCodes          String[] @default([])
+  heartbeatMissed      Boolean @default(false)
+  heartbeatMissedCount Int?    @default(3)
+
+  steps     EscalationStep[]
+  websites  website[]
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, userId])
+}
+
+
+model EscalationStep {
+  id            String   @id @default(uuid())
+  policyId      String
+  policy        EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  
+  stepOrder     Int      // order of step (1, 2, 3, etc.)
+  
+  // Alert Methods - storing as JSON arrays to match frontend structure
+  primaryMethods     String[] @default([]) // ["email", "sms", "phone"]
+  additionalMethods  String[] @default([]) // ["slack", "discord", "webhook"]
+  
+  recipients    String[] // list of user IDs, team names, or external contacts
+  delayMinutes  Int      @default(0) // wait before this step triggers
+  escalateAfter Int      @default(5) // wait before escalating to next step (in minutes)
+  customMessage String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([policyId, stepOrder]) // ensure unique step order per policy
+}
+
+// Team Members model for the "Notify Who" dropdown
+model TeamMember {
+  id       String   @id @default(uuid())
+  name     String
+  email    String   @unique
+  phone    String?
+  role     String   // "Lead Developer", "DevOps Engineer", etc.
+  isActive Boolean  @default(true)  // is this user actively monitoring?
+  
+  // Special roles
+  isOnCall   Boolean @default(false)  // is this user on call?
+  isTeamLead Boolean @default(false)  // is this user the team lead?
+  
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Integration model to track available notification methods
+model Integration {
+  id          String   @id @default(uuid())
+  name        String   // "Slack", "Discord", "Webhook", etc.
+  type        String   // "slack", "discord", "webhook", "teams", etc.
+  isActive    Boolean  @default(false)
+  isIntegrated Boolean @default(false)
+  
+  // Integration-specific configuration (stored as JSON)
+  configuration Json?   // webhook URLs, channel IDs, etc.
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, type]) // one integration per type per user
+}
+
+enum Priority {
+  critical
+  high
+  medium
+  low
 }
 
 model Region {
@@ -51,4 +170,24 @@ enum WebsiteStatus {
   Online
   Offline
   Unknown
+}
+
+enum MonitorType {
+  https
+  http
+}
+
+enum Method {
+  GET
+  POST
+  PUT
+  DELETE
+  HEAD
+}
+
+enum Severity {
+  critical
+  high
+  medium
+  low
 }
