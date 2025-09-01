@@ -1,6 +1,16 @@
 import { createClient } from "redis";
 
-type WebsiteEvent = { url: string; id: string };
+type WebsiteEvent = { 
+    url: string; 
+    id: string; 
+    checkInterval?: number;
+    method?: string;
+    monitorType?: string;
+    escalationPolicyId?: string;
+    regions?: string[];
+    user_id?: string;
+    region?: string;
+};
 
 export const STREAM_NAME = "betteruptime::website";
 
@@ -37,23 +47,28 @@ export async function getStreamLength() {
     return length;
 }
 
-export async function xAdd({url,id}:WebsiteEvent){
-    await client.xAdd(
-        STREAM_NAME,"*",{
-            url,
-            id
-        }
-    )    
+export async function xAdd(website: WebsiteEvent){
+    const data: any = {
+        url: website.url,
+        id: website.id
+    };
+    
+    // Add optional fields if they exist
+    if (website.checkInterval !== undefined) data.checkInterval = website.checkInterval.toString();
+    if (website.method) data.method = website.method;
+    if (website.monitorType) data.monitorType = website.monitorType;
+    if (website.escalationPolicyId) data.escalationPolicyId = website.escalationPolicyId;
+    if (website.regions) data.regions = JSON.stringify(website.regions);
+    if (website.user_id) data.user_id = website.user_id;
+    if (website.region) data.region = website.region;
+    
+    await client.xAdd(STREAM_NAME, "*", data);
 }
 
 
 export async function xAddBulk(websites:WebsiteEvent[]){
     for (let i = 0; i < websites.length; i++) {
-        await xAdd({
-            // i put ! because it is the website i know it is not null the the loop will start so there i have mentioned by putting ! tbat website must be not empty.
-            url:websites[i]!.url,
-            id:websites[i]!.id
-        })        
+        await xAdd(websites[i]!);        
     }    
 }
 
