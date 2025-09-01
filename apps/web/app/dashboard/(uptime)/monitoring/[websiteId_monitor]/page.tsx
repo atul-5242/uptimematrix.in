@@ -44,6 +44,12 @@ interface WebsiteData {
   uptimeDuration: string;
   incidents: number;
   responseData: { time: string; ms: number }[];
+  // New fields from backend
+  checkInterval?: number;
+  method?: string;
+  monitorType?: string;
+  regions?: string[];
+  tags?: string[];
 }
 
 export default function MonitorPage() {
@@ -52,6 +58,7 @@ export default function MonitorPage() {
 
   const [loading, setLoading] = useState(true);
   const [website, setWebsite] = useState<WebsiteData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const [fromDate, setFromDate] = useState<Date | undefined>(
     new Date("2025-08-04")
@@ -62,31 +69,96 @@ export default function MonitorPage() {
 
   // Fetch website status
   useEffect(() => {
+    let isMounted = true;
+    
     async function fetchStatus() {
       try {
-        console.log("websiteId", websiteId);
+        if (!isMounted) return;
+        
+        setLoading(true);
+        setError(null);
+        
+        if (!websiteId) {
+          throw new Error("Website ID is missing from URL");
+        }
+        
+        console.log("🔍 Fetching website with ID:", websiteId);
+        
         const data = await getWebsiteStatusAction(websiteId);
-        console.log(" data", data);
+        
+        if (!isMounted) return;
+        
+        console.log("✅ Website data received:", data);
+        
+        // Validate the data structure
+        if (!data || !data.id || !data.url) {
+          throw new Error("Invalid website data received from server");
+        }
+        
         setWebsite(data);
-      } catch (err) { 
-        console.error("Failed to fetch website:", err);
+      } catch (err: any) { 
+        if (!isMounted) return;
+        
+        console.error("❌ Failed to fetch website:", err);
+        setError(err.message || "Failed to fetch website details");
+        setWebsite(null);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
-    if (websiteId) fetchStatus();
-  }, [websiteId]);
+    
+    if (websiteId) {
+      fetchStatus();
+    }
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, [websiteId]); // Remove params dependency to prevent unnecessary re-renders
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-background text-foreground p-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Loading website details...</p>
+            <p className="text-sm text-gray-500 mt-2">Website ID: {websiteId}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Website</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-sm text-gray-500">Website ID: {websiteId}</p>
+        </div>
+      </div>
+    );
   }
 
   if (!website) {
-    return <div className="p-8">Website not found.</div>;
+    return (
+      <div className="p-8">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Website Not Found</h2>
+          <p className="text-gray-600 mb-4">The website you're looking for could not be found.</p>
+          <p className="text-sm text-gray-500">Website ID: {websiteId}</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-8 space-y-8">
+    <div key={websiteId} className="min-h-screen bg-background text-foreground p-8 space-y-8">
       {/* Monitor Overview */}
       <Card>
         <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -100,8 +172,10 @@ export default function MonitorPage() {
               {website.url}
             </CardTitle>
             <CardDescription>
-              {website.status === "up" ? "up": website.status === "down"?"Down":"Unknown"} • Checked every 3
-              minutes
+              {website.status === "up" ? "Online" : website.status === "down" ? "Offline" : "Unknown"} • 
+              Checked every {website.checkInterval ? Math.round(website.checkInterval / 1000) : 60} seconds
+              {website.method && ` • ${website.method} method`}
+              {website.monitorType && ` • ${website.monitorType.toUpperCase()}`}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -140,6 +214,45 @@ export default function MonitorPage() {
               <p className="text-lg font-medium">{website.incidents}</p>
             </div>
           </div>
+          
+          {/* Additional website details */}
+          {(website.regions || website.tags) && (
+            <div className="mt-6 pt-6 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {website.regions && website.regions.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Monitoring Regions</p>
+                    <div className="flex flex-wrap gap-2">
+                      {website.regions.map((region, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                        >
+                          {region}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {website.tags && website.tags.length > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-2">
+                      {website.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -158,7 +271,12 @@ export default function MonitorPage() {
           </Tabs>
           <div className="flex items-center gap-2 mb-2">
             <img src="/flags/eu.svg" alt="Europe" className="w-5 h-5" />
-            <span className="text-sm font-medium">Europe</span>
+            <span className="text-sm font-medium">
+              {website.regions && website.regions.length > 0 
+                ? website.regions.join(", ") 
+                : "India"
+              }
+            </span>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -174,6 +292,43 @@ export default function MonitorPage() {
                 />
               </LineChart>
             </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Monitoring Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monitoring Configuration</CardTitle>
+          <CardDescription>Current settings for this monitor</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Check Interval</p>
+              <p className="text-lg font-medium">
+                {website.checkInterval ? Math.round(website.checkInterval / 1000) : 60}s
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">HTTP Method</p>
+              <p className="text-lg font-medium">{website.method || "GET"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Monitor Type</p>
+              <p className="text-lg font-medium">{website.monitorType || "HTTPS"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="text-lg font-medium">
+                <span
+                  className={`inline-block w-3 h-3 rounded-full mr-2 ${
+                    website.status === "up" ? "bg-green-500" : "bg-red-500"
+                  }`}
+                />
+                {website.status === "up" ? "Online" : website.status === "down" ? "Offline" : "Unknown"}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -260,6 +415,23 @@ export default function MonitorPage() {
             Need help? Contact us at{" "}
             <span className="underline">atul.fzdlko2002@gmail.com</span>
           </p>
+          
+          {/* Debug Information - Remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Info</h4>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>Website ID: {website.id}</p>
+                <p>Status: {website.status}</p>
+                <p>Check Interval: {website.checkInterval}ms</p>
+                <p>Method: {website.method}</p>
+                <p>Monitor Type: {website.monitorType}</p>
+                <p>Regions: {website.regions?.join(", ") || "None"}</p>
+                <p>Tags: {website.tags?.join(", ") || "None"}</p>
+                <p>Response Data Points: {website.responseData.length}</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -78,10 +78,19 @@ export async function createMonitorAction(data: MonitorFormData) {
 }
 
 export async function getWebsiteStatusAction(websiteId: string) {
+  const token = localStorage.getItem("auth_token");
+  if (!token) {
+    throw new Error("Authentication token not found");
+  }
+
   const res = await fetch(`/api/uptime/monitor/${websiteId}`, {
     method: "GET",
-    credentials: "include", // if using cookies/session
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
   });
+  
   console.log("res>>>>>>>>>>>>>>>>>>>>>>>>>>", res);
   if (!res.ok) {
     const err = await res.json();
@@ -90,24 +99,30 @@ export async function getWebsiteStatusAction(websiteId: string) {
 
   const data = await res.json();
   console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------", data.data);
+  
   // Transform API -> UI format
   return {
     id: data.data.id,
-    incidents: 0, // backend doesn’t send yet
-    lastChecked: new Date().toISOString(), // backend doesn’t send, so fake for now
+    incidents: data.data.incidents || 0,
+    lastChecked: data.data.lastChecked || new Date().toISOString(),
     responseData: data.data.ticks
-    ? data.data.ticks.map((tick: any) => ({
-        time: new Date(tick.createdAt).toLocaleTimeString(),
-        ms: tick.response_time_ms,
-      }))
+      ? data.data.ticks.map((tick: any) => ({
+          time: new Date(tick.createdAt).toLocaleTimeString(),
+          ms: tick.response_time_ms,
+        }))
       : [],
     status: data.data.status?.toLowerCase() === "online"
       ? "up"
-      : data.status?.toLowerCase() === "offline"
+      : data.data.status?.toLowerCase() === "offline"
         ? "down"
         : "unknown",
-
-        uptimeDuration: "3 days 4 hrs", // backend doesn’t send yet → static placeholder
-        url: data.data.url,
+    uptimeDuration: "3 days 4 hrs", // backend doesn't send yet → static placeholder
+    url: data.data.url,
+    // Add new fields that backend now provides
+    checkInterval: data.data.checkInterval,
+    method: data.data.method,
+    monitorType: data.data.monitorType,
+    regions: data.data.regions,
+    tags: data.data.tags,
   };
 }

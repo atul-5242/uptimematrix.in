@@ -34,7 +34,7 @@ export const addWebsite = async (req: Request, res: Response) => {
                 escalationPolicyId: escalationPolicyId || null,
                 tags: tags || [],
                 timeAdded: new Date(),
-                nextCheckTime: new Date(),
+                nextCheckTime: new Date(Date.now() + 5000), // Set to 5 seconds from now for first monitoring cycle
                 user_id: req.userId!, // ✅ correct field name
             },
         });
@@ -66,16 +66,28 @@ export const addWebsite = async (req: Request, res: Response) => {
                 data: {
                     response_time_ms: responseTime,
                     status,
-                    Website_: { connect: { id: website.id } },
-                    Region_: { connect: { id: region.id } },
+                    website_id: website.id,  // ✅ Fixed: use correct field name
+                    region_id: region.id,    // ✅ Fixed: use correct field name
                 },
             });
         }
+
+        // 4️⃣ Update website with first check results and set proper nextCheckTime
+        const nextCheckTime = new Date(Date.now() + (website.checkInterval || 60000));
+        await prismaClient.website.update({
+            where: { id: website.id },
+            data: {
+                lastChecked: new Date(),
+                nextCheckTime: nextCheckTime, // Set proper next check time based on interval
+                currently_upForIndays: status === WebsiteStatus.Online ? 1 : 0,
+            },
+        });
 
         res.json({
             message: "✅ Website added and first check done",
             id: website.id,
             initialStatus: status,
+            nextCheckTime: nextCheckTime.toISOString(),
         });
 
     } catch (error) {
@@ -91,8 +103,7 @@ export const getWebsiteStatus = async (req: Request, res: Response) => {
       where: { user_id: req.userId!, id: req.params.websiteId },
       include: { ticks: { orderBy: [{ createdAt: "desc" }], take: 20 } }, // fetch more ticks
       orderBy: { timeAdded: "desc" },
-    }
-  );
+    });
   
     if (!website) {
       res.status(409).json({ message: "Website not found" });
@@ -105,6 +116,13 @@ export const getWebsiteStatus = async (req: Request, res: Response) => {
       status: website.ticks[0]?.status,
       id: website.id,
       userId: website.user_id,
+      incidents: website.incidents || 0,
+      lastChecked: website.lastChecked || website.timeAdded,
+      checkInterval: website.checkInterval,
+      method: website.method,
+      monitorType: website.monitorType,
+      regions: website.regions,
+      tags: website.tags,
       ticks: website.ticks.map((t:any) => ({
         response_time_ms: t.response_time_ms,
         createdAt: t.createdAt,

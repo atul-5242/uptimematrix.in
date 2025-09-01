@@ -17,6 +17,7 @@ import {
   Plus,
   Info
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface MonitorFormData {
   name: string
@@ -35,6 +36,7 @@ interface FormErrors {
 }
 
 export default function MonitorCreatePage() {
+  const router = useRouter()
   const [formData, setFormData] = useState<MonitorFormData>({
     name: '',
     url: '',
@@ -158,7 +160,7 @@ export default function MonitorCreatePage() {
         const err = await response.json().catch(() => ({}))
         throw new Error(err.message || 'Failed to create monitor')
       }
-
+      router.push('/dashboard/monitoring')  
       alert('Monitor created successfully!')
     } catch (error) {
       console.error('Error creating monitor:', error)

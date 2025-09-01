@@ -3,12 +3,10 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Filter, Plus, Eye, MessageSquare, Users, Calendar, TrendingUp, Globe, Zap, Bell, Settings } from 'lucide-react'
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Plus, Eye, TrendingUp, Globe, Users } from 'lucide-react'
 
 type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
 type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low'
@@ -21,13 +19,12 @@ type Incident = {
   severity: IncidentSeverity
   affectedServices: string[]
   createdAt: string
-  acknowledgedAt?: string
   resolvedAt?: string
   assignee?: string
-  responseTime: number
-  downtime: number
-  impactedUsers: number
-  escalationLevel: number
+  responseTime: number // minutes
+  escalationPolicy: {
+    name: string
+  }
   tags: string[]
 }
 
@@ -39,7 +36,6 @@ type IncidentStats = {
   resolved: number
   avgResponseTime: number
   avgResolutionTime: number
-  mttr: number
   uptime: number
 }
 
@@ -54,23 +50,27 @@ export default function IncidentsPage() {
     resolved: 0,
     avgResponseTime: 0,
     avgResolutionTime: 0,
-    mttr: 0,
     uptime: 99.9
   })
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [severityFilter, setSeverityFilter] = useState<string>('all')
   const [activeTab, setActiveTab] = useState('active')
+
+  // Helper to format minutes to "Xm" or "Yh Zm"
+  const formatDuration = (minutes: number) => {
+    if (!minutes || minutes <= 0) return '0m'
+    if (minutes < 60) return `${minutes}m`
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours}h ${mins}m`
+  }
 
   // Demo data - replace with API calls
   useEffect(() => {
     const fetchIncidents = async () => {
       setLoading(true)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      await new Promise(resolve => setTimeout(resolve, 800))
+
       const demoIncidents: Incident[] = [
         {
           id: '1',
@@ -80,12 +80,9 @@ export default function IncidentsPage() {
           severity: 'critical',
           affectedServices: ['youtube.com', 'API Gateway', 'Video Streaming'],
           createdAt: '2024-01-15T10:30:00Z',
-          acknowledgedAt: '2024-01-15T10:32:00Z',
           assignee: 'John Doe',
           responseTime: 2,
-          downtime: 45,
-          impactedUsers: 15420,
-          escalationLevel: 2,
+          escalationPolicy: { name: "Critical API Escalation Policy" },
           tags: ['api', 'timeout', 'performance']
         },
         {
@@ -96,12 +93,9 @@ export default function IncidentsPage() {
           severity: 'high',
           affectedServices: ['Main Database', 'User Authentication'],
           createdAt: '2024-01-15T09:15:00Z',
-          acknowledgedAt: '2024-01-15T09:17:00Z',
           assignee: 'Jane Smith',
-          responseTime: 2,
-          downtime: 0,
-          impactedUsers: 8750,
-          escalationLevel: 1,
+          responseTime: 5,
+          escalationPolicy: { name: "Database Reliability Policy" },
           tags: ['database', 'connection', 'performance']
         },
         {
@@ -112,10 +106,9 @@ export default function IncidentsPage() {
           severity: 'medium',
           affectedServices: ['subdomain.example.com'],
           createdAt: '2024-01-15T08:00:00Z',
+          assignee: 'Ops Team',
           responseTime: 0,
-          downtime: 0,
-          impactedUsers: 0,
-          escalationLevel: 0,
+          escalationPolicy: { name: "Security Alerts Policy" },
           tags: ['ssl', 'certificate', 'security']
         },
         {
@@ -126,55 +119,31 @@ export default function IncidentsPage() {
           severity: 'medium',
           affectedServices: ['CDN', 'Static Assets', 'Image Delivery'],
           createdAt: '2024-01-14T16:45:00Z',
-          acknowledgedAt: '2024-01-14T16:47:00Z',
           resolvedAt: '2024-01-14T18:30:00Z',
           assignee: 'Mike Wilson',
-          responseTime: 2,
-          downtime: 0,
-          impactedUsers: 5200,
-          escalationLevel: 1,
+          responseTime: 10,
+          escalationPolicy: { name: "CDN Escalation Policy" },
           tags: ['cdn', 'performance', 'asia-pacific']
-        },
-        {
-          id: '5',
-          title: 'Load Balancer Health Check Failures',
-          description: 'Multiple backend servers failing health checks',
-          status: 'closed',
-          severity: 'high',
-          affectedServices: ['Load Balancer', 'Web Servers'],
-          createdAt: '2024-01-13T14:20:00Z',
-          acknowledgedAt: '2024-01-13T14:22:00Z',
-          resolvedAt: '2024-01-13T15:10:00Z',
-          assignee: 'Sarah Johnson',
-          responseTime: 2,
-          downtime: 48,
-          impactedUsers: 12300,
-          escalationLevel: 2,
-          tags: ['load-balancer', 'health-check', 'infrastructure']
         }
       ]
-      
+
       setIncidents(demoIncidents)
-      
-      // Calculate stats
-      const activeIncidents = demoIncidents.filter(i => ['open', 'acknowledged', 'investigating'].includes(i.status))
-      const resolvedIncidents = demoIncidents.filter(i => ['resolved', 'closed'].includes(i.status))
-      
+
+      const avgResponse = Math.round(demoIncidents.reduce((acc, i) => acc + (i.responseTime || 0), 0) / demoIncidents.length)
+
       setStats({
         total: demoIncidents.length,
         open: demoIncidents.filter(i => i.status === 'open').length,
         acknowledged: demoIncidents.filter(i => i.status === 'acknowledged').length,
         investigating: demoIncidents.filter(i => i.status === 'investigating').length,
         resolved: demoIncidents.filter(i => ['resolved', 'closed'].includes(i.status)).length,
-        avgResponseTime: Math.round(demoIncidents.reduce((acc, i) => acc + i.responseTime, 0) / demoIncidents.length),
-        avgResolutionTime: 67,
-        mttr: 45,
+        avgResponseTime: avgResponse,
+        avgResolutionTime: 0,
         uptime: 99.94
       })
-      
       setLoading(false)
     }
-    
+
     fetchIncidents()
   }, [])
 
@@ -186,16 +155,6 @@ export default function IncidentsPage() {
       case 'resolved': return 'bg-green-100 text-green-800 border-green-200'
       case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const getSeverityColor = (severity: IncidentSeverity) => {
-    switch (severity) {
-      case 'critical': return 'bg-red-500'
-      case 'high': return 'bg-orange-500'
-      case 'medium': return 'bg-yellow-500'
-      case 'low': return 'bg-blue-500'
-      default: return 'bg-gray-500'
     }
   }
 
@@ -211,26 +170,18 @@ export default function IncidentsPage() {
   }
 
   const filteredIncidents = incidents.filter(incident => {
-    const matchesSearch = incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         incident.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         incident.affectedServices.some(service => service.toLowerCase().includes(searchQuery.toLowerCase()))
-    
-    const matchesStatus = statusFilter === 'all' || incident.status === statusFilter
-    const matchesSeverity = severityFilter === 'all' || incident.severity === severityFilter
-    
-    const matchesTab = activeTab === 'all' || 
-                      (activeTab === 'active' && ['open', 'acknowledged', 'investigating'].includes(incident.status)) ||
-                      (activeTab === 'resolved' && ['resolved', 'closed'].includes(incident.status))
-    
-    return matchesSearch && matchesStatus && matchesSeverity && matchesTab
-  })
+    const q = searchQuery.toLowerCase()
+    const matchesSearch =
+      incident.title.toLowerCase().includes(q) ||
+      incident.description.toLowerCase().includes(q) ||
+      incident.affectedServices.some(s => s.toLowerCase().includes(q))
 
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return `${hours}h ${mins}m`
-  }
+    const matchesTab = activeTab === 'all' ||
+      (activeTab === 'active' && ['open', 'acknowledged', 'investigating'].includes(incident.status)) ||
+      (activeTab === 'resolved' && ['resolved', 'closed'].includes(incident.status))
+
+    return matchesSearch && matchesTab
+  })
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -239,7 +190,7 @@ export default function IncidentsPage() {
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(minutes / 60)
     const days = Math.floor(hours / 24)
-    
+
     if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
     if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
     return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
@@ -251,11 +202,6 @@ export default function IncidentsPage() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="animate-pulse">
             <div className="h-8 bg-gray-300 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-300 rounded"></div>
-              ))}
-            </div>
             <div className="h-64 bg-gray-300 rounded"></div>
           </div>
         </div>
@@ -292,8 +238,8 @@ export default function IncidentsPage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Stats Cards: Active, Resolved, Total */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card className="bg-white/70 backdrop-blur-sm border-red-200/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -322,84 +268,32 @@ export default function IncidentsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 backdrop-blur-sm border-blue-200/50">
+          <Card className="bg-white/70 backdrop-blur-sm border-gray-200/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-600 text-sm font-medium">MTTR</p>
-                  <p className="text-2xl font-bold text-blue-700">{formatDuration(stats.mttr)}</p>
+                  <p className="text-gray-600 text-sm font-medium">Total Incidents</p>
+                  <p className="text-2xl font-bold text-gray-700">{stats.total}</p>
                 </div>
-                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/70 backdrop-blur-sm border-purple-200/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-600 text-sm font-medium">Uptime</p>
-                  <p className="text-2xl font-bold text-purple-700">{stats.uptime}%</p>
-                </div>
-                <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-purple-600" />
+                <div className="h-12 w-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-gray-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters and Search */}
+        {/* Search Only */}
         <Card className="bg-white/70 backdrop-blur-sm border-gray-200/70 mb-6">
           <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search incidents, services, or descriptions..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                    <SelectItem value="investigating">Investigating</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={severityFilter} onValueChange={setSeverityFilter}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Severity</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  More Filters
-                </Button>
-              </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search incidents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </CardContent>
         </Card>
@@ -427,7 +321,7 @@ export default function IncidentsPage() {
                 <div className="p-12 text-center">
                   <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No incidents found</h3>
-                  <p className="text-gray-600">Try adjusting your search or filter criteria.</p>
+                  <p className="text-gray-600">Try adjusting your search text.</p>
                 </div>
               ) : (
                 filteredIncidents.map((incident) => (
@@ -437,9 +331,6 @@ export default function IncidentsPage() {
                     onClick={() => router.push(`/dashboard/incidents/${incident.id}`)}
                   >
                     <div className="flex items-start gap-4">
-                      {/* Severity Indicator */}
-                      <div className={`w-1 h-16 rounded ${getSeverityColor(incident.severity)}`} />
-                      
                       {/* Main Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
@@ -450,9 +341,6 @@ export default function IncidentsPage() {
                             <Badge className={getStatusColor(incident.status)}>
                               {getStatusIcon(incident.status)}
                               <span className="ml-1 capitalize">{incident.status}</span>
-                            </Badge>
-                            <Badge variant="outline" className="capitalize">
-                              {incident.severity}
                             </Badge>
                           </div>
                           <div className="text-sm text-gray-500">
@@ -465,66 +353,50 @@ export default function IncidentsPage() {
                         </p>
 
                         {/* Affected Services */}
-                        <div className="flex flex-wrap gap-1 mb-3">
-                          {incident.affectedServices.map((service, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              <Globe className="h-3 w-3 mr-1" />
-                              {service}
-                            </Badge>
-                          ))}
-                        </div>
+                        {incident.affectedServices?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {incident.affectedServices.map((service, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs flex items-center gap-1">
+                                <Globe className="h-3 w-3" />
+                                {service}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
 
-                        {/* Metadata */}
-                        <div className="flex items-center gap-6 text-sm text-gray-500">
+                        {/* Metadata: assignee + responseTime + escalationPolicy */}
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-2">
                           {incident.assignee && (
                             <div className="flex items-center gap-1">
                               <Users className="h-4 w-4" />
                               <span>{incident.assignee}</span>
                             </div>
                           )}
-                          
-                          {incident.responseTime > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              <span>Response: {formatDuration(incident.responseTime)}</span>
-                            </div>
-                          )}
-                          
-                          {incident.downtime > 0 && (
-                            <div className="flex items-center gap-1">
-                              <XCircle className="h-4 w-4" />
-                              <span>Downtime: {formatDuration(incident.downtime)}</span>
-                            </div>
-                          )}
 
-                          {incident.impactedUsers > 0 && (
-                            <div className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              <span>{incident.impactedUsers.toLocaleString()} users affected</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            <span>Response: {formatDuration(incident.responseTime)}</span>
+                          </div>
 
-                          {incident.escalationLevel > 0 && (
+                          {incident.escalationPolicy?.name && (
                             <div className="flex items-center gap-1">
-                              <Bell className="h-4 w-4" />
-                              <span>Escalation Level {incident.escalationLevel}</span>
+                              <span className="font-medium text-gray-700">Escalation:</span>
+                              <span>{incident.escalationPolicy.name}</span>
                             </div>
                           )}
                         </div>
 
                         {/* Tags */}
-                        {incident.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-3">
+                        {incident.tags?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
                             {incident.tags.map((tag, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
-                                #{tag}
-                              </Badge>
+                              <Badge key={index} variant="outline" className="text-xs">#{tag}</Badge>
                             ))}
                           </div>
                         )}
                       </div>
 
-                      {/* Action Buttons */}
+                      {/* View Button */}
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="ghost" 
@@ -535,16 +407,6 @@ export default function IncidentsPage() {
                           }}
                         >
                           <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Handle comment action
-                          }}
-                        >
-                          <MessageSquare className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

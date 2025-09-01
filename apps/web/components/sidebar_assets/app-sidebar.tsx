@@ -59,10 +59,6 @@ const data = {
           url: "/dashboard/monitoring",
         },
         {
-          title: "Heartbeats",
-          url: "/dashboard/heartbeats",
-        },
-        {
           title: "Status pages",
           url: "/dashboard/status-pages",
         },
@@ -77,7 +73,7 @@ const data = {
       ],
     },
     {
-      title: "Telemetry",
+      title: "Telemetry (upcoming)",
       url: "#",
       icon: Bot,
       items: [
@@ -98,15 +94,15 @@ const data = {
       items: [
         {
           title: "Account Settings",
-          url: "#",
+          url: "/dashboard/settings/account_settings",
         },
         {
           title: "Team",
-          url: "#",
+          url: "/dashboard/settings/teams",
         },
         {
           title: "Billing",
-          url: "#",
+          url: "/dashboard/settings/billings",
         },
       ],
     },

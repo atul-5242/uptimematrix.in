@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { AlertTriangle, Clock, CheckCircle, XCircle, ArrowLeft, MessageSquare, Users, Calendar, Activity, Globe, Zap, Bell, Send, Edit3, Save, X, Plus, TrendingUp, AlertCircle, Eye, FileText, Link2 } from 'lucide-react'
+import { AlertTriangle, Clock, CheckCircle, XCircle, ArrowLeft, MessageSquare, Users, Calendar, Activity, Globe, Zap, Bell, Send, Edit3, Save, X, Plus, TrendingUp, AlertCircle, Eye, FileText, Link2, BookOpen } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
@@ -21,7 +21,7 @@ type IncidentUpdate = {
   status?: IncidentStatus
   author: string
   timestamp: string
-  type: 'status_change' | 'comment' | 'assignment' | 'escalation'
+  type: 'status_change' | 'comment' | 'assignment' | 'escalation' | 'incident_report'
 }
 
 type Incident = {
@@ -55,9 +55,11 @@ export default function IncidentDetailPage() {
   
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
+  // NOTE: two separate loading states to keep action button UI and posting UI independent
+  const [updating, setUpdating] = useState(false) // used for Post Update
+  const [actionLoading, setActionLoading] = useState(false) // used for Acknowledge/Resolve
   const [newUpdate, setNewUpdate] = useState('')
-  const [newStatus, setNewStatus] = useState<IncidentStatus | ''>('')
+  const [updateType, setUpdateType] = useState<'comment' | 'incident_report'>('comment')
   const [isEditing, setIsEditing] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [editedDescription, setEditedDescription] = useState('')
@@ -76,7 +78,7 @@ export default function IncidentDetailPage() {
         title: 'YouTube.com API Gateway Timeout',
         description: 'API gateway experiencing high latency and timeout errors affecting video streaming and user authentication services. Multiple regions reporting increased response times.',
         status: 'investigating',
-        severity: 'critical',
+        severity: 'low',
         affectedServices: ['youtube.com', 'API Gateway', 'Video Streaming', 'User Authentication'],
         createdAt: '2024-01-15T10:30:00Z',
         acknowledgedAt: '2024-01-15T10:32:00Z',
@@ -177,7 +179,7 @@ export default function IncidentDetailPage() {
   }
 
   const handleUpdateSubmit = async () => {
-    if (!newUpdate.trim() && !newStatus) return
+    if (!newUpdate.trim()) return
     
     setUpdating(true)
     
@@ -187,25 +189,59 @@ export default function IncidentDetailPage() {
       
       const update: IncidentUpdate = {
         id: Date.now().toString(),
-        message: newUpdate || `Status changed to ${newStatus}`,
-        status: newStatus || undefined,
-        type: newStatus ? 'status_change' : 'comment',
+        message: newUpdate,
+        type: updateType === 'incident_report' ? 'incident_report' : 'comment',
         author: 'Current User',
         timestamp: new Date().toISOString()
       }
       
-      setIncident(prev => prev ? {
+      setIncident(prev => prev ? ({
         ...prev,
-        status: newStatus || prev.status,
         updates: [...prev.updates, update]
-      } : null)
+      } as Incident) : null)
       
       setNewUpdate('')
-      setNewStatus('')
+      setUpdateType('comment')
     } catch (error) {
       console.error('Error updating incident:', error)
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleActionClick = async () => {
+    if (!incident) return
+    setActionLoading(true)
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // If not acknowledged yet, acknowledge. If acknowledged, resolve.
+      if (incident.status !== 'acknowledged' && incident.status !== 'resolved' && incident.status !== 'closed') {
+        const update: IncidentUpdate = {
+          id: Date.now().toString(),
+          message: `Incident acknowledged by Current User.`,
+          status: 'acknowledged',
+          type: 'status_change',
+          author: 'Current User',
+          timestamp: new Date().toISOString()
+        }
+        setIncident(prev => prev ? ({ ...prev, status: 'acknowledged', acknowledgedAt: new Date().toISOString(), updates: [...prev.updates, update] }) : null)
+      } else if (incident.status === 'acknowledged') {
+        const update: IncidentUpdate = {
+          id: Date.now().toString(),
+          message: `Incident resolved by Current User.`,
+          status: 'resolved',
+          type: 'status_change',
+          author: 'Current User',
+          timestamp: new Date().toISOString()
+        }
+        setIncident(prev => prev ? ({ ...prev, status: 'resolved', resolvedAt: new Date().toISOString(), updates: [...prev.updates, update] }) : null)
+      }
+    } catch (error) {
+      console.error('Error performing action:', error)
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -216,11 +252,11 @@ export default function IncidentDetailPage() {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      setIncident(prev => prev ? {
+      setIncident(prev => prev ? ({
         ...prev,
         title: editedTitle,
         description: editedDescription
-      } : null)
+      } as Incident) : null)
       
       setIsEditing(false)
     } catch (error) {
@@ -302,7 +338,7 @@ export default function IncidentDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
                 <div className={`w-1 h-8 rounded ${getSeverityColor(incident.severity)}`} />
                 {isEditing ? (
                   <Input
@@ -332,28 +368,42 @@ export default function IncidentDetailPage() {
                 <span>Incident #{incident.id}</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {isEditing ? (
-                <>
-                  <Button size="sm" onClick={handleSaveEdit} disabled={updating}>
-                    <Save className="h-4 w-4 mr-1" />
-                    Save
+
+            {/* Action Button and acknowledgements/resolution info */}
+            <div className="flex flex-col items-end gap-2">
+              {incident.status !== 'resolved' && incident.status !== 'closed' && (
+                incident.status === 'acknowledged' ? (
+                  <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
+                    <CheckCircle className="h-4 w-4 mr-1" /> Resolve
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
-                    <X className="h-4 w-4 mr-1" />
-                    Cancel
+                ) : (
+                  <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
+                    Acknowledge
                   </Button>
-                </>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit3 className="h-4 w-4 mr-1" />
-                  Edit
-                </Button>
+                )
               )}
-              <Button size="sm" onClick={() => router.push(`/dashboard/incidents/${incident.id}/postmortem`)}>
-                <FileText className="h-4 w-4 mr-1" />
-                Postmortem
-              </Button>
+
+              {/* Permanent label after resolve / acknowledged */}
+              {incident.status === 'resolved' && (
+                <div className="inline-flex items-center gap-2 bg-green-600 text-white text-sm px-3 py-1 rounded">
+                  <CheckCircle className="h-4 w-4" /> Resolved
+                </div>
+              )}
+
+              {incident.status === 'acknowledged' && !incident.resolvedAt && (
+                <div className="inline-flex items-center gap-2 bg-yellow-500 text-white text-sm px-3 py-1 rounded">
+                  <Clock className="h-4 w-4" /> Acknowledged
+                </div>
+              )}
+
+              <div className="text-sm text-gray-600">
+                {incident.acknowledgedAt && (
+                  <div>Acknowledged by Current User at {new Date(incident.acknowledgedAt).toLocaleString()}</div>
+                )}
+                {incident.resolvedAt && (
+                  <div>Resolved by Current User at {new Date(incident.resolvedAt).toLocaleString()}</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -383,14 +433,12 @@ export default function IncidentDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Tabs */}
+            {/* Tabs (only Timeline) */}
             <Card className="bg-white/70 backdrop-blur-sm border-gray-200/70">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <CardHeader>
-                  <TabsList className="grid w-full grid-cols-3">
+                  <TabsList className="grid w-full grid-cols-1">
                     <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                    <TabsTrigger value="metrics">Metrics</TabsTrigger>
-                    <TabsTrigger value="related">Related</TabsTrigger>
                   </TabsList>
                 </CardHeader>
                 
@@ -400,28 +448,23 @@ export default function IncidentDetailPage() {
                     <div className="p-4 border border-gray-200 rounded-lg bg-gray-50/50">
                       <div className="space-y-4">
                         <Textarea
-                          placeholder="Add an update, comment, or status change..."
+                          placeholder="Add an update, comment, or incident report..."
                           value={newUpdate}
                           onChange={(e) => setNewUpdate(e.target.value)}
                           rows={3}
                         />
                         <div className="flex items-center justify-between">
-                        <Select value={newStatus || "none"} onValueChange={(value) => 
-  setNewStatus(value === "none" ? "" : (value as IncidentStatus))
-}>
-  <SelectTrigger className="w-48">
-    <SelectValue placeholder="Change status (optional)" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="none">No status change</SelectItem>
-    <SelectItem value="acknowledged">Acknowledged</SelectItem>
-    <SelectItem value="investigating">Investigating</SelectItem>
-    <SelectItem value="resolved">Resolved</SelectItem>
-    <SelectItem value="closed">Closed</SelectItem>
-  </SelectContent>
-</Select>
+                          <Select value={updateType} onValueChange={(value) => setUpdateType(value as 'comment' | 'incident_report')}>
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="comment">Comment</SelectItem>
+                              <SelectItem value="incident_report">Incident Report</SelectItem>
+                            </SelectContent>
+                          </Select>
 
-                          <Button onClick={handleUpdateSubmit} disabled={updating || (!newUpdate.trim() && !newStatus)}>
+                          <Button onClick={handleUpdateSubmit} disabled={updating || !newUpdate.trim()}>
                             <Send className="h-4 w-4 mr-2" />
                             {updating ? 'Posting...' : 'Post Update'}
                           </Button>
@@ -439,6 +482,8 @@ export default function IncidentDetailPage() {
                             }`}>
                               {update.type === 'status_change' ? (
                                 <Activity className="h-4 w-4 text-blue-600" />
+                              ) : update.type === 'incident_report' ? (
+                                <BookOpen className="h-4 w-4 text-purple-600" />
                               ) : (
                                 <MessageSquare className="h-4 w-4 text-gray-600" />
                               )}
@@ -467,44 +512,6 @@ export default function IncidentDetailPage() {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </CardContent>
-                </TabsContent>
-
-                <TabsContent value="metrics">
-                  <CardContent className="space-y-6">
-                    {/* Response Time Chart */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-4">Response Time Trend</h4>
-                      <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border">
-                        <div className="text-center">
-                          <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-gray-600">Response time metrics would be displayed here</p>
-                          <p className="text-sm text-gray-500">Current avg: 650ms</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Error Rate Chart */}
-                    <div>
-                      <h4 className="text-lg font-semibold mb-4">Error Rate</h4>
-                      <div className="h-64 bg-gray-50 rounded-lg flex items-center justify-center border">
-                        <div className="text-center">
-                          <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-gray-600">Error rate metrics would be displayed here</p>
-                          <p className="text-sm text-gray-500">Current rate: 1.2%</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </TabsContent>
-
-                <TabsContent value="related">
-                  <CardContent>
-                    <div className="text-center py-12">
-                      <Link2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h4 className="text-lg font-semibold text-gray-600 mb-2">No related incidents</h4>
-                      <p className="text-gray-500">Related incidents and dependencies would appear here</p>
                     </div>
                   </CardContent>
                 </TabsContent>
@@ -552,18 +559,6 @@ export default function IncidentDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-500">Response Time</label>
                     <p className="mt-1 text-sm text-gray-900">{formatDuration(incident.responseTime)}</p>
-                  </div>
-
-                  {incident.downtime > 0 && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Downtime</label>
-                      <p className="mt-1 text-sm text-gray-900">{formatDuration(incident.downtime)}</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Impacted Users</label>
-                    <p className="mt-1 text-sm text-gray-900">{incident.impactedUsers.toLocaleString()}</p>
                   </div>
 
                   {incident.escalationLevel > 0 && (
@@ -615,33 +610,7 @@ export default function IncidentDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
-            <Card className="bg-white/70 backdrop-blur-sm border-gray-200/70">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-blue-600" />
-                  Quick Actions
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <Users className="h-4 w-4 mr-2" />
-                  Reassign Incident
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Escalate
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Notify Team
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Create Postmortem
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Quick Actions removed as requested */}
           </div>
         </div>
       </div>

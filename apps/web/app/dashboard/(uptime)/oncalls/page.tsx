@@ -1,695 +1,1026 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
+  Users, 
+  User, 
+  Clock, 
   Phone, 
   Mail, 
-  Clock, 
-  Users, 
-  AlertTriangle, 
+  Shield, 
   Settings, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  RotateCcw,
-  Calendar,
-  Bell,
-  Shield,
-  User,
-  ChevronDown,
-  ChevronRight,
-  Activity,
-  Timer,
+  Calendar, 
+  Bell, 
   CheckCircle,
-  XCircle
-} from 'lucide-react';
+  AlertTriangle,
+  Info,
+  UserCheck,
+  // Team,
+  Save,
+  X,
+  Plus,
+  Eye,
+  PersonStanding
+} from 'lucide-react'
 
-const WhosOnCallPage = () => {
-  const [activeTab, setActiveTab] = useState('current');
-  const [showCreateSchedule, setShowCreateSchedule] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState('all');
-  const [expandedSchedules, setExpandedSchedules] = useState({});
+type OnCallPerson = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  avatar?: string;
+  isActive: boolean;
+}
 
-  // Mock data for demonstration
-  const [currentOnCall] = useState([
-    {
-      id: 1,
-      team: 'Frontend',
-      primary: { name: 'John Doe', phone: '+1-555-0101', email: 'john@company.com', avatar: 'JD' },
-      secondary: { name: 'Sarah Wilson', phone: '+1-555-0102', email: 'sarah@company.com', avatar: 'SW' },
-      schedule: 'Frontend Rotation',
-      shiftStart: '2024-08-26T08:00:00',
-      shiftEnd: '2024-08-27T08:00:00',
-      status: 'active',
-      lastResponse: '2 minutes ago'
-    },
-    {
-      id: 2,
-      team: 'Backend',
-      primary: { name: 'Mike Johnson', phone: '+1-555-0201', email: 'mike@company.com', avatar: 'MJ' },
-      secondary: { name: 'Lisa Chen', phone: '+1-555-0202', email: 'lisa@company.com', avatar: 'LC' },
-      schedule: 'Backend 24/7',
-      shiftStart: '2024-08-26T00:00:00',
-      shiftEnd: '2024-08-27T00:00:00',
-      status: 'active',
-      lastResponse: '5 minutes ago'
-    },
-    {
-      id: 3,
-      team: 'DevOps',
-      primary: { name: 'Alex Turner', phone: '+1-555-0301', email: 'alex@company.com', avatar: 'AT' },
-      secondary: { name: 'Emma Davis', phone: '+1-555-0302', email: 'emma@company.com', avatar: 'ED' },
-      schedule: 'Infrastructure Watch',
-      shiftStart: '2024-08-26T06:00:00',
-      shiftEnd: '2024-08-27T06:00:00',
-      status: 'active',
-      lastResponse: '1 minute ago'
-    }
-  ]);
+type OnCallTeam = {
+  id: string;
+  name: string;
+  description: string;
+  members: OnCallPerson[];
+  schedule: string;
+  isActive: boolean;
+}
 
-  const [schedules] = useState([
-    {
-      id: 1,
-      name: 'Frontend Rotation',
-      team: 'Frontend',
-      type: 'Weekly',
-      timezone: 'UTC-8',
-      members: 4,
-      nextRotation: '2024-08-27T08:00:00',
-      status: 'active'
-    },
-    {
-      id: 2,
-      name: 'Backend 24/7',
-      team: 'Backend',
-      type: 'Daily',
-      timezone: 'UTC-8',
-      members: 6,
-      nextRotation: '2024-08-27T00:00:00',
-      status: 'active'
-    },
-    {
-      id: 3,
-      name: 'Infrastructure Watch',
-      team: 'DevOps',
-      type: 'Custom',
-      timezone: 'UTC-8',
-      members: 3,
-      nextRotation: '2024-08-27T06:00:00',
-      status: 'active'
-    }
-  ]);
+type OnCallConfig = {
+  selectedPersons: string[];
+  selectedTeams: string[];
+  notes: string;
+  fallbackToAdmin: boolean;
+}
 
-  const [recentIncidents] = useState([
-    {
-      id: 1,
-      title: 'API Gateway Timeout',
-      severity: 'high',
-      assignedTo: 'Mike Johnson',
-      team: 'Backend',
-      createdAt: '2024-08-26T10:30:00',
-      responseTime: '2 minutes',
-      status: 'resolved'
-    },
-    {
-      id: 2,
-      title: 'Frontend Build Failed',
-      severity: 'medium',
-      assignedTo: 'John Doe',
-      team: 'Frontend',
-      createdAt: '2024-08-26T09:15:00',
-      responseTime: '5 minutes',
-      status: 'investigating'
-    }
-  ]);
-
-  const teams = ['all', 'Frontend', 'Backend', 'DevOps', 'QA', 'Security'];
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getTimeUntilRotation = (rotationTime) => {
-    const now = new Date();
-    const rotation = new Date(rotationTime);
-    const diff = rotation - now;
-    
-    if (diff < 0) return 'Overdue';
-    
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 24) {
-      const days = Math.floor(hours / 24);
-      return `${days}d ${hours % 24}h`;
-    }
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-  };
-
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case 'high': return 'text-red-600 bg-red-50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50';
-      case 'low': return 'text-blue-600 bg-blue-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'resolved': return 'text-green-600 bg-green-50';
-      case 'investigating': return 'text-yellow-600 bg-yellow-50';
-      case 'escalated': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const filteredOnCall = selectedTeam === 'all' 
-    ? currentOnCall 
-    : currentOnCall.filter(item => item.team === selectedTeam);
-
-  const filteredSchedules = selectedTeam === 'all' 
-    ? schedules 
-    : schedules.filter(schedule => schedule.team === selectedTeam);
-
+// Modal Component for Person Details
+function PersonDetailsModal({ person, isOpen, onClose }: { person: OnCallPerson, isOpen: boolean, onClose: () => void }) {
+  if (!isOpen) return null;
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Engineer Details</h3>
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-lg font-bold">
+              {person.name.split(' ').map(n => n[0]).join('')}
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Who's on Call</h1>
-              <p className="mt-2 text-gray-600">Manage on-call schedules and escalation policies</p>
+              <h4 className="font-medium text-gray-900">{person.name}</h4>
+              <p className="text-sm text-gray-600">{person.role}</p>
+              <div className="flex items-center gap-1 mt-1">
+                <div className={`w-2 h-2 rounded-full ${person.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <span className={`text-xs font-medium ${person.isActive ? 'text-green-600' : 'text-gray-500'}`}>
+                  {person.isActive ? 'Available' : 'Unavailable'}
+                </span>
+              </div>
             </div>
-            <div className="flex space-x-3">
-              <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 flex items-center space-x-2">
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </button>
-              <button 
-                onClick={() => setShowCreateSchedule(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Create Schedule</span>
-              </button>
+          </div>
+          
+          <Separator />
+          
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Mail className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-sm font-medium">Email</p>
+                <p className="text-sm text-gray-600">{person.email}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Phone className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-sm font-medium">Phone</p>
+                <p className="text-sm text-gray-600">{person.phone}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Shield className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-sm font-medium">Role Type</p>
+                <Badge variant={person.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                  {person.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active On-Call</p>
-                <p className="text-2xl font-bold text-gray-900">{currentOnCall.length}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
+// Modal Component for Team Details
+function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen: boolean, onClose: () => void }) {
+  const [selectedMember, setSelectedMember] = useState<OnCallPerson | null>(null);
+  
+  if (!isOpen) return null;
+  
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+        <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Team Details</h3>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
           </div>
           
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Open Incidents</p>
-                <p className="text-2xl font-bold text-gray-900">2</p>
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-purple-500 flex items-center justify-center text-white">
+                {/* <Team className="h-8 w-8" /> */}
               </div>
-              <div className="p-3 bg-yellow-100 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+              <div>
+                <h4 className="font-medium text-gray-900">{team.name}</h4>
+                <p className="text-sm text-gray-600">{team.description}</p>
+                <Badge variant="outline" className="text-xs mt-1">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {team.schedule}
+                </Badge>
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Avg Response Time</p>
-                <p className="text-2xl font-bold text-gray-900">3.2m</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <Timer className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Next Rotation</p>
-                <p className="text-2xl font-bold text-gray-900">5h 32m</p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <RotateCcw className="w-6 h-6 text-purple-600" />
+            
+            <Separator />
+            
+            <div>
+              <h5 className="font-medium mb-3 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Team Members ({team.members.length})
+              </h5>
+              <div className="space-y-2">
+                {team.members.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                        {member.name.split(' ').map(n => n[0]).join('')}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{member.name}</p>
+                        <p className="text-xs text-gray-500">{member.role}</p>
+                      </div>
+                      <Badge variant={member.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                        {member.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                      </Badge>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedMember(member)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* Nested Person Details Modal */}
+      {selectedMember && (
+        <PersonDetailsModal 
+          person={selectedMember} 
+          isOpen={!!selectedMember} 
+          onClose={() => setSelectedMember(null)} 
+        />
+      )}
+    </>
+  );
+}
 
-        {/* Tabs and Filters */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-            {['current', 'schedules', 'history'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
-                  activeTab === tab
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {tab === 'current' ? 'Currently On-Call' : tab}
-              </button>
-            ))}
+// Tabs Component for On-Call Status
+function OnCallStatusTabs({ persons, teams, notes }: { persons: OnCallPerson[], teams: OnCallTeam[], notes: string }) {
+  const [activeTab, setActiveTab] = useState<'engineers' | 'teams'>('engineers');
+  const [selectedPerson, setSelectedPerson] = useState<OnCallPerson | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<OnCallTeam | null>(null);
+  
+  return (
+    <div className="space-y-4">
+      {/* Tab Navigation */}
+      <div className="flex border-b border-gray-200">
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'engineers'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveTab('engineers')}
+        >
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            On-Call Engineers ({persons.length})
           </div>
-          
-          <select 
-            value={selectedTeam} 
-            onChange={(e) => setSelectedTeam(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 bg-white"
-          >
-            {teams.map(team => (
-              <option key={team} value={team}>
-                {team === 'all' ? 'All Teams' : team}
-              </option>
-            ))}
-          </select>
-        </div>
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'teams'
+              ? 'border-purple-600 text-purple-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveTab('teams')}
+        >
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            On-Call Teams ({teams.length})
+          </div>
+        </button>
+      </div>
 
-        {/* Tab Content */}
-        {activeTab === 'current' && (
-          <div className="space-y-6">
-            {filteredOnCall.map((onCall) => (
-              <div key={onCall.id} className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4">
-                  <div className="flex items-center space-x-4 mb-4 lg:mb-0">
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Shield className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{onCall.team} Team</h3>
-                      <p className="text-sm text-gray-600">{onCall.schedule}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <Activity className="w-3 h-3 mr-1" />
-                      Active
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      Ends {formatTime(onCall.shiftEnd)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Primary On-Call */}
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-gray-900">Primary On-Call</h4>
-                      <span className="text-xs text-gray-500">Last response: {onCall.lastResponse}</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
-                        {onCall.primary.avatar}
+      {/* Tab Content */}
+      <div className="min-h-[300px]">
+        {activeTab === 'engineers' && (
+          <div className="space-y-4">
+            {persons.length > 0 ? (
+              <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
+                {persons.map((person) => (
+                  <div key={person.id} className="flex items-center justify-between p-4 border border-gray-200/70 rounded-lg bg-blue-50/50 hover:bg-blue-100/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                        {person.name.split(' ').map(n => n[0]).join('')}
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{onCall.primary.name}</p>
-                        <div className="flex flex-col sm:flex-row sm:space-x-4 text-sm text-gray-600">
-                          <div className="flex items-center space-x-1">
-                            <Phone className="w-4 h-4" />
-                            <span>{onCall.primary.phone}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Mail className="w-4 h-4" />
-                            <span>{onCall.primary.email}</span>
+                      <div>
+                        <h4 className="font-medium text-gray-900">{person.name}</h4>
+                        <p className="text-sm text-gray-600">{person.role}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant={person.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                            {person.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <div className={`w-2 h-2 rounded-full ${person.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                            <span className={`text-xs font-medium ${person.isActive ? 'text-green-600' : 'text-gray-500'}`}>
+                              {person.isActive ? 'Available' : 'Unavailable'}
+                            </span>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 flex space-x-2">
-                      <button className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700 flex items-center justify-center space-x-1">
-                        <Phone className="w-4 h-4" />
-                        <span>Call</span>
-                      </button>
-                      <button className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 flex items-center justify-center space-x-1">
-                        <Mail className="w-4 h-4" />
-                        <span>Message</span>
-                      </button>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedPerson(person)}
+                      className="h-8 w-8 p-0 hover:bg-blue-200"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </div>
-
-                  {/* Secondary On-Call */}
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-gray-900">Secondary On-Call</h4>
-                      <span className="text-xs text-gray-500">Backup</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white font-medium">
-                        {onCall.secondary.avatar}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{onCall.secondary.name}</p>
-                        <div className="flex flex-col sm:flex-row sm:space-x-4 text-sm text-gray-600">
-                          <div className="flex items-center space-x-1">
-                            <Phone className="w-4 h-4" />
-                            <span>{onCall.secondary.phone}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Mail className="w-4 h-4" />
-                            <span>{onCall.secondary.email}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex space-x-2">
-                      <button className="flex-1 bg-gray-600 text-white px-3 py-2 rounded-md text-sm hover:bg-gray-700 flex items-center justify-center space-x-1">
-                        <Phone className="w-4 h-4" />
-                        <span>Call</span>
-                      </button>
-                      <button className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 flex items-center justify-center space-x-1">
-                        <Mail className="w-4 h-4" />
-                        <span>Message</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-sm text-gray-600">
-                    <div className="flex items-center space-x-4">
-                      <span className="flex items-center space-x-1">
-                        <Clock className="w-4 h-4" />
-                        <span>Shift: {formatTime(onCall.shiftStart)} - {formatTime(onCall.shiftEnd)}</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-                      <button className="text-blue-600 hover:text-blue-800 flex items-center space-x-1">
-                        <Edit3 className="w-4 h-4" />
-                        <span>Override</span>
-                      </button>
-                      <button className="text-gray-600 hover:text-gray-800 flex items-center space-x-1">
-                        <RotateCcw className="w-4 h-4" />
-                        <span>Escalate</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : (
+              <div className="text-center py-12">
+                <PersonStanding className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-gray-900 mb-2">No Engineers On-Call</h4>
+                <p className="text-gray-600">No individual engineers are currently assigned</p>
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'schedules' && (
-          <div className="space-y-6">
-            {filteredSchedules.map((schedule) => (
-              <div key={schedule.id} className="bg-white rounded-lg border border-gray-200">
-                <div className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={() => setExpandedSchedules(prev => ({
-                          ...prev,
-                          [schedule.id]: !prev[schedule.id]
-                        }))}
-                        className="p-2 hover:bg-gray-100 rounded-lg"
-                      >
-                        {expandedSchedules[schedule.id] ? 
-                          <ChevronDown className="w-5 h-5" /> : 
-                          <ChevronRight className="w-5 h-5" />
-                        }
-                      </button>
+        {activeTab === 'teams' && (
+          <div className="space-y-4">
+            {teams.length > 0 ? (
+              <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
+                {teams.map((team) => (
+                  <div key={team.id} className="flex items-center justify-between p-4 border border-gray-200/70 rounded-lg bg-purple-50/50 hover:bg-purple-100/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white">
+                        {/* <Team className="h-5 w-5" /> */}
+                      </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{schedule.name}</h3>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span>{schedule.team}</span>
-                          <span>•</span>
-                          <span>{schedule.type} rotation</span>
-                          <span>•</span>
-                          <span>{schedule.members} members</span>
-                          <span>•</span>
-                          <span>{schedule.timezone}</span>
+                        <h4 className="font-medium text-gray-900">{team.name}</h4>
+                        <p className="text-sm text-gray-600">{team.description}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {team.schedule}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {team.members.length} members
+                          </Badge>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">Next rotation</p>
-                        <p className="text-sm text-gray-600">{getTimeUntilRotation(schedule.nextRotation)}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          schedule.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {schedule.status}
-                        </span>
-                        <button className="p-2 text-gray-400 hover:text-gray-600">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button className="p-2 text-gray-400 hover:text-red-600">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setSelectedTeam(team)}
+                      className="h-8 w-8 p-0 hover:bg-purple-200"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </div>
-                  
-                  {expandedSchedules[schedule.id] && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-3">Schedule Details</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Rotation Type:</span>
-                              <span className="text-gray-900">{schedule.type}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Timezone:</span>
-                              <span className="text-gray-900">{schedule.timezone}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Next Rotation:</span>
-                              <span className="text-gray-900">{formatDate(schedule.nextRotation)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Members:</span>
-                              <span className="text-gray-900">{schedule.members} people</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-3">Escalation Policy</h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2 text-sm">
-                              <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium">1</div>
-                              <span>Primary on-call (0 min delay)</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-sm">
-                              <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 font-medium">2</div>
-                              <span>Secondary on-call (5 min delay)</span>
-                            </div>
-                            <div className="flex items-center space-x-2 text-sm">
-                              <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center text-red-600 font-medium">3</div>
-                              <span>Team lead (10 min delay)</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-
-        {activeTab === 'history' && (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Incident Response</h3>
-              <p className="text-sm text-gray-600 mt-1">Track on-call performance and response times</p>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {recentIncidents.map((incident) => (
-                <div key={incident.id} className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className={`p-2 rounded-full ${getSeverityColor(incident.severity)}`}>
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">{incident.title}</h4>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span>Assigned to {incident.assignedTo}</span>
-                          <span>•</span>
-                          <span>{incident.team} Team</span>
-                          <span>•</span>
-                          <span>{formatDate(incident.createdAt)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">Response Time</p>
-                        <p className="text-sm text-green-600">{incident.responseTime}</p>
-                      </div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(incident.status)}`}>
-                        {incident.status === 'resolved' ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
-                        {incident.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ) : (
+              <div className="text-center py-12">
+                {/* <Team className="h-12 w-12 text-gray-400 mx-auto mb-4" /> */}
+                <h4 className="text-lg font-medium text-gray-900 mb-2">No Teams On-Call</h4>
+                <p className="text-gray-600">No teams are currently assigned for on-call duties</p>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Create Schedule Modal */}
-      {showCreateSchedule && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-90vh overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Create New Schedule</h3>
-                <button 
-                  onClick={() => setShowCreateSchedule(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-            <div className="p-6">
-              <form className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Schedule Name</label>
-                    <input 
-                      type="text" 
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g., Frontend Weekend Rotation"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Team</label>
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                      <option value="">Select a team</option>
-                      {teams.filter(team => team !== 'all').map(team => (
-                        <option key={team} value={team}>{team}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rotation Type</label>
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="custom">Custom</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                      <option value="UTC-8">UTC-8 (PST)</option>
-                      <option value="UTC-5">UTC-5 (EST)</option>
-                      <option value="UTC+0">UTC+0 (GMT)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Team Members</label>
-                  <div className="border border-gray-300 rounded-lg p-4">
-                    <div className="space-y-2">
-                      {['John Doe', 'Sarah Wilson', 'Mike Johnson', 'Lisa Chen'].map((member, index) => (
-                        <label key={index} className="flex items-center space-x-3">
-                          <input type="checkbox" className="rounded border-gray-300" />
-                          <span className="text-sm text-gray-900">{member}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Escalation Policy</label>
-                  <div className="border border-gray-300 rounded-lg p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-4">
-                        <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium text-sm">1</span>
-                        <div className="flex-1">
-                          <select className="w-full border border-gray-300 rounded px-3 py-1 text-sm">
-                            <option>Primary on-call</option>
-                            <option>Secondary on-call</option>
-                          </select>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="0" className="w-16 border border-gray-300 rounded px-2 py-1 text-sm" />
-                          <span className="text-sm text-gray-600">min delay</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <span className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 font-medium text-sm">2</span>
-                        <div className="flex-1">
-                          <select className="w-full border border-gray-300 rounded px-3 py-1 text-sm">
-                            <option>Secondary on-call</option>
-                            <option>Team lead</option>
-                          </select>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="5" className="w-16 border border-gray-300 rounded px-2 py-1 text-sm" />
-                          <span className="text-sm text-gray-600">min delay</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
-              <button 
-                onClick={() => setShowCreateSchedule(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={() => setShowCreateSchedule(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Create Schedule
-              </button>
-            </div>
+      {/* Special Instructions */}
+      {notes && (
+        <div className="space-y-2 mt-6 pt-4 border-t border-gray-200">
+          <Label className="text-base font-medium flex items-center gap-2">
+            <Bell className="h-4 w-4 text-orange-600" />
+            Special Instructions
+          </Label>
+          <div className="p-3 bg-orange-50/50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-gray-700">{notes}</p>
           </div>
         </div>
       )}
+
+      {/* No one on-call fallback message */}
+      {persons.length === 0 && teams.length === 0 && (
+        <div className="text-center py-12">
+          <AlertTriangle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No On-Call Engineers Assigned</h3>
+          <p className="text-gray-600 mb-4">All alerts will automatically fallback to System Administrator</p>
+          <Badge variant="outline" className="text-orange-600 border-orange-300">
+            <Shield className="h-3 w-3 mr-1" />
+            Fallback Active: admin@company.com
+          </Badge>
+        </div>
+      )}
+
+      {/* Modals */}
+      {selectedPerson && (
+        <PersonDetailsModal 
+          person={selectedPerson} 
+          isOpen={!!selectedPerson} 
+          onClose={() => setSelectedPerson(null)} 
+        />
+      )}
+      
+      {selectedTeam && (
+        <TeamDetailsModal 
+          team={selectedTeam} 
+          isOpen={!!selectedTeam} 
+          onClose={() => setSelectedTeam(null)} 
+        />
+      )}
     </div>
   );
-};
+}
 
-export default WhosOnCallPage;
+export default function OnCallPage() {
+  const router = useRouter()
+  const [currentOnCall, setCurrentOnCall] = useState<{
+    persons: OnCallPerson[];
+    teams: OnCallTeam[];
+    notes: string;
+    lastUpdated: string;
+  }>({
+    persons: [],
+    teams: [],
+    notes: '',
+    lastUpdated: ''
+  })
+
+  const [config, setConfig] = useState<OnCallConfig>({
+    selectedPersons: [],
+    selectedTeams: [],
+    notes: '',
+    fallbackToAdmin: true
+  })
+
+  const [availablePersons, setAvailablePersons] = useState<OnCallPerson[]>([])
+  const [availableTeams, setAvailableTeams] = useState<OnCallTeam[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Demo data - replace with actual API calls
+  useEffect(() => {
+    // Set current on-call data
+    setCurrentOnCall({
+      persons: [
+        {
+          id: 'john-doe',
+          name: 'John Doe',
+          email: 'john@company.com',
+          phone: '+1 (555) 123-4567',
+          role: 'Lead Developer',
+          isActive: true
+        },
+        {
+          id: 'jane-smith',
+          name: 'Jane Smith',
+          email: 'jane@company.com',
+          phone: '+1 (555) 234-5678',
+          role: 'DevOps Engineer',
+          isActive: true
+        },
+        {
+          id: 'mike-wilson',
+          name: 'Mike Wilson',
+          email: 'mike@company.com',
+          phone: '+1 (555) 987-6543',
+          role: 'System Admin',
+          isActive: true
+        },
+        {
+          id: 'sarah-johnson',
+          name: 'Sarah Johnson',
+          email: 'sarah@company.com',
+          phone: '+1 (555) 345-6789',
+          role: 'Senior Engineer',
+          isActive: false
+        },
+        {
+          id: 'admin',
+          name: 'System Admin',
+          email: 'admin@company.com',
+          phone: '+1 (555) 000-0000',
+          role: 'Administrator',
+          isActive: true
+        },  
+      ],
+      teams: [
+        {
+          id: 'night-shift',
+          name: 'Night Shift Team',
+          description: 'Handles overnight incidents',
+          members: [
+            {
+              id: 'mike-wilson',
+              name: 'Mike Wilson',
+              email: 'mike@company.com',
+              phone: '+1 (555) 987-6543',
+              role: 'System Admin',
+              isActive: true
+            },
+            {
+              id: 'jane-smith',
+              name: 'Jane Smith',
+              email: 'jane@company.com',
+              phone: '+1 (555) 234-5678',
+              role: 'DevOps Engineer',
+              isActive: true
+            },
+            {
+              id: 'jane-smith',
+              name: 'Jane Smith',
+              email: 'jane@company.com',
+              phone: '+1 (555) 234-5678',
+              role: 'DevOps Engineer',
+              isActive: true
+            },
+            {
+              id: 'jane-smith',
+              name: 'Jane Smith',
+              email: 'jane@company.com',
+              phone: '+1 (555) 234-5678',
+              role: 'DevOps Engineer',
+              isActive: true
+            },
+            {
+              id: 'jane-smith',
+              name: 'Jane Smith',
+              email: 'jane@company.com',
+              phone: '+1 (555) 234-5678',
+              role: 'DevOps Engineer',
+              isActive: true
+            },
+          ],
+          schedule: '10:00 PM - 6:00 AM',
+          isActive: true
+        },
+        {
+          id: 'office-hours',
+          name: 'Office Hours Team',
+          description: 'Handles incidents during business hours (9 AM - 5 PM)',
+          members: [
+            {
+              id: 'john-doe', 
+              name: 'John Doe',
+              email: 'john@company.com',
+              phone: '+1 (555) 123-4567',
+              role: 'Lead Developer',
+              isActive: true
+            },
+            {
+              id: 'jane-smith',
+              name: 'Jane Smith',
+              email: 'jane@company.com',
+              phone: '+1 (555) 234-5678',
+              role: 'DevOps Engineer',
+              isActive: true
+            }
+          ],
+          schedule: '9:00 AM - 5:00 PM',
+          isActive: true
+        },
+        {
+          id: 'night-shift',
+          name: 'Night Shift Team',
+          description: 'Handles overnight incidents and monitoring',
+          members: [
+            {
+              id: 'mike-wilson',
+              name: 'Mike Wilson',
+              email: 'mike@company.com',
+              phone: '+1 (555) 987-6543',
+              role: 'System Admin',
+              isActive: true
+            }
+          ],
+          schedule: '10:00 PM - 6:00 AM',
+          isActive: true
+        },
+        {
+          id: 'weekend-team',
+          name: 'Weekend Team',
+          description: 'Coverage for weekends and holidays',
+          members: [
+            {
+              id: 'sarah-johnson',
+              name: 'Sarah Johnson',
+              email: 'sarah@company.com',
+              phone: '+1 (555) 345-6789',
+              role: 'Senior Engineer',
+              isActive: false
+            }
+          ],
+          schedule: 'Saturday - Sunday',
+          isActive: true
+        },
+        {
+          id: 'escalation-team', 
+          name: 'Escalation Team',
+          description: 'Secondary escalation for critical issues',
+          members: [
+            {
+              id: 'john-doe',
+              name: 'John Doe',
+              email: 'john@company.com',
+              phone: '+1 (555) 123-4567',
+              role: 'Lead Developer',
+              isActive: true
+            }
+          ],
+          schedule: 'Always Available',
+          isActive: false
+        } 
+        
+      ],
+      notes: 'Currently handling deployment issues. Contact immediately for any critical alerts.',
+      lastUpdated: '2 hours ago'
+    })
+
+    // Set available persons
+    setAvailablePersons([
+      {
+        id: 'john-doe',
+        name: 'John Doe',
+        email: 'john@company.com',
+        phone: '+1 (555) 123-4567',
+        role: 'Lead Developer',
+        isActive: true
+      },
+      {
+        id: 'jane-smith',
+        name: 'Jane Smith',
+        email: 'jane@company.com',
+        phone: '+1 (555) 234-5678',
+        role: 'DevOps Engineer',
+        isActive: true
+      },
+      {
+        id: 'mike-wilson',
+        name: 'Mike Wilson',
+        email: 'mike@company.com',
+        phone: '+1 (555) 987-6543',
+        role: 'System Admin',
+        isActive: true
+      },
+      {
+        id: 'sarah-johnson',
+        name: 'Sarah Johnson',
+        email: 'sarah@company.com',
+        phone: '+1 (555) 345-6789',
+        role: 'Senior Engineer',
+        isActive: false
+      },
+      {
+        id: 'admin',
+        name: 'System Admin',
+        email: 'admin@company.com',
+        phone: '+1 (555) 000-0000',
+        role: 'Administrator',
+        isActive: true
+      }
+    ])
+
+    // Set available teams
+    setAvailableTeams([
+      {
+        id: 'office-hours',
+        name: 'Office Hours Team',
+        description: 'Handles incidents during business hours (9 AM - 5 PM)',
+        schedule: '9:00 AM - 5:00 PM',
+        isActive: true,
+        members: [
+          {
+            id: 'john-doe',
+            name: 'John Doe',
+            email: 'john@company.com',
+            phone: '+1 (555) 123-4567',
+            role: 'Lead Developer',
+            isActive: true
+          },
+          {
+            id: 'jane-smith',
+            name: 'Jane Smith',
+            email: 'jane@company.com',
+            phone: '+1 (555) 234-5678',
+            role: 'DevOps Engineer',
+            isActive: true
+          }
+        ]
+      },
+      {
+        id: 'night-shift',
+        name: 'Night Shift Team',
+        description: 'Handles overnight incidents and monitoring',
+        schedule: '10:00 PM - 6:00 AM',
+        isActive: true,
+        members: [
+          {
+            id: 'mike-wilson',
+            name: 'Mike Wilson',
+            email: 'mike@company.com',
+            phone: '+1 (555) 987-6543',
+            role: 'System Admin',
+            isActive: true
+          }
+        ]
+      },
+      {
+        id: 'weekend-team',
+        name: 'Weekend Team',
+        description: 'Coverage for weekends and holidays',
+        schedule: 'Saturday - Sunday',
+        isActive: true,
+        members: [
+          {
+            id: 'sarah-johnson',
+            name: 'Sarah Johnson',
+            email: 'sarah@company.com',
+            phone: '+1 (555) 345-6789',
+            role: 'Senior Engineer',
+            isActive: false
+          }
+        ]
+      },
+      {
+        id: 'escalation-team',
+        name: 'Escalation Team',
+        description: 'Secondary escalation for critical issues',
+        schedule: 'Always Available',
+        isActive: false,
+        members: [
+          {
+            id: 'john-doe',
+            name: 'John Doe',
+            email: 'john@company.com',
+            phone: '+1 (555) 123-4567',
+            role: 'Lead Developer',
+            isActive: true
+          }
+        ]
+      }
+    ])
+  }, [])
+
+  const addPerson = (personId: string) => {
+    if (!config.selectedPersons.includes(personId)) {
+      setConfig(prev => ({
+        ...prev,
+        selectedPersons: [...prev.selectedPersons, personId]
+      }))
+    }
+  }
+
+  const removePerson = (personId: string) => {
+    setConfig(prev => ({
+      ...prev,
+      selectedPersons: prev.selectedPersons.filter(id => id !== personId)
+    }))
+  }
+
+  const addTeam = (teamId: string) => {
+    if (!config.selectedTeams.includes(teamId)) {
+      setConfig(prev => ({
+        ...prev,
+        selectedTeams: [...prev.selectedTeams, teamId]
+      }))
+    }
+  }
+
+  const removeTeam = (teamId: string) => {
+    setConfig(prev => ({
+      ...prev,
+      selectedTeams: prev.selectedTeams.filter(id => id !== teamId)
+    }))
+  }
+
+  const getPersonById = (id: string) => {
+    return availablePersons.find(person => person.id === id)
+  }
+
+  const getTeamById = (id: string) => {
+    return availableTeams.find(team => team.id === id)
+  }
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSaving(true)
+    
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Update current on-call with new configuration
+      const selectedPersonsData = config.selectedPersons.map(id => getPersonById(id)).filter(Boolean) as OnCallPerson[]
+      const selectedTeamsData = config.selectedTeams.map(id => getTeamById(id)).filter(Boolean) as OnCallTeam[]
+      
+      setCurrentOnCall({
+        persons: selectedPersonsData,
+        teams: selectedTeamsData,
+        notes: config.notes,
+        lastUpdated: 'Just now'
+      })
+      
+      alert('On-call configuration updated successfully!')
+    } catch (error) {
+      console.error('Error updating on-call config:', error)
+      alert('Failed to update on-call configuration. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <UserCheck className="h-8 w-8 text-blue-600" />
+            On-Call Management
+          </h1>
+          <p className="text-gray-600 mt-1">Manage who's currently on-call for incident response and monitoring alerts</p>
+        </div>
+
+        {/* Fallback Admin Notice */}
+        <Alert className="mb-8 border-blue-200 bg-blue-50/50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800">
+            <strong>Default Fallback:</strong> If no on-call engineer is selected, all alerts will automatically fallback to the System Administrator (admin@company.com) to ensure 24/7 coverage.
+          </AlertDescription>
+        </Alert>
+
+        {/* Section 1: Current On-Call Status */}
+        <Card className="shadow-sm border-gray-200/70 bg-white/70 backdrop-blur-sm mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-600" />
+              Current On-Call Status
+              <Badge variant="secondary" className="ml-2">
+                <Clock className="h-3 w-3 mr-1" />
+                Updated {currentOnCall.lastUpdated}
+              </Badge>
+            </CardTitle>
+            <p className="text-sm text-gray-600">Who's currently handling alerts and incidents</p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Tabbed Interface */}
+            <OnCallStatusTabs 
+              persons={currentOnCall.persons} 
+              teams={currentOnCall.teams} 
+              notes={currentOnCall.notes}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Section 2: Configure On-Call */}
+        <form onSubmit={handleSubmit}>
+          <Card className="shadow-sm border-gray-200/70 bg-white/70 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-blue-600" />
+                Configure On-Call Assignment
+              </CardTitle>
+              <p className="text-sm text-gray-600">Select teams or individual engineers for on-call duties</p>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {/* Team Selection */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-600" />
+                  Select Teams
+                </Label>
+                <Select onValueChange={(value) => addTeam(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose teams for on-call duty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id} disabled={config.selectedTeams.includes(team.id)}>
+                        <div className="flex items-center gap-2">
+                          {/* <Team className="h-4 w-4" /> */}
+                          <div className="flex flex-col">
+                            <span className="font-medium">{team.name}</span>
+                            <span className="text-xs text-gray-500">{team.schedule} • {team.members.length} members</span>
+                          </div>
+                          {team.isActive ? (
+                            <Badge variant="outline" className="text-green-600 border-green-300">Active</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactive</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Selected Teams Display */}
+                {config.selectedTeams.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Selected Teams</Label>
+                    <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-lg bg-purple-50/50">
+                      {config.selectedTeams.map((teamId) => {
+                        const team = getTeamById(teamId)
+                        return team ? (
+                          <Badge key={teamId} variant="default" className="flex items-center gap-1 bg-purple-600">
+                            {/* <Team className="h-3 w-3" /> */}
+                            {team.name}
+                            <X 
+                              className="h-3 w-3 cursor-pointer hover:text-red-200" 
+                              onClick={() => removeTeam(teamId)}
+                            />
+                          </Badge>
+                        ) : null
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Individual Person Selection */}
+              <div className="space-y-4">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <User className="h-4 w-4 text-blue-600" />
+                  Select Individual Engineers
+                </Label>
+                <Select onValueChange={(value) => addPerson(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose individual engineers for on-call" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePersons.map((person) => (
+                      <SelectItem key={person.id} value={person.id} disabled={config.selectedPersons.includes(person.id)}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">
+                            {person.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{person.name}</span>
+                            <span className="text-xs text-gray-500">{person.role} • {person.email}</span>
+                          </div>
+                          {person.isActive ? (
+                            <Badge variant="outline" className="text-green-600 border-green-300">Available</Badge>
+                          ) : (
+                            <Badge variant="secondary">Unavailable</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Selected Persons Display */}
+                {config.selectedPersons.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-gray-700">Selected Engineers</Label>
+                    <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-lg bg-blue-50/50">
+                      {config.selectedPersons.map((personId) => {
+                        const person = getPersonById(personId)
+                        return person ? (
+                          <Badge key={personId} variant="default" className="flex items-center gap-1 bg-blue-600">
+                            {/* <User className="h-3 w-3" /> */}
+                            {person.name}
+                            <X 
+                              className="h-3 w-3 cursor-pointer hover:text-red-200" 
+                              onClick={() => removePerson(personId)}
+                            />
+                          </Badge>
+                        ) : null
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Special Instructions */}
+              <div className="space-y-4">
+                <Label htmlFor="notes" className="text-base font-medium flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-orange-600" />
+                  Special Instructions for On-Call Engineers
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add any special instructions, contact preferences, or important notes for the on-call engineers..."
+                  value={config.notes}
+                  onChange={(e) => setConfig(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={4}
+                  className="min-h-[100px]"
+                />
+                <p className="text-xs text-gray-500">These notes will be included in all alert notifications to provide context</p>
+              </div>
+
+              {/* Fallback Admin Setting */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 p-4 border border-gray-200/70 rounded-lg bg-gray-50/50">
+                  <Checkbox
+                    id="fallback"
+                    checked={config.fallbackToAdmin}
+                    onCheckedChange={(checked: boolean) => setConfig(prev => ({ 
+                      ...prev, 
+                      fallbackToAdmin: checked 
+                    }))}
+                  />
+                  <div className="flex-1">
+                    <Label htmlFor="fallback" className="font-medium flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-600" />
+                      Enable Admin Fallback
+                    </Label>
+                    <p className="text-sm text-gray-600 mt-1">
+                      If no on-call engineers are available or selected, automatically fallback to System Administrator
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex items-center justify-end space-x-4 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => {
+                    setConfig({
+                      selectedPersons: [],
+                      selectedTeams: [],
+                      notes: '',
+                      fallbackToAdmin: true
+                    })
+                  }}
+                >
+                  Clear Selection
+                </Button>
+                <Button type="submit" disabled={saving} className="min-w-[200px]">
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Updating On-Call...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Update On-Call Assignment
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
+      </div>
+    </div>
+  )
+}
