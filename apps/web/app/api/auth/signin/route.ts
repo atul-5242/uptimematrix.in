@@ -21,23 +21,79 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await upstream.json();
+    console.log('API response data:', JSON.stringify(data, null, 2));
+    
     const token: string | undefined = data?.jwt;
+    
+    // Extract user ID from JWT token
+    let userId: string | undefined;
+    if (token) {
+      try {
+        // Base64 decode the payload part of the JWT
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
+        userId = payload.sub; // sub is the standard JWT field for user ID
+        console.log('Decoded JWT payload:', payload);
+      } catch (error) {
+        console.error('Error decoding JWT:', error);
+      }
+    }
+    
+    console.log('Extracted token:', !!token);
+    console.log('Extracted userId:', userId);
+    
     if (!token) {
       return NextResponse.json({ message: 'JWT not returned by upstream' }, { status: 502 });
     }
 
-    const response = NextResponse.json({ jwt: token });
-    response.cookies.set('auth_token', token, {
+    if (!userId) {
+      throw new Error('User ID not found in response');
+    }
+
+    // Create response with user data
+    const response = NextResponse.json(
+      { 
+        token,
+        user: { id: userId },
+        isAuthenticated: true
+      },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, max-age=0'
+        }
+      }
+    );
+
+    // Set auth token cookie
+    response.cookies.set({
+      name: 'auth_token',
+      value: token,
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 7 days
     });
+
+    // Set user ID cookie
+    response.cookies.set({
+      name: 'auth_userId',
+      value: userId,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+    });
+
     return response;
   } catch (error: any) {
-    return NextResponse.json({ message: error?.message || 'Internal error' }, { status: 500 });
+    console.error('Sign in error:', error);
+    return NextResponse.json(
+      { message: error?.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
-
-

@@ -3,30 +3,38 @@ import cors from "cors";
 import authRouter from "./routes/authRoute/authroute.js";
 import websiteRouter from "./routes/websiteRoute/websiteroute.js";
 import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.js";
+import sessionRouter from "./routes/authRoute/session.js";
 import dotenv from "dotenv";
 
 dotenv.config();
 const app = express();
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*' }));
-
+app.use(cors({ 
+  origin: process.env.CORS_ORIGIN?.split(',') || '*',
+  credentials: true 
+}));
 
 app.use(express.json());
+
+// Routes
 app.use("/auth", authRouter);
 app.use("/website", websiteRouter);
-
 app.use("/escalation-policies", escalationRouter);
 
+// Session validation endpoint
+app.use("/api", sessionRouter);
 
-// Minimal request logger for auth routes
-// app.use((req, _res, next) => {
-//   if (req.path.startsWith('/user/')) {
-//     const username = typeof req.body?.username === 'string' ? req.body.username : undefined;
-//     console.log(`[API] ${req.method} ${req.path}`, username ? { username } : {});
-//   }
-//   next();
-// });
+// Error handling middleware
+app.use((err: any, _req: any, res: any, _next: any) => {
+  console.error('API Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
+// Not found handler
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
 
-app.listen(process.env.PORT || 3001, () => {
-  console.log(`Server is running on port ${process.env.PORT || 3001}`);
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
