@@ -3,16 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { username, password } = body || {};
-    if (!username || !password) {
-      return NextResponse.json({ message: 'Username and password are required' }, { status: 400 });
+    const { email, password } = body || {};
+    if (!email || !password) {
+      return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
     }
 
     const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const upstream = await fetch(`${baseURL}/auth/user/signin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     });
 
     if (!upstream.ok) {

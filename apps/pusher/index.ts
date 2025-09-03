@@ -1,4 +1,5 @@
 import { prismaClient } from "@uptimematrix/store";
+import { Website } from "@uptimematrix/store";
 import { xAddBulk, xGroupCreate, STREAM_NAME } from "@uptimematrix/redisstream/client";
 
 const GROUP_NAME = process.env.GROUP_NAME!;
@@ -37,14 +38,14 @@ async function pushWebsites() {
 
             if (websites.length > 0) {
                 console.log(`📋 Found ${websites.length} websites due for checking:`);
-                websites.forEach(site => {
+                websites.forEach((site: Website) => {
                     const intervalSeconds = Math.round((site.checkInterval || 60000) / 1000);
                     const nextCheck = site.nextCheckTime ? site.nextCheckTime.toISOString() : 'null';
                     console.log(`   - ${site.url} (interval: ${intervalSeconds}s, next: ${nextCheck})`);
                 });
 
                 const messages: any[] = [];
-                websites.forEach(site => {
+                websites.forEach((site: Website) => {
                     // Send one message per website, not per region - worker will handle all regions
                     const message = { 
                         ...site, 
@@ -58,7 +59,7 @@ async function pushWebsites() {
                 console.log(`✅ Queued ${messages.length} website checks`);
                 
                 // Immediately update nextCheckTime to prevent re-queuing
-                const updatePromises = websites.map(site => 
+                const updatePromises = websites.map((site: Website) => 
                     prismaClient.website.update({
                         where: { id: site.id },
                         data: { 
@@ -81,7 +82,7 @@ async function pushWebsites() {
                 
                 if (nextWebsites.length > 0) {
                     console.log(`🔮 Next websites to check:`);
-                    nextWebsites.forEach(site => {
+                    nextWebsites.forEach((site: { url: string; nextCheckTime: Date | null; checkInterval: number | null }) => {
                         const timeUntil = site.nextCheckTime ? 
                             Math.round((site.nextCheckTime.getTime() - now.getTime()) / 1000) : 
                             'unknown';

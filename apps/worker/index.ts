@@ -1,7 +1,6 @@
 import axios from "axios";
 import { xReadBulk, xAckBulk } from "@uptimematrix/redisstream/client";
-import { prismaClient } from "@uptimematrix/store/client";
-import { WebsiteStatus } from "@uptimematrix/store/client";
+import { prismaClient, WebsiteStatus } from "@uptimematrix/store";
 import { handleEscalation } from "./escalation/handleEscalation.js";
 
 const GROUP_NAME = process.env.GROUP_NAME!;

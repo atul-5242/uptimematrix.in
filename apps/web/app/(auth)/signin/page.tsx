@@ -7,7 +7,7 @@ import { useAppDispatch } from '@/store';
 import { signInAction } from './actions';
 
 interface SignInFormData {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -19,9 +19,9 @@ interface SignInProps {
 }
 
 const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = false, error }) => {
-  const [formData, setFormData] = useState<SignInFormData>({ username: '', password: '' });
+  const [formData, setFormData] = useState<{email: string; password: string}>({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Partial<SignInFormData>>({});
+  const [validationErrors, setValidationErrors] = useState<Partial<{email: string; password: string}>>({});
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -29,7 +29,8 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
 
   const validateForm = (): boolean => {
     const errors: Partial<SignInFormData> = {};
-    if (!formData.username) errors.username = 'Username is required';
+    if (!formData.email) errors.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email';
     if (!formData.password) errors.password = 'Password is required';
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -40,13 +41,16 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
     if (!validateForm()) return;
     setSubmitting(true);
     try {
-      await signInAction(dispatch, { username: formData.username, password: formData.password });
+      await signInAction(dispatch, { 
+        email: formData.email, 
+        password: formData.password 
+      });
       const redirect = searchParams.get('redirect');
       const target = redirect && redirect.startsWith('/') ? redirect : '/dashboard';
       router.replace(target);
     } catch (e) {
       // surface a simple error
-      setValidationErrors({ username: 'Invalid credentials', password: 'Invalid credentials' });
+      setValidationErrors({ email: 'Invalid credentials', password: 'Invalid credentials' });
     } finally {
       setSubmitting(false);
     }
@@ -78,22 +82,24 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
               </div>
             )}
             <div className="space-y-2">
-              <label htmlFor="username" className="block text-sm font-medium text-slate-700">Username</label>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
                 </div>
                 <input
-                  id="username"
-                  type="text"
-                  value={formData.username}
-                  onChange={handleChange('username')}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.username ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  placeholder="Enter your username"
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
+                    validationErrors.email ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholder="Enter your email"
                   disabled={isLoading || submitting}
                 />
               </div>
-              {validationErrors.username && <p className="text-sm text-red-600">{validationErrors.username}</p>}
+              {validationErrors.email && <p className="text-sm text-red-600">{validationErrors.email}</p>}
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-medium text-slate-700">Password</label>

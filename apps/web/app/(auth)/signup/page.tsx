@@ -78,8 +78,12 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
     setSubmitting(true);
     setApiError(null);
     try {
-      // Backend expects { username, password }
-      await signUpAction({ username: formData.email, password: formData.password });
+      // Backend expects { username, email, password }
+      await signUpAction({ 
+        username: formData.firstName + (formData.lastName ? ' ' + formData.lastName : ''),
+        email: formData.email, 
+        password: formData.password 
+      });
       if (onSubmit) await onSubmit({ ...formData });
       router.push('/signin');
     } catch (e: any) {
