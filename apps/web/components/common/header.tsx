@@ -40,19 +40,32 @@ export function Header() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Logo />
+          <div onClick={() => token ? router.push('/dashboard') : router.push('/')} className="cursor-pointer">
+            <Logo />
+          </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            {navigation.map((item) => (
+            {token ? (
+              // Show dashboard link for authenticated users
               <a
-                key={item.name}
-                href={item.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                href="/dashboard"
+                className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
               >
-                {item.name}
+                Dashboard
               </a>
-            ))}
+            ) : (
+              // Show regular navigation for non-authenticated users
+              navigation.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {item.name}
+                </a>
+              ))
+            )}
           </nav>
 
           {/* Desktop Actions */}
