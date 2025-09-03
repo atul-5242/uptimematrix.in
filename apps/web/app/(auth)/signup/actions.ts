@@ -2,10 +2,14 @@
 
 import { api } from '@/lib/api';
 
-export async function signUpAction(data: { username: string; password: string }) {
+export async function signUpAction(data: { username: string; email: string; password: string }) {
   try {
-    console.log('[WEB] POST /auth/user/signup', { baseURL: api.defaults.baseURL, username: data.username });
-    const res = await api.post('/auth/user/signup', data);
+    console.log('[WEB] POST /auth/user/signup', { baseURL: api.defaults.baseURL, username: data.username, email: data.email });
+    const res = await api.post('/auth/user/signup', {
+      username: data.username,
+      email: data.email,
+      password: data.password
+    });
     console.log('[WEB] /auth/user/signup response', res.status, res.data);
     return res.data;
   } catch (e: any) {

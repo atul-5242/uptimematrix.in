@@ -1,23 +1,11 @@
 // prismaClient.ts
 import { PrismaClient } from "@prisma/client";
 
-// Enums from Prisma schema
-import {
-  Priority,
-  WebsiteStatus,
-  MonitorType,
-  Method,
-  Severity,
-} from "@prisma/client";
+// Re-export specific enums from Prisma client to maintain type compatibility
+export { Method, MonitorType, Priority, WebsiteStatus, Severity } from "@prisma/client";
+
+// Export Website type from types.ts
+export { Website } from "./types.js";
 
 // Prisma client instance (singleton)
 export const prismaClient = new PrismaClient();
-
-// Re-export enums for use throughout the app
-export {
-  Priority,
-  WebsiteStatus,
-  MonitorType,
-  Method,
-  Severity,
-};

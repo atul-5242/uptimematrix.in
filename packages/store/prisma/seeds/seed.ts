@@ -7,6 +7,7 @@ async function main() {
     update: {},
     create: {
       username: "admin",
+      email: "admin@example.com",
       password: "admin", // ⚠️ replace with hashed password in production
     },
   });
