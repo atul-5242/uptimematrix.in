@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres
+    image: postgres:16-alpine
     container_name: my_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -12,8 +12,9 @@ services:
       - pgdata_base:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+
   redis:
-    image: redis/redis-stack:latest
+    image: redis:7-alpine
     container_name: my_redis
     ports:
       - "6379:6379"
