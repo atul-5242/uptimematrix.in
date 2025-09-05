@@ -8,6 +8,8 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react"
+import { useRouter } from 'next/navigation'
+import { useAppDispatch } from '@/store'
 
 import {
   Avatar,
@@ -29,6 +31,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { signOut } from '@/store/authSlice'
 
 export function NavUser({
   user,
@@ -40,7 +43,18 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+  const dispatch = useAppDispatch()
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/signout', { method: 'POST' });
+    } catch {}
+    localStorage.removeItem('auth_token');
+    dispatch(signOut());
+    router.push('/');
+  };
+  
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -102,7 +116,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               Log out
             </DropdownMenuItem>

@@ -114,14 +114,9 @@ const data = {
       icon: Bell,
     },
     {
-      title: "Support",
-      url: "#",
+      title: "Organizations",
+      url: "/dashboard/organizations",
       icon: LifeBuoy,
-    },
-    {
-      title: "Feedback",
-      url: "#",
-      icon: Send,
     },
   ],
   projects: [
