@@ -41,8 +41,8 @@ interface StatusPage {
   subdomain: string
   customDomain?: string
   description: string
-  status: 'operational' | 'degraded' | 'major_outage' | 'maintenance'
-  visibility: 'public' | 'private' | 'password_protected'
+  status: 'operational' | 'degraded'
+  visibility: 'public'
   services: ServiceGroup[]
   subscribers: number
   incidents: number
@@ -62,13 +62,13 @@ interface ServiceGroup {
   id: string
   name: string
   services: Service[]
-  status: 'operational' | 'degraded' | 'major_outage'
+  status: 'operational' | 'degraded'
 }
 
 interface Service {
   id: string
   name: string
-  status: 'operational' | 'degraded' | 'major_outage'
+  status: 'operational' | 'degraded'
   uptime: number
   monitorId?: string
 }
@@ -80,7 +80,6 @@ export default function StatusPagesDashboard() {
   const [loading, setLoading] = useState<boolean>(true)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [visibilityFilter, setVisibilityFilter] = useState<string>('all')
 
   // Mock data - replace with actual API calls
   useEffect(() => {
@@ -163,7 +162,7 @@ export default function StatusPagesDashboard() {
         subdomain: 'internal',
         description: 'Private status page for internal team monitoring',
         status: 'operational',
-        visibility: 'private',
+        visibility: 'public',
         services: [
           {
             id: '4',
@@ -211,19 +210,16 @@ export default function StatusPagesDashboard() {
       filtered = filtered.filter(page => page.status === statusFilter)
     }
 
-    if (visibilityFilter !== 'all') {
-      filtered = filtered.filter(page => page.visibility === visibilityFilter)
-    }
+    // Only show public status pages
+    filtered = filtered.filter(page => page.visibility === 'public')
 
     setFilteredPages(filtered)
-  }, [statusPages, searchTerm, statusFilter, visibilityFilter])
+  }, [statusPages, searchTerm, statusFilter])
 
   const getStatusColor = (status: StatusPage['status']): string => {
     switch (status) {
       case 'operational': return 'text-green-600 bg-green-50'
       case 'degraded': return 'text-yellow-600 bg-yellow-50'
-      case 'major_outage': return 'text-red-600 bg-red-50'
-      case 'maintenance': return 'text-blue-600 bg-blue-50'
       default: return 'text-gray-600 bg-gray-50'
     }
   }
@@ -232,17 +228,12 @@ export default function StatusPagesDashboard() {
     switch (status) {
       case 'operational': return <CheckCircle className="h-4 w-4" />
       case 'degraded': return <AlertTriangle className="h-4 w-4" />
-      case 'major_outage': return <XCircle className="h-4 w-4" />
-      case 'maintenance': return <Settings className="h-4 w-4" />
+      default: return null
     }
   }
 
-  const getVisibilityIcon = (visibility: StatusPage['visibility']) => {
-    switch (visibility) {
-      case 'public': return <Globe className="h-4 w-4 text-green-500" />
-      case 'private': return <EyeOff className="h-4 w-4 text-gray-500" />
-      case 'password_protected': return <Eye className="h-4 w-4 text-yellow-500" />
-    }
+  const getVisibilityIcon = () => {
+    return <Globe className="h-4 w-4 text-green-500" />
   }
 
   const formatLastUpdated = (dateString: string): string => {
@@ -352,30 +343,6 @@ export default function StatusPagesDashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-500" />
-                  <div className="text-sm text-gray-600">Total Subscribers</div>
-                </div>
-                <div className="text-2xl font-bold">
-                  {statusPages.reduce((sum, p) => sum + p.subscribers, 0)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-orange-500" />
-                  <div className="text-sm text-gray-600">Avg Uptime</div>
-                </div>
-                <div className="text-2xl font-bold">
-                  {(statusPages.reduce((sum, p) => sum + p.uptime, 0) / statusPages.length || 0).toFixed(1)}%
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Filters */}
@@ -402,22 +369,9 @@ export default function StatusPagesDashboard() {
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="operational">Operational</SelectItem>
                     <SelectItem value="degraded">Degraded</SelectItem>
-                    <SelectItem value="major_outage">Major Outage</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem>
                   </SelectContent>
                 </Select>
 
-                <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                    <SelectItem value="password_protected">Protected</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </div>
@@ -489,7 +443,7 @@ export default function StatusPagesDashboard() {
                         {page.description}
                       </p>
 
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                      <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                           <div className="text-gray-500 mb-1">Services</div>
                           <div className="font-semibold">
@@ -503,18 +457,8 @@ export default function StatusPagesDashboard() {
                         </div>
 
                         <div>
-                          <div className="text-gray-500 mb-1">Subscribers</div>
-                          <div className="font-semibold">{page.subscribers.toLocaleString()}</div>
-                        </div>
-
-                        <div>
                           <div className="text-gray-500 mb-1">Incidents</div>
                           <div className="font-semibold">{page.incidents}</div>
-                        </div>
-
-                        <div>
-                          <div className="text-gray-500 mb-1">Last Updated</div>
-                          <div className="font-semibold">{formatLastUpdated(page.lastUpdated)}</div>
                         </div>
                       </div>
                     </div>

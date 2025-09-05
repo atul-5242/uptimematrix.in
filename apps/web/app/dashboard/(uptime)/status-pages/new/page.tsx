@@ -33,7 +33,7 @@ interface StatusPageFormData {
   subdomain: string
   customDomain: string
   description: string
-  visibility: 'public' | 'private' | 'password_protected'
+  visibility: 'public'
   password: string
   theme: 'light' | 'dark' | 'auto'
   branding: {
@@ -124,6 +124,8 @@ export default function CreateStatusPage() {
   const [availableMonitors, setAvailableMonitors] = useState<Monitor[]>([])
   const [currentStep, setCurrentStep] = useState<number>(1)
   const [previewMode, setPreviewMode] = useState<boolean>(false)
+  const [isCurrentStepValid, setIsCurrentStepValid] = useState<boolean>(false)
+  const [hasSubmitted, setHasSubmitted] = useState<boolean>(false)
 
   // Fetch available monitors
   useEffect(() => {
@@ -153,43 +155,100 @@ export default function CreateStatusPage() {
       .substring(0, 50)
   }
 
+  const validateStep = (step: number, updateErrors: boolean = false): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+
+    switch (step) {
+      case 1: // Basic Information
+        if (!formData.name.trim()) {
+          newErrors.name = 'Status page name is required';
+          isValid = false;
+        } else {
+          delete newErrors.name;
+        }
+        
+        if (!formData.subdomain.trim()) {
+          newErrors.subdomain = 'Subdomain is required';
+          isValid = false;
+        } else if (!/^[a-z0-9-]+$/.test(formData.subdomain)) {
+          newErrors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+          isValid = false;
+        } else {
+          delete newErrors.subdomain;
+        }
+
+        if (!formData.description.trim()) {
+          newErrors.description = 'Description is required';
+          isValid = false;
+        } else {
+          delete newErrors.description;
+        }
+
+        if (formData.customDomain && !/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/.test(formData.customDomain)) {
+          newErrors.customDomain = 'Please enter a valid domain name';
+          isValid = false;
+        } else {
+          delete newErrors.customDomain;
+        }
+        break;
+
+      case 2: // Services
+        if (formData.serviceGroups.length === 0) {
+          newErrors.serviceGroups = 'At least one service group is required';
+          isValid = false;
+        } else {
+          formData.serviceGroups.forEach((group, groupIndex) => {
+            // Validate service group name
+            if (!group.name.trim()) {
+              newErrors[`serviceGroup_${groupIndex}_name`] = 'Service group name is required';
+              isValid = false;
+            } else {
+              delete newErrors[`serviceGroup_${groupIndex}_name`];
+            }
+            
+            // Validate services in the group
+            if (group.services.length === 0) {
+              newErrors[`serviceGroup_${groupIndex}_services`] = 'At least one service is required in this group';
+              isValid = false;
+            } else {
+              // Validate each service in the group
+              group.services.forEach((service, serviceIndex) => {
+                if (!service.name.trim()) {
+                  newErrors[`service_${groupIndex}_${serviceIndex}_name`] = 'Service name is required';
+                  isValid = false;
+                } else {
+                  delete newErrors[`service_${groupIndex}_${serviceIndex}_name`];
+                }
+                
+                if (!service.monitorId) {
+                  newErrors[`service_${groupIndex}_${serviceIndex}_monitor`] = 'Please select a monitor';
+                  isValid = false;
+                } else {
+                  delete newErrors[`service_${groupIndex}_${serviceIndex}_monitor`];
+                }
+              });
+              
+              delete newErrors[`serviceGroup_${groupIndex}_services`];
+            }
+          });
+          delete newErrors.serviceGroups;
+        }
+        break;
+    }
+
+    if (updateErrors || hasSubmitted) {
+      setErrors(newErrors);
+    }
+    return isValid;
+  };
+
+  useEffect(() => {
+    setIsCurrentStepValid(validateStep(currentStep, false));
+  }, [currentStep, formData, errors, hasSubmitted]);
+
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {}
-    
-    if (!formData.name.trim()) {
-      newErrors.name = 'Status page name is required'
-    }
-    
-    if (!formData.subdomain.trim()) {
-      newErrors.subdomain = 'Subdomain is required'
-    } else if (!/^[a-z0-9-]+$/.test(formData.subdomain)) {
-      newErrors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens'
-    }
-
-    if (formData.customDomain && !/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/.test(formData.customDomain)) {
-      newErrors.customDomain = 'Please enter a valid domain name'
-    }
-
-    if (formData.visibility === 'password_protected' && !formData.password.trim()) {
-      newErrors.password = 'Password is required for password-protected pages'
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required'
-    }
-
-    if (formData.serviceGroups.length === 0) {
-      newErrors.serviceGroups = 'At least one service group is required'
-    }
-
-    formData.serviceGroups.forEach((group, groupIndex) => {
-      if (!group.name.trim()) {
-        newErrors[`serviceGroup_${groupIndex}_name`] = 'Service group name is required'
-      }
-    })
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return validateStep(currentStep, true);
   }
 
   const handleSubmit = async (): Promise<void> => {
@@ -197,7 +256,7 @@ export default function CreateStatusPage() {
 
     setLoading(true)
     try {
-      // Replace with actual API call
+      console.log('Submitting status page:', formData)
       const response = await fetch('/api/status-pages', {
         method: 'POST',
         headers: { 
@@ -205,16 +264,17 @@ export default function CreateStatusPage() {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify(formData)
-      })
-
+      });
+      
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error(err.message || 'Failed to create status page')
+        throw new Error('Failed to create status page');
       }
-
-      const result = await response.json()
-      alert('Status page created successfully!')
-      router.push(`/dashboard/status-pages/${result.id}`)
+      
+      // Simulate API call delay (can be removed in production)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Redirect to status pages list after successful creation
+      router.push('/dashboard/status-pages')
     } catch (error) {
       console.error('Error creating status page:', error)
       alert('Failed to create status page. Please try again.')
@@ -307,8 +367,7 @@ export default function CreateStatusPage() {
   const steps = [
     { id: 1, name: 'Basic Info', icon: Globe },
     { id: 2, name: 'Services', icon: Monitor },
-    { id: 3, name: 'Design', icon: Palette },
-    { id: 4, name: 'Settings', icon: Settings }
+    { id: 3, name: 'Design & Settings', icon: Palette }
   ]
 
   const renderStepContent = () => {
@@ -387,61 +446,20 @@ export default function CreateStatusPage() {
 
                 <div className="space-y-4">
                   <Label>Visibility</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div 
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        formData.visibility === 'public' ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-300'
-                      }`}
-                      onClick={() => setFormData(prev => ({ ...prev, visibility: 'public' }))}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Globe className="h-5 w-5 text-green-500" />
-                        <span className="font-medium">Public</span>
+                  <div className="border rounded-lg p-4 bg-blue-50 border-blue-200">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-blue-100 text-blue-600">
+                        <Globe className="h-5 w-5" />
                       </div>
-                      <p className="text-sm text-gray-600">Anyone can view this status page</p>
-                    </div>
-
-                    <div 
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        formData.visibility === 'private' ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-300'
-                      }`}
-                      onClick={() => setFormData(prev => ({ ...prev, visibility: 'private' }))}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Lock className="h-5 w-5 text-gray-500" />
-                        <span className="font-medium">Private</span>
+                      <div>
+                        <div className="font-medium">Public</div>
+                        <p className="text-sm text-gray-600">Anyone with the link can view this status page</p>
                       </div>
-                      <p className="text-sm text-gray-600">Only you can view this status page</p>
-                    </div>
-
-                    <div 
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        formData.visibility === 'password_protected' ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-300'
-                      }`}
-                      onClick={() => setFormData(prev => ({ ...prev, visibility: 'password_protected' }))}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Shield className="h-5 w-5 text-yellow-500" />
-                        <span className="font-medium">Protected</span>
-                      </div>
-                      <p className="text-sm text-gray-600">Requires password to view</p>
                     </div>
                   </div>
-
-                  {formData.visibility === 'password_protected' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password *</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="Enter a secure password"
-                        value={formData.password}
-                        onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                        className={errors.password ? 'border-red-500' : ''}
-                      />
-                      {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-500">
+                    This status page is publicly accessible to anyone with the link.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -558,7 +576,7 @@ export default function CreateStatusPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-6 w-6 text-purple-600" />
-                  Design & Branding
+                  Design & Settings
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -785,6 +803,20 @@ export default function CreateStatusPage() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Preview Button */}
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <div className="flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setPreviewMode(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Preview Status Page
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -854,13 +886,23 @@ export default function CreateStatusPage() {
           </Button>
           
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => setPreviewMode(true)}>
-              <Eye className="h-4 w-4 mr-2" />
-              Preview
-            </Button>
+            {currentStep === 3 && (
+              <Button variant="outline" onClick={() => setPreviewMode(true)}>
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
+            )}
             
             {currentStep < steps.length ? (
-              <Button onClick={() => setCurrentStep(Math.min(steps.length, currentStep + 1))}>
+              <Button 
+                onClick={() => {
+                  setHasSubmitted(true);
+                  if (isCurrentStepValid) {
+                    setCurrentStep(Math.min(steps.length, currentStep + 1));
+                  }
+                }}
+                disabled={hasSubmitted && !isCurrentStepValid}
+              >
                 Next
               </Button>
             ) : (
