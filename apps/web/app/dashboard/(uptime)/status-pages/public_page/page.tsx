@@ -39,7 +39,7 @@ interface StatusPageData {
   id: string
   name: string
   description: string
-  status: 'operational' | 'degraded' | 'major_outage' | 'maintenance'
+  status: 'operational' | 'down' | 'major_outage' | 'maintenance' // Re-added 'maintenance'
   lastUpdated: string
   logo?: string
   branding: {
@@ -60,14 +60,14 @@ interface StatusPageData {
 interface ServiceGroup {
   id: string
   name: string
-  status: 'operational' | 'degraded' | 'major_outage'
+  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
   services: Service[]
 }
 
 interface Service {
   id: string
   name: string
-  status: 'operational' | 'degraded' | 'major_outage'
+  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
   uptime: number
   responseTime?: number
   description?: string
@@ -78,7 +78,7 @@ interface Service {
 interface UptimeDay {
   date: string
   uptime: number
-  status: 'operational' | 'degraded' | 'major_outage'
+  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
 }
 
 interface Incident {
@@ -149,7 +149,7 @@ export default function PublicStatusPage() {
               uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
                 date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 uptime: Math.random() > 0.05 ? Math.random() * 5 + 95 : Math.random() * 30 + 60,
-                status: Math.random() > 0.05 ? 'operational' : 'degraded' as 'operational' | 'degraded' | 'major_outage'
+                status: Math.random() > 0.05 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
               }))
             },
             {
@@ -163,7 +163,7 @@ export default function PublicStatusPage() {
               uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
                 date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 uptime: Math.random() > 0.02 ? Math.random() * 3 + 97 : Math.random() * 40 + 50,
-                status: Math.random() > 0.02 ? 'operational' : 'degraded' as 'operational' | 'degraded' | 'major_outage'
+                status: Math.random() > 0.02 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
               }))
             },
             {
@@ -177,7 +177,7 @@ export default function PublicStatusPage() {
               uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
                 date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 uptime: Math.random() * 2 + 98,
-                status: 'operational' as 'operational' | 'degraded' | 'major_outage'
+                status: 'operational' as 'operational' | 'down' | 'major_outage'
               }))
             }
           ]
@@ -198,7 +198,7 @@ export default function PublicStatusPage() {
               uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
                 date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 uptime: Math.random() * 1 + 99,
-                status: 'operational' as 'operational' | 'degraded' | 'major_outage'
+                status: 'operational' as 'operational' | 'down' | 'major_outage'
               }))
             },
             {
@@ -212,7 +212,7 @@ export default function PublicStatusPage() {
               uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
                 date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 uptime: Math.random() > 0.03 ? Math.random() * 3 + 97 : Math.random() * 20 + 70,
-                status: Math.random() > 0.03 ? 'operational' : 'degraded' as 'operational' | 'degraded' | 'major_outage'
+                status: Math.random() > 0.03 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
               }))
             }
           ]
@@ -275,7 +275,7 @@ export default function PublicStatusPage() {
   const getStatusColor = (status: string): string => {
     switch (status) {
       case 'operational': return 'text-green-600 bg-green-50 border-green-200'
-      case 'degraded': return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+      case 'down': return 'text-red-600 bg-red-50 border-red-200'
       case 'major_outage': return 'text-red-600 bg-red-50 border-red-200'
       case 'maintenance': return 'text-blue-600 bg-blue-50 border-blue-200'
       default: return 'text-gray-600 bg-gray-50 border-gray-200'
@@ -285,7 +285,7 @@ export default function PublicStatusPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'operational': return <CheckCircle className="h-4 w-4" />
-      case 'degraded': return <AlertTriangle className="h-4 w-4" />
+      case 'down': return <XCircle className="h-4 w-4" />
       case 'major_outage': return <XCircle className="h-4 w-4" />
       case 'maintenance': return <Clock className="h-4 w-4" />
       default: return <AlertTriangle className="h-4 w-4" />
@@ -413,7 +413,7 @@ export default function PublicStatusPage() {
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border ${getStatusColor(statusData.status)}`}>
                 {getStatusIcon(statusData.status)}
                 {statusData.status === 'operational' && 'All Systems Operational'}
-                {statusData.status === 'degraded' && 'Some Systems Degraded'}
+                {statusData.status === 'down' && 'Some Systems Down'}
                 {statusData.status === 'major_outage' && 'Major Outage'}
                 {statusData.status === 'maintenance' && 'Under Maintenance'}
               </div>

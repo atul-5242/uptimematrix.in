@@ -31,7 +31,8 @@ import {
   AlertTriangle,
   ExternalLink,
   Settings,
-  Share
+  Share,
+  Clock
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -41,7 +42,7 @@ interface StatusPage {
   subdomain: string
   customDomain?: string
   description: string
-  status: 'operational' | 'degraded'
+  status: 'operational' | 'down' | 'maintenance' // Added 'maintenance'
   visibility: 'public'
   services: ServiceGroup[]
   subscribers: number
@@ -62,13 +63,13 @@ interface ServiceGroup {
   id: string
   name: string
   services: Service[]
-  status: 'operational' | 'degraded'
+  status: 'operational' | 'down' | 'maintenance' // Changed 'degraded' to 'down', added 'maintenance'
 }
 
 interface Service {
   id: string
   name: string
-  status: 'operational' | 'degraded'
+  status: 'operational' | 'down' | 'maintenance' // Changed 'degraded' to 'down', added 'maintenance'
   uptime: number
   monitorId?: string
 }
@@ -80,31 +81,31 @@ export default function StatusPagesDashboard() {
   const [loading, setLoading] = useState<boolean>(true)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [visibilityFilter, setVisibilityFilter] = useState<string>('all')
 
   // Mock data - replace with actual API calls
   useEffect(() => {
     const mockStatusPages: StatusPage[] = [
       {
         id: '1',
-        name: 'My Company Status',
-        subdomain: 'mycompany',
-        customDomain: 'status.mycompany.com',
-        description: 'Track the status of our main services and infrastructure',
+        name: 'Main Website',
+        subdomain: 'main',
+        description: 'Our main marketing website and services',
         status: 'operational',
         visibility: 'public',
         services: [
           {
-            id: '1',
-            name: 'Web Services',
+            id: 'srv1',
+            name: 'API Backend',
             status: 'operational',
             services: [
               { id: '1', name: 'Main Website', status: 'operational', uptime: 99.95, monitorId: 'mon1' },
               { id: '2', name: 'API Gateway', status: 'operational', uptime: 99.98, monitorId: 'mon2' },
-              { id: '3', name: 'CDN', status: 'operational', uptime: 100, monitorId: 'mon3' }
+              { id: '3', name: 'CDN', status: 'maintenance', uptime: 100, monitorId: 'mon3' } // Changed to maintenance
             ]
           },
           {
-            id: '2',
+            id: 'srv2',
             name: 'Database Services',
             status: 'operational',
             services: [
@@ -130,15 +131,15 @@ export default function StatusPagesDashboard() {
         name: 'E-commerce Platform',
         subdomain: 'ecommerce-platform',
         description: 'Status updates for our online store and payment systems',
-        status: 'degraded',
+        status: 'operational',
         visibility: 'public',
         services: [
           {
             id: '3',
             name: 'Store Front',
-            status: 'degraded',
+            status: 'down',
             services: [
-              { id: '6', name: 'Product Catalog', status: 'degraded', uptime: 98.5 },
+              { id: '6', name: 'Product Catalog', status: 'down', uptime: 98.5 }, // Changed to down
               { id: '7', name: 'Shopping Cart', status: 'operational', uptime: 99.8 },
               { id: '8', name: 'Checkout Process', status: 'operational', uptime: 99.9 }
             ]
@@ -196,30 +197,23 @@ export default function StatusPagesDashboard() {
   }, [])
 
   useEffect(() => {
-    let filtered = statusPages
-
-    if (searchTerm) {
-      filtered = filtered.filter(page => 
-        page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        page.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        page.description.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(page => page.status === statusFilter)
-    }
-
-    // Only show public status pages
-    filtered = filtered.filter(page => page.visibility === 'public')
-
+    const filtered = statusPages.filter((page) => {
+      const matchesSearch = page.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         page.description.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = statusFilter === 'all' || page.status === statusFilter
+      const matchesVisibility = visibilityFilter === 'all' || 
+                              (visibilityFilter === 'published' && page.isPublished) ||
+                              (visibilityFilter === 'draft' && !page.isPublished)
+      return matchesSearch && matchesStatus && matchesVisibility
+    })
     setFilteredPages(filtered)
-  }, [statusPages, searchTerm, statusFilter])
+  }, [statusPages, searchTerm, statusFilter, visibilityFilter])
 
   const getStatusColor = (status: StatusPage['status']): string => {
     switch (status) {
       case 'operational': return 'text-green-600 bg-green-50'
-      case 'degraded': return 'text-yellow-600 bg-yellow-50'
+      case 'down': return 'text-red-600 bg-red-50'
+      case 'maintenance': return 'text-blue-600 bg-blue-50' // Added maintenance case
       default: return 'text-gray-600 bg-gray-50'
     }
   }
@@ -227,7 +221,8 @@ export default function StatusPagesDashboard() {
   const getStatusIcon = (status: StatusPage['status']) => {
     switch (status) {
       case 'operational': return <CheckCircle className="h-4 w-4" />
-      case 'degraded': return <AlertTriangle className="h-4 w-4" />
+      case 'down': return <XCircle className="h-4 w-4" />
+      case 'maintenance': return <Clock className="h-4 w-4" /> // Added maintenance case
       default: return null
     }
   }
@@ -368,7 +363,8 @@ export default function StatusPagesDashboard() {
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="operational">Operational</SelectItem>
-                    <SelectItem value="degraded">Degraded</SelectItem>
+                    <SelectItem value="down">Down</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem> // Added maintenance filter
                   </SelectContent>
                 </Select>
 
@@ -413,7 +409,7 @@ export default function StatusPagesDashboard() {
                           {page.status.replace('_', ' ').toUpperCase()}
                         </div>
                         <div className="flex items-center gap-1">
-                          {getVisibilityIcon(page.visibility)}
+                          {getVisibilityIcon()}
                           <Badge variant="outline" className="text-xs capitalize">
                             {page.visibility.replace('_', ' ')}
                           </Badge>

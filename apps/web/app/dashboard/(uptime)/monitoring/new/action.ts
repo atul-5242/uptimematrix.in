@@ -7,7 +7,7 @@ export interface MonitorFormData {
   url: string;
   monitorType: 'http';
   checkInterval: number; // ms
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'HEAD';
+  method: 'GET';
   regions: string[];
   escalationPolicyId: string;
   tags: string[];

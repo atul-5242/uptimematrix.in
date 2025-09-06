@@ -9,9 +9,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Plus, Eye, TrendingUp, Globe, Users } from 'lucide-react'
 
 type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
-type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low'
+type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low' | 'maintenance' // Re-added 'maintenance'
 
-type Incident = {
+interface Incident { // AI-generated type from frontend usage
   id: string
   title: string
   description: string

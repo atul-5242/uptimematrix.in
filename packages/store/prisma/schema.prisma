@@ -15,37 +15,55 @@ datasource db {
 }
 
 model User {
-  id       String    @id @default(uuid())
-  username String    @unique
-  email    String    @unique
-  password String
-  websites website[]
-  escalationPolicies EscalationPolicy[]
-  teamMembers TeamMember[]
-  integrations Integration[]
+  id               String    @id @default(uuid())
+  firstName        String? // Added from frontend
+  lastName         String? // Added from frontend
+  email            String    @unique
+  phone            String? // Added from frontend
+  company          String[] @default([]) // Added from frontend - represents multiple organizations
+  jobTitle         String? // Added from frontend (referred to as 'Expertise')
+  location         String? // Added from frontend
+  bio              String? // Added from frontend
+  avatar           String? // Added from frontend
+  joinDate         DateTime  @default(now()) // Added from frontend
+  lastLogin        DateTime? // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
+  isEmailVerified  Boolean   @default(false) // Added from frontend
+  isPhoneVerified  Boolean   @default(false) // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
+  password         String
+  websites         website[] // Not directly used in frontend pages analyzed, but part of User relation
+  escalationPolicies EscalationPolicy[] // Not directly used in frontend pages analyzed, but part of User relation
+  teamMembers      TeamMember[] // Not directly used in frontend pages analyzed, but part of User relation
+  integrations     Integration[] // Not directly used in frontend pages analyzed, but part of User relation
+  organizationMembers OrganizationMember[] // AI-generated relation to OrganizationMember - Not directly used in frontend pages analyzed, but part of User relation
 } 
 
 model website {
-  id            String        @id @default(uuid())
-  name          String        @default("Unnamed Monitor")
-  monitorType   MonitorType   @default(https)
-  url           String
-  checkInterval Int           @default(60000)  // this include min+sec(sec which is timeout in frontend).
-  method        Method        @default(GET)
-  regions       String[]      @default(["India"])
-  alertTime     Int           @default(0)
-  severity      Severity      @default(low)
-  timeAdded     DateTime      @default(now())
-  ticks         WebsiteTick[]
-  user          User          @relation(fields: [user_id], references: [id])
-  user_id       String
-  escalationPolicyId String?
-  escalationPolicy   EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id])
-  incidents     Int           @default(0)
-  lastChecked   DateTime      @default(now())
-  currently_upForIndays Int   @default(0)
-  tags String[] @default([])
-  nextCheckTime      DateTime?     // Add this field to store next check time
+  id                    String        @id @default(uuid())
+  name                  String        @default("Unnamed Monitor")
+  monitorType           MonitorType   @default(https)
+  url                   String
+  checkInterval         Int           @default(60000)
+  method                Method        @default(GET)
+  regions               String[]      @default(["India"])
+  alertTime             Int           @default(0) // Not directly used in frontend pages analyzed
+  severity              Severity      @default(low) // Not directly used in frontend pages analyzed
+  timeAdded             DateTime      @default(now()) // Not directly used in frontend pages analyzed
+  ticks                 WebsiteTick[] // Not directly used in frontend pages analyzed, but part of website relation
+  user                  User          @relation(fields: [user_id], references: [id]) // Not directly used in frontend pages analyzed, but part of website relation
+  user_id               String
+  escalationPolicyId    String?
+  escalationPolicy      EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id]) // Not directly used in frontend pages analyzed, but part of website relation
+  incidents             Int           @default(0)
+  lastChecked           DateTime      @default(now())
+  currently_upForIndays Int           @default(0) // Not directly used in frontend pages analyzed
+  tags                  String[]      @default([])
+  nextCheckTime         DateTime?     // Not directly used in frontend pages analyzed
+  uptime                Float         @default(100) // Explicitly set as float, aligned with frontend
+  responseTimeMs        Int           @default(0) // Added from frontend (referred to as responseTime)
+  isActive              Boolean       @default(true) // Added from frontend
+  downtimeToday         Int           @default(0) // Added from frontend - Not currently used in frontend pages analyzed
+  avgResponseTime24h    Int           @default(0) // Added from frontend
+  uptimeTrend           UptimeTrend   @default(ONLINE) // Added from frontend
 }
 
 model EscalationPolicy {
@@ -84,7 +102,7 @@ model EscalationPolicy {
 model EscalationStep {
   id            String   @id @default(uuid())
   policyId      String
-  policy        EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policy        EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade) // Not directly used in frontend pages analyzed, but part of EscalationStep relation
   
   stepOrder     Int      // order of step (1, 2, 3, etc.)
   
@@ -92,10 +110,10 @@ model EscalationStep {
   primaryMethods     String[] @default([]) // ["email", "sms", "phone"]
   additionalMethods  String[] @default([]) // ["slack", "discord", "webhook"]
   
-  recipients    String[] // list of user IDs, team names, or external contacts
-  delayMinutes  Int      @default(0) // wait before this step triggers
-  escalateAfter Int      @default(5) // wait before escalating to next step (in minutes)
-  customMessage String?
+  recipients    String[] // list of user IDs, team names, or external contacts - Not directly used in frontend pages analyzed (though mentioned in concepts)
+  delayMinutes  Int      @default(0) // wait before this step triggers - Not directly used in frontend pages analyzed (though mentioned in concepts)
+  escalateAfter Int      @default(5) // wait before escalating to next step (in minutes) - Not directly used in frontend pages analyzed (though mentioned in concepts)
+  customMessage String? // Not directly used in frontend pages analyzed (though mentioned in concepts)
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -108,16 +126,16 @@ model TeamMember {
   id       String   @id @default(uuid())
   name     String
   email    String   @unique
-  phone    String?
-  role     String   // "Lead Developer", "DevOps Engineer", etc.
-  isActive Boolean  @default(true)  // is this user actively monitoring?
+  phone    String? // Not directly used in frontend pages analyzed (though conceptually related)
+  role     String   // "Lead Developer", "DevOps Engineer", etc. - Not directly used in frontend pages analyzed (though conceptually related)
+  isActive Boolean  @default(true)  // is this user actively monitoring? - Not directly used in frontend pages analyzed (though conceptually related)
   
   // Special roles
-  isOnCall   Boolean @default(false)  // is this user on call?
-  isTeamLead Boolean @default(false)  // is this user the team lead?
+  isOnCall   Boolean @default(false)  // is this user on call? - Not directly used in frontend pages analyzed (though conceptually related)
+  isTeamLead Boolean @default(false)  // is this user the team lead? - Not directly used in frontend pages analyzed (though conceptually related)
   
   userId   String
-  user     User     @relation(fields: [userId], references: [id])
+  user     User     @relation(fields: [userId], references: [id]) // Not directly used in frontend pages analyzed, but part of TeamMember relation
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -126,16 +144,16 @@ model TeamMember {
 // Integration model to track available notification methods
 model Integration {
   id          String   @id @default(uuid())
-  name        String   // "Slack", "Discord", "Webhook", etc.
-  type        String   // "slack", "discord", "webhook", "teams", etc.
+  name        String   // "Slack", "Discord", "Webhook", etc. - Not directly used in frontend pages analyzed (though conceptually related)
+  type        String   // "slack", "discord", "webhook", "teams", etc. - Not directly used in frontend pages analyzed (though conceptually related)
   isActive    Boolean  @default(false)
   isIntegrated Boolean @default(false)
   
   // Integration-specific configuration (stored as JSON)
-  configuration Json?   // webhook URLs, channel IDs, etc.
+  configuration Json?   // webhook URLs, channel IDs, etc. - Not directly used in frontend pages analyzed (though conceptually related)
   
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id]) // Not directly used in frontend pages analyzed, but part of Integration relation
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -153,15 +171,15 @@ enum Priority {
 model Region {
   id    String        @id @default(uuid())
   name  String        @unique
-  ticks WebsiteTick[]
+  ticks WebsiteTick[] // Not directly used in frontend pages analyzed, but part of Region relation
 }
 
 model WebsiteTick {
   id               String        @id @default(uuid())
   response_time_ms Int
   status           WebsiteStatus
-  Website_         website       @relation(fields: [website_id], references: [id])
-  Region_          Region        @relation(fields: [region_id], references: [id])
+  Website_         website       @relation(fields: [website_id], references: [id]) // Not directly used in frontend pages analyzed, but part of WebsiteTick relation
+  Region_          Region        @relation(fields: [region_id], references: [id]) // Not directly used in frontend pages analyzed, but part of WebsiteTick relation
   website_id       String
   region_id        String
   createdAt        DateTime      @default(now())
@@ -171,19 +189,20 @@ enum WebsiteStatus {
   Online
   Offline
   Unknown
+  Paused // Added from frontend
+  Maintenance // Added as requested
 }
 
 enum MonitorType {
   https
   http
+  ping // Added from frontend
+  tcp // Added from frontend
+  dns // Added from frontend
 }
 
 enum Method {
   GET
-  POST
-  PUT
-  DELETE
-  HEAD
 }
 
 enum Severity {
@@ -191,4 +210,154 @@ enum Severity {
   high
   medium
   low
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE // Added from frontend
+}
+
+enum ReportServiceStatus { // AI-generated enum from frontend usage
+  OPERATIONAL // Added from frontend
+  DOWN // Added from frontend
+  MAINTENANCE // Added from frontend
+}
+
+enum IncidentStatus { // AI-generated enum from frontend usage
+  RESOLVED // Added from frontend
+  INVESTIGATING // Added from frontend
+  MONITORING // Added from frontend
+  OPERATIONAL // Added as requested
+  DOWN // Added as requested
+  MAINTENANCE // Added as requested
+}
+
+enum IncidentSeverity { // AI-generated enum from frontend usage
+  CRITICAL // Added from frontend
+  MAJOR // Added from frontend
+  MINOR // Added from frontend
+  MAINTENANCE // Re-added as requested
+  NONE // Added from frontend
+}
+
+enum StatusPageStatus { // AI-generated enum from frontend usage
+  OPERATIONAL // Added from frontend
+}
+
+enum StatusPageVisibility { // AI-generated enum from frontend usage
+  PUBLIC // Added from frontend
+}
+
+enum ServiceStatus { // AI-generated enum from frontend usage
+  OPERATIONAL // Added from frontend
+}
+
+
+model StatusPage { // AI-generated model from frontend usage
+  id                    String             @id @default(cuid())
+  name                  String
+  subdomain             String             @unique
+  customDomain          String?
+  description           String
+  status                StatusPageStatus
+  visibility            StatusPageVisibility
+  password              String? // Added from frontend
+  services              ServiceGroup[] // AI-generated relation to ServiceGroup
+  // subscribers           Int                @default(0) // Added from frontend
+  incidents             Int                @default(0) // Added from frontend
+  uptime                Float              @default(100) // Added from frontend
+  lastUpdated           DateTime           @updatedAt // Added from frontend
+  isPublished           Boolean            @default(false) // Added from frontend
+  createdAt             DateTime           @default(now()) // Added from frontend
+  theme                 String // Added from frontend
+  logo                  String? // Added from frontend
+  primaryColor          String // Added from frontend
+  headerBg              String // Added from frontend
+  emailNotifications    Boolean            @default(false) // Added from frontend
+  slackNotifications    Boolean            @default(false) // Added from frontend
+  webhookNotifications  Boolean            @default(false) // Added from frontend
+  smsNotifications      Boolean            @default(false) // Added from frontend
+  showUptime            Boolean            @default(true) // Added from frontend
+  showIncidents         Boolean            @default(true) // Added from frontend
+  showMetrics           Boolean            @default(true) // Added from frontend
+  // allowSubscriptions    Boolean            @default(true) // Added from frontend
+  customCSS             String?            // Added from frontend
+  customHTML            String?            // Added from frontend
+}
+
+model ServiceGroup { // AI-generated model from frontend usage
+  id            String         @id @default(cuid())
+  name          String
+  services      Service[] // AI-generated relation to Service
+  status        ServiceStatus
+  statusPageId  String // AI-generated relation field
+  statusPage    StatusPage     @relation(fields: [statusPageId], references: [id]) // AI-generated relation
+}
+
+model Service { // AI-generated model from frontend usage
+  id            String         @id @default(cuid())
+  name          String
+  status        ServiceStatus
+  uptime        Float          @default(100) // Added from frontend
+  monitorId     String? // Added from frontend  // here monitor id is equal to the website_id
+  serviceGroupId String // AI-generated relation field
+  serviceGroup  ServiceGroup   @relation(fields: [serviceGroupId], references: [id]) // AI-generated relation
+}
+
+model Organization { // AI-generated model from frontend usage
+  id            String             @id @default(cuid())
+  name          String
+  description   String?
+  status        OrganizationStatus @default(ACTIVE)
+  totalMembers  Int                @default(0) // Added from frontend (as memberCount)
+  createdOn     DateTime           @default(now()) // Added from frontend (as createdDate)
+  industry      String? // Added from frontend
+  location      String? // Added from frontend
+  memberSince   DateTime           @default(now()) // Added from frontend
+  foundedYear   Int? // Added from frontend
+  about         String? // Added from frontend
+  members       OrganizationMember[] // AI-generated relation to OrganizationMember
+}
+
+model OrganizationMember { // AI-generated model from frontend usage
+  id            String             @id @default(cuid())
+  name          String
+  email         String             @unique
+  role          String // Changed to String to allow dynamic roles from frontend
+  initials      String // Added from frontend
+  organizationId String // AI-generated relation field
+  organization  Organization       @relation(fields: [organizationId], references: [id]) // AI-generated relation
+  userId        String? // AI-generated relation field
+  user          User?              @relation(fields: [userId], references: [id]) // AI-generated relation
+}
+
+model ReportService { // AI-generated model from frontend usage
+  id             String                @id @default(cuid())
+  name           String
+  url            String
+  status         ReportServiceStatus
+  uptime         Float
+  avgResponse    Int // Added from frontend
+  incidents      Int // Added from frontend
+  lastChecked    DateTime // Added from frontend
+  Incidents      Incident[] // AI-generated relation to Incident
+}
+
+model Incident { // AI-generated model from frontend usage
+  id             String             @id @default(cuid())
+  title          String
+  serviceName    String // Added from frontend
+  status         IncidentStatus
+  severity       IncidentSeverity
+  startTime      DateTime // Added from frontend
+  endTime        DateTime? // Added from frontend
+  duration       String // Added from frontend
+  impact         String // Added from frontend
+  serviceId      String? // AI-generated relation field
+  service        ReportService?     @relation(fields: [serviceId], references: [id]) // AI-generated relation
+}
+
+enum UptimeTrend { // AI-generated enum from frontend usage
+  ONLINE // Added from frontend
+  OFFLINE // Added from frontend
 }

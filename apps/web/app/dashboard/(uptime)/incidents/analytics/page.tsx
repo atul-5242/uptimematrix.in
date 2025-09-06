@@ -13,7 +13,7 @@ import { AlertTriangle, Clock, CheckCircle, XCircle, ArrowLeft, MessageSquare, U
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
-type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low'
+type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low' | 'maintenance' // Re-added 'maintenance'
 
 type IncidentUpdate = {
   id: string
@@ -29,7 +29,7 @@ type Incident = {
   title: string
   description: string
   status: IncidentStatus
-  severity: IncidentSeverity
+  severity: IncidentSeverity // Changed back to IncidentSeverity
   affectedServices: string[]
   createdAt: string
   acknowledgedAt?: string
@@ -163,6 +163,7 @@ export default function IncidentDetailPage() {
       case 'high': return 'bg-orange-500'
       case 'medium': return 'bg-yellow-500'
       case 'low': return 'bg-blue-500'
+      case 'maintenance': return 'bg-purple-500' // Re-added maintenance case
       default: return 'bg-gray-500'
     }
   }

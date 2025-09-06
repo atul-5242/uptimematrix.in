@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from 'react';
-import { Calendar, Clock, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, PieChart, Download, Filter, Search, Eye, Globe, Server, Database, Wifi, Pie } from 'lucide-react';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell } from 'recharts';
+import { Calendar, Clock, TrendingUp, TrendingDown, Activity, AlertTriangle, CheckCircle, XCircle, BarChart3, PieChart, Download, Filter, Search, Eye, Globe, Server, Database, Wifi } from 'lucide-react';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
 
 const ReportingPage = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
@@ -62,7 +62,7 @@ const ReportingPage = () => {
       id: 3,
       name: 'Database Cluster',
       url: 'db.uptimematrix.com:5432',
-      status: 'degraded',
+      status: 'maintenance', // Changed from 'degraded' to 'maintenance'
       uptime: 98.45,
       avgResponse: 578,
       incidents: 5,
@@ -110,7 +110,7 @@ const ReportingPage = () => {
       title: 'SSL Certificate Renewal',
       service: 'Main Website',
       status: 'resolved',
-      severity: 'maintenance',
+      severity: 'low', // Changed from 'maintenance' to 'low'
       startTime: '2024-09-02 02:00',
       endTime: '2024-09-02 02:15',
       duration: '15m',
@@ -118,17 +118,16 @@ const ReportingPage = () => {
     },
   ];
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'operational': return 'bg-green-100 text-green-800';
-      case 'degraded': return 'bg-yellow-100 text-yellow-800';
       case 'down': return 'bg-red-100 text-red-800';
       case 'maintenance': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getIncidentStatusColor = (status) => {
+  const getIncidentStatusColor = (status: string) => {
     switch (status) {
       case 'resolved': return 'bg-green-100 text-green-800';
       case 'investigating': return 'bg-yellow-100 text-yellow-800';
@@ -138,12 +137,13 @@ const ReportingPage = () => {
     }
   };
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'critical': return 'bg-red-100 text-red-800';
       case 'major': return 'bg-orange-100 text-orange-800';
       case 'minor': return 'bg-yellow-100 text-yellow-800';
-      case 'maintenance': return 'bg-blue-100 text-blue-800';
+      case 'low': return 'bg-blue-100 text-blue-800';
+      case 'maintenance': return 'bg-purple-100 text-purple-800'; // Re-added maintenance case with a new color
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -478,7 +478,7 @@ const ReportingPage = () => {
                   >
                     {incidentData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                    ))} 
                   </Pie>
                   <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
                 </RechartsPieChart>

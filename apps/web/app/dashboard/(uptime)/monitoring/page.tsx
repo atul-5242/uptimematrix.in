@@ -43,7 +43,7 @@ interface Monitor {
   name: string
   url: string
   type: 'http' | 'ping' | 'tcp' | 'dns'
-  status: 'online' | 'offline' | 'unknown' | 'paused' | 'degraded'
+  status: 'online' | 'offline' | 'unknown' | 'paused' | 'maintenance' // Changed 'degraded' to 'maintenance'
   uptime: number
   responseTime: number
   lastCheck: string
@@ -55,7 +55,7 @@ interface Monitor {
   incidents: number
   downtimeToday: number
   avgResponseTime24h: number
-  uptimeTrend: 'online' | 'offline' | 'stable'
+  uptimeTrend: 'online' | 'offline' ;
 }
 
 interface DashboardStats {
@@ -197,8 +197,8 @@ export default function MonitorsDashboard() {
       case 'online': return 'text-green-600 bg-green-50'
       case 'offline': return 'text-red-600 bg-red-50'
       case 'unknown': return 'text-yellow-600 bg-yellow-50'
-      case 'degraded': return 'text-yellow-600 bg-yellow-50'
       case 'paused': return 'text-gray-600 bg-gray-50'
+      case 'maintenance': return 'text-blue-600 bg-blue-50' // Added maintenance case
       default: return 'text-gray-600 bg-gray-50'
     }
   }
@@ -207,9 +207,9 @@ export default function MonitorsDashboard() {
     switch (status) {
       case 'online': return <CheckCircle className="h-4 w-4" />
       case 'offline': return <XCircle className="h-4 w-4" />
-      case 'degraded': return <AlertTriangle className="h-4 w-4" />
       case 'unknown': return <AlertTriangle className="h-4 w-4" />
       case 'paused': return <PowerOff className="h-4 w-4" />
+      case 'maintenance': return <Clock className="h-4 w-4" /> // Added maintenance case
     }
   }
 
@@ -352,9 +352,9 @@ export default function MonitorsDashboard() {
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="online">Online</SelectItem>
                     <SelectItem value="offline">Offline</SelectItem>
-                    <SelectItem value="degraded">Degraded</SelectItem>
                     <SelectItem value="unknown">Unknown</SelectItem>
                     <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem> // Added maintenance filter
                   </SelectContent>
                 </Select>
 
