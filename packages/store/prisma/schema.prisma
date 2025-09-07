@@ -16,8 +16,7 @@ datasource db {
 
 model User {
   id               String    @id @default(uuid())
-  firstName        String? // Added from frontend
-  lastName         String? // Added from frontend
+  fullName         String?
   email            String    @unique
   phone            String? // Added from frontend
   company          String[] @default([]) // Added from frontend - represents multiple organizations

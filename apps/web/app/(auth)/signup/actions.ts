@@ -1,17 +1,20 @@
 'use client';
 
-import { api } from '@/lib/api';
-
-export async function signUpAction(data: { username: string; email: string; password: string }) {
+export async function signUpAction(data: { fullName: string; email: string; password: string }) {
   try {
-    console.log('[WEB] POST /auth/user/signup', { baseURL: api.defaults.baseURL, username: data.username, email: data.email });
-    const res = await api.post('/auth/user/signup', {
-      username: data.username,
-      email: data.email,
-      password: data.password
+    const response = await fetch('/api/auth/user/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password
+      }),
     });
-    console.log('[WEB] /auth/user/signup response', res.status, res.data);
-    return res.data;
+    console.log('[WEB] /auth/user/signup response', response.status, response);
+    const data_response = await response.json();
+    console.log('[WEB] /auth/user/signup response', data_response);
+    return data_response;
   } catch (e: any) {
     console.error('[WEB] /auth/user/signup error', e?.response?.status, e?.response?.data || e?.message);
     const msg = e?.response?.data?.message || 'Sign up failed';

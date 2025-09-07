@@ -19,7 +19,7 @@ router.post('/validate-session', async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
-        username: true
+        fullName: true
       }
     });
     
@@ -56,7 +56,7 @@ router.post('/validate-session', async (req: Request, res: Response) => {
       user: {
         id: user.id,
         email: user.email,
-        username: user.username
+        fullName: user.fullName
       }
     });
   } catch (error) {

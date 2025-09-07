@@ -20,7 +20,7 @@ router.post('/auth/validate-session', async (req, res) => {
       select: {
         id: true,
         email: true,
-        username: true,
+        fullName: true,
         // Add other non-sensitive fields you want to return
       },
     });
@@ -33,7 +33,7 @@ router.post('/auth/validate-session', async (req, res) => {
     res.json({
       id: user.id,
       email: user.email,
-      username: user.username,
+      fullName: user.fullName,
       // Include any other user fields you need
     });
   } catch (error) {

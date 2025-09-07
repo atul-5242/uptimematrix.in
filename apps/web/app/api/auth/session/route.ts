@@ -5,9 +5,9 @@ export async function GET() {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get('auth_token')?.value;
-    let userId = token?.sub || null;
+    let userId = localStorage.getItem('auth_userId');
     
-    console.log('Session check - Token exists:', !!token);
+    console.log('Session check - Token exists:', token);
     console.log('Session check - User ID:', token?.sub);
 
     if (!token) {

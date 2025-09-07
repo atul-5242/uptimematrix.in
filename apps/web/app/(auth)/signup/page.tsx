@@ -57,7 +57,6 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
 
     if (!formData.firstName.trim()) errors.firstName = 'First name is required';
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
-
     if (!formData.email) errors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email address';
 
@@ -78,11 +77,11 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
     setSubmitting(true);
     setApiError(null);
     try {
-      // Backend expects { username, email, password }
-      await signUpAction({ 
-        username: formData.firstName + (formData.lastName ? ' ' + formData.lastName : ''),
-        email: formData.email, 
-        password: formData.password 
+      // Backend expects { fullName, email, password }
+      await signUpAction({
+        fullName: formData.firstName + ' ' + formData.lastName,
+        email: formData.email,
+        password: formData.password
       });
       if (onSubmit) await onSubmit({ ...formData });
       router.push('/signin');
@@ -127,7 +126,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
             {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="firstName" className="block text-sm font-medium text-slate-700">First name</label>
+                <label htmlFor="firstName" className="block text-sm font-medium text-slate-700">First Name</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-slate-400" />
@@ -137,8 +136,13 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                 {validationErrors.firstName && (<p className="text-sm text-red-600">{validationErrors.firstName}</p>)}
               </div>
               <div className="space-y-2">
-                <label htmlFor="lastName" className="block text-sm font-medium text-slate-700">Last name</label>
-                <input id="lastName" type="text" value={formData.lastName} onChange={handleChange('lastName')} className={`w-full px-4 py-3 border rounded-lg ${validationErrors.lastName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Doe" disabled={isLoading || submitting} />
+                <label htmlFor="lastName" className="block text-sm font-medium text-slate-700">Last Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input id="lastName" type="text" value={formData.lastName} onChange={handleChange('lastName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.lastName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Doe" disabled={isLoading || submitting} />
+                </div>
                 {validationErrors.lastName && (<p className="text-sm text-red-600">{validationErrors.lastName}</p>)}
               </div>
             </div>

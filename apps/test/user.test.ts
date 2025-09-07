@@ -20,7 +20,7 @@ describe("Signup end point", () => {
     it("Is able to signup if body is correct", async () => { 
         try {
             const respose = await axios.post(`${BACKEND_URL}/auth/user/signup`, {
-                username: USER_NAME_RANDOM,//just writing wrong field here so test failed and that means this testing got succeded
+                fullName: USER_NAME_RANDOM,
                 password: "password"
             }) 
             expect(respose.status).toBe(200);
@@ -53,7 +53,7 @@ describe("Signin end point", () => {
         try {
             console.log("username", USER_NAME_RANDOM);
             const respose = await axios.post(`${BACKEND_URL}/user/signin`, {
-                username: USER_NAME_RANDOM,//just writing wrong field here so test failed and that means this testing got succeded
+                fullName: USER_NAME_RANDOM,
                 password: "password"
             }) 
             console.log("respose", respose);

@@ -3,10 +3,10 @@ import { prismaClient } from "../../index.js";
 async function main() {
   // 1️⃣ Ensure a default user exists (will be reused everywhere)
   const defaultUser = await prismaClient.user.upsert({
-    where: { username: "admin" },
+    where: { email: "admin@example.com" },
     update: {},
     create: {
-      username: "admin",
+      fullName: "admin",
       email: "admin@example.com",
       password: "admin", // ⚠️ replace with hashed password in production
     },

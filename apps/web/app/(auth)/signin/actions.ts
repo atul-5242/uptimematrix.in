@@ -23,6 +23,27 @@ export async function signInAction(
 
   const { user, token } = await res.json();
   
+  console.log("token comes from here okay please check it be sure that token come okay",token);
+
+  
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('auth_token', token);
+  }
+  
+  if (typeof document !== "undefined") {
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + 7);
+  
+    let cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax;`;
+  
+    if (process.env.NODE_ENV === "production") {
+      cookie += " Secure;";
+    }
+  
+    document.cookie = cookie;
+  }
+  
+  
   // Update auth state
   dispatch(setAuthState({
     token,

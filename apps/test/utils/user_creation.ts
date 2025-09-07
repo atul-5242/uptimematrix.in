@@ -10,12 +10,12 @@ export async function createUser(): Promise<userParameters>{
     const USER_NAME = Math.random().toString(36).substring(2, 15);
 
     const signUpResponse = await axios.post(`${BACKEND_URL}/auth/user/signup`, {
-        username: USER_NAME,
+        fullName: USER_NAME,
         password: "password",
     })
     
     const signInResponse = await axios.post(`${BACKEND_URL}/user/signin`, {
-        username: USER_NAME,
+        fullName: USER_NAME,
         password: "password",
     })
 
