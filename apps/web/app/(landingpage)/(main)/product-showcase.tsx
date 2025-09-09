@@ -13,10 +13,10 @@ export function ProductShowcase() {
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Product Demo</Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            See BetterStack in action
+            See UptimeMatrix. in action
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Watch how teams use BetterStack to monitor their infrastructure, manage incidents, and keep their services running smoothly.
+            Watch how teams use UptimeMatrix. to monitor their infrastructure, manage incidents, and keep their services running smoothly.
           </p>
         </div>
 

@@ -5,10 +5,11 @@ export async function GET() {
   try {
     const cookieStore = cookies();
     const token = cookieStore.get('auth_token')?.value;
-    let userId = localStorage.getItem('auth_userId');
+    const userIdCookie = cookieStore.get('auth_userId')?.value;
+    let userId = userIdCookie || null;
     
-    console.log('Session check - Token exists:', token);
-    console.log('Session check - User ID:', token?.sub);
+    console.log('Session check - Token exists:', !!token);
+    console.log('Session check - User ID from cookie:', userIdCookie);
 
     if (!token) {
       return NextResponse.json(

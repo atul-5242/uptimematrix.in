@@ -30,17 +30,24 @@ export async function signInAction(
     localStorage.setItem('auth_token', token);
   }
   
+  if (typeof window !== 'undefined' && user?.id) {
+    localStorage.setItem('auth_userId', user.id);
+  }
+  
   if (typeof document !== "undefined") {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + 7);
   
-    let cookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax;`;
+    let authTokenCookie = `auth_token=${token}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax;`;
+    let authUserIdCookie = `auth_userId=${user?.id || ''}; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax;`;
   
     if (process.env.NODE_ENV === "production") {
-      cookie += " Secure;";
+      authTokenCookie += " Secure;";
+      authUserIdCookie += " Secure;";
     }
   
-    document.cookie = cookie;
+    document.cookie = authTokenCookie;
+    document.cookie = authUserIdCookie;
   }
   
   

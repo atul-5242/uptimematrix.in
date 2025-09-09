@@ -54,7 +54,7 @@ async function processWebsite(site: {
     escalationPolicyId?: string;
     region?: string;
     checkInterval?: number;
-    user_id?: string;   // ✅ fixed (was userId before)
+    createdById?: string;
 }) {
     const startTime = Date.now();
     try {

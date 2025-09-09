@@ -1,14 +1,16 @@
 'use client';
 
-export async function signUpAction(data: { fullName: string; email: string; password: string }) {
+export async function signUpAction(data: { fullName: string; email: string; password: string; organizationName: string; invitationEmails: string[] }) {
   try {
-    const response = await fetch('/api/auth/user/signup', {
+    const response = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fullName: data.fullName,
         email: data.email,
-        password: data.password
+        password: data.password,
+        organizationName: data.organizationName,
+        invitationEmails: data.invitationEmails,
       }),
     });
     console.log('[WEB] /auth/user/signup response', response.status, response);

@@ -3,11 +3,11 @@ import { WebsiteStatus } from "@uptimematrix/store/client";
 import { sendEmail, sendSlack, sendWebhook, sendSMS } from "./../notifications/index.js";
 
 export async function handleEscalation(
-    site: { id: string, url: string, escalationPolicyId?: string, userId?: string, region?: string },
+    site: { id: string, url: string, escalationPolicyId?: string, createdById?: string, region?: string },
     status: WebsiteStatus
 ) {
     const regionName = site.region || "India";
-    const userEmail = await getUserEmail(site.userId);
+    const userEmail = await getUserEmail(site.createdById);
 
     if (!site.escalationPolicyId) {
         // Default fallback notification

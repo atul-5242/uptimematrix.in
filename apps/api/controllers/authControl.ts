@@ -3,6 +3,7 @@ import { AuthInput } from "../types.js";
 import jwt from "jsonwebtoken";
 import { prismaClient } from "@uptimematrix/store";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+import { sendEmail, createInvitationLink } from "../utils/email.js"; // Import new email utility
 
 // ---------------------- PASSWORD HELPERS ----------------------
 function hashPassword(password: string): string {
@@ -45,19 +46,95 @@ export const signUp = async (req: Request, res: Response) => {
 
     // Hash the password
     const hashedPassword = hashPassword(data.data.password);
-
-    const user = await prismaClient.user.create({
+    
+    const { email, password, fullName, organizationName, invitationEmails } = data.data;
+    
+    // Create Organization
+    const organization = await prismaClient.organization.create({
       data: {
-        email: data.data.email,
-        password: hashedPassword,
-        fullName: data.data.fullName,
+        name: organizationName,
+        description: `Organization for ${organizationName}`,
       },
     });
+    
+    // Create User
+    const user = await prismaClient.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        fullName,
+      },
+    });
+    
+    // Find or create 'Admin' role
+    let adminRole = await prismaClient.role.findUnique({ where: { name: "Admin" } });
+    if (!adminRole) {
+      adminRole = await prismaClient.role.create({ data: { name: "Admin", description: "Administrator role" } });
+    }
+    
+    // Create OrganizationMember for the user who signed up
+    await prismaClient.organizationMember.create({
+      data: {
+        userId: user.id,
+        organizationId: organization.id,
+        roleId: adminRole.id,
+        email: user.email,
+        name: user.fullName || "",
+        isVerified: true, // The user who signed up is verified
+      },
+    });
+    
+    // Handle invitation emails
+    if (invitationEmails && invitationEmails.length > 0) {
+      // Find or create 'Member' role
+      let memberRole = await prismaClient.role.findUnique({ where: { name: "Member" } });
+      if (!memberRole) {
+        memberRole = await prismaClient.role.create({ data: { name: "Member", description: "Standard member role" } });
+      }
+      
+      for (const invitedEmail of invitationEmails) {
+        // Create inactive OrganizationMember for the invited user (no User record yet)
+        await prismaClient.organizationMember.create({
+          data: {
+            organizationId: organization.id,
+            roleId: memberRole.id,
+            email: invitedEmail,
+            name: invitedEmail.split('@')[0] || invitedEmail, // Basic name from email
+            isVerified: false, // Will be true when they accept invitation
+            invitedById: user.id, // The user who created the organization invited them
+            userId: null, // No userId - will be set when they accept invitation and create/link account
+          },
+        });
+        
+        // Generate invitation token (e.g., JWT) - No expiration until accepted
+        const invitationToken = jwt.sign(
+          { email: invitedEmail, organizationId: organization.id, role: 'Member' },
+          (process.env.INVITATION_SECRET || "").trim() // Use a separate secret for invitations
+          // No expiration - token is valid until accepted
+        );
+        
+        const invitationLink = createInvitationLink(invitationToken);
+        const emailSubject = `You're invited to join ${organization.name} on UptimeMatrix.`;
+        const emailBody = `
+          <p>Hello,</p>
+          <p>You've been invited by ${user.fullName || user.email} to join the organization <strong>${organization.name}</strong> on UptimeMatrix..</p>
+          <p>Click the link below to accept the invitation and set up your account:</p>
+          <p><a href="${invitationLink}">${invitationLink}</a></p>
+          <p>If you already have a UptimeMatrix. account, please sign in first, then click the link.</p>
+          <p>Best regards,</p>
+          <p>The UptimeMatrix. Team</p>
+        `;
+        
+        await sendEmail(invitedEmail, emailSubject, emailBody);
+        console.log(`[API] Sent invitation email to ${invitedEmail}`);
+      }
+    }
 
     console.log("[API] /auth/user/signup success", { id: user.id });
     return res.json({
       message: "User created successfully",
       id: user.id,
+      organizationId: organization.id,
     });
   } catch (error) {
     console.error("[API] /auth/user/signup error", error);

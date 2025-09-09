@@ -27,48 +27,7 @@ async function main() {
 
   console.log("✅ Regions seeded successfully");
 
-  // 3️⃣ Seed Default Escalation Policy (linked with defaultUser)
-  const defaultPolicy = await prismaClient.escalationPolicy.upsert({
-    where: { name_userId: { name: "Default Escalation Policy", userId: defaultUser.id } },
-    update: {},
-    create: {
-      name: "Default Escalation Policy",
-      description: "Default policy for handling website alerts",
-      priorityLevel: "low",
-      tags: ["default", "policy"],
-      isActive: true,
 
-      monitorsDown: true,
-      responseTimeThreshold: false,
-      responseTimeValue: 5000,
-      sslExpiry: false,
-      sslExpiryDays: 30,
-      domainExpiry: false,
-      domainExpiryDays: 30,
-      statusCodeErrors: false,
-      statusCodes: [],
-      heartbeatMissed: false,
-      heartbeatMissedCount: 3,
-
-      userId: defaultUser.id,
-      steps: {
-        create: [
-          {
-            stepOrder: 1,
-            primaryMethods: ["email"],
-            additionalMethods: [],
-            recipients: ["default-admin@example.com"],
-            delayMinutes: 0,
-            escalateAfter: 0,
-            customMessage: "⚠️ Default Alert: Please check the website status.",
-          },
-        ],
-      },
-    },
-    include: { steps: true },
-  });
-
-  console.log("✅ Default Escalation Policy seeded successfully:", defaultPolicy);
 }
 
 // Run seeding

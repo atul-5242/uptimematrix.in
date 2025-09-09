@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { signUpAction } from './actions';
+import { signUpAction } from './actions'; // Re-import to refresh types
 
 interface SignUpFormData {
   firstName: string;
@@ -11,6 +11,8 @@ interface SignUpFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  organizationName: string;
+  invitationEmails: string[];
   agreeToTerms: boolean;
 }
 
@@ -30,6 +32,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
     email: '',
     password: '',
     confirmPassword: '',
+    organizationName: '',
+    invitationEmails: [],
     agreeToTerms: false
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -57,6 +61,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
 
     if (!formData.firstName.trim()) errors.firstName = 'First name is required';
     if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
+    if (!formData.organizationName.trim()) errors.organizationName = 'Organization name is required';
     if (!formData.email) errors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = 'Please enter a valid email address';
 
@@ -64,6 +69,12 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
     else if (!Object.values(passwordRequirements).every(Boolean)) errors.password = 'Password does not meet requirements';
 
     if (formData.password !== formData.confirmPassword) errors.confirmPassword = 'Passwords do not match';
+
+    // Validate invitation emails
+    const invalidEmails = formData.invitationEmails.filter(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+    if (invalidEmails.length > 0) {
+      errors.invitationEmails = 'One or more invitation emails are invalid';
+    }
 
     if (!formData.agreeToTerms) errors.agreeToTerms = 'You must agree to the terms and conditions';
 
@@ -81,7 +92,9 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
       await signUpAction({
         fullName: formData.firstName + ' ' + formData.lastName,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        organizationName: formData.organizationName,
+        invitationEmails: formData.invitationEmails,
       });
       if (onSubmit) await onSubmit({ ...formData });
       router.push('/signin');
@@ -96,6 +109,31 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
     const value = field === 'agreeToTerms' ? (e.target as HTMLInputElement).checked : e.target.value;
     setFormData(prev => ({ ...prev, [field]: value }));
     if (validationErrors[field]) setValidationErrors(prev => ({ ...prev, [field]: undefined }));
+  };
+
+  const handleInvitationEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      const email = (e.target as HTMLInputElement).value.trim();
+      if (email && !formData.invitationEmails.includes(email)) {
+        setFormData(prev => ({ ...prev, invitationEmails: [...prev.invitationEmails, email] }));
+        (e.target as HTMLInputElement).value = '';
+      }
+    }
+  };
+
+  const handleInvitationEmailBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const email = (e.target as HTMLInputElement).value.trim();
+    if (email && !formData.invitationEmails.includes(email)) {
+      setFormData(prev => ({ ...prev, invitationEmails: [...prev.invitationEmails, email] }));
+    }
+  };
+
+  const handleRemoveInvitationEmail = (emailToRemove: string) => {
+    setFormData(prev => ({
+      ...prev,
+      invitationEmails: prev.invitationEmails.filter(email => email !== emailToRemove)
+    }));
   };
 
   return (
@@ -147,6 +185,18 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
               </div>
             </div>
 
+            {/* Organization Name Field */}
+            <div className="space-y-2">
+              <label htmlFor="organizationName" className="block text-sm font-medium text-slate-700">Organization Name</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="h-5 w-5 text-slate-400">🏢</span>
+                </div>
+                <input id="organizationName" type="text" value={formData.organizationName} onChange={handleChange('organizationName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.organizationName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Acme Corp" disabled={isLoading || submitting} />
+              </div>
+              {validationErrors.organizationName && (<p className="text-sm text-red-600">{validationErrors.organizationName}</p>)}
+            </div>
+
             {/* Email Field */}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email address</label>
@@ -185,6 +235,34 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
               {validationErrors.confirmPassword && (<p className="text-sm text-red-600">{validationErrors.confirmPassword}</p>)}
             </div>
 
+            {/* Invitation Emails Field */}
+            <div className="space-y-2">
+              <label htmlFor="invitationEmails" className="block text-sm font-medium text-slate-700">Invite Team Members (Optional)</label>
+              <div className="relative">
+                <input
+                  id="invitationEmailInput"
+                  type="email"
+                  className={`w-full pr-4 py-3 border rounded-lg ${validationErrors.invitationEmails ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  placeholder="Enter email and press Enter or Tab"
+                  onKeyDown={handleInvitationEmailKeyDown}
+                  onBlur={handleInvitationEmailBlur}
+                  disabled={isLoading || submitting}
+                />
+              </div>
+              {formData.invitationEmails.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.invitationEmails.map((email, index) => (
+                    <span key={email} className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                      {email}
+                      <button type="button" onClick={() => handleRemoveInvitationEmail(email)} className="text-blue-600 hover:text-blue-800">
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {validationErrors.invitationEmails && (<p className="text-sm text-red-600">{validationErrors.invitationEmails}</p>)}
+            </div>
             {/* Terms and Conditions */}
             <div className="space-y-2">
               <label className="flex items-start gap-3 cursor-pointer">

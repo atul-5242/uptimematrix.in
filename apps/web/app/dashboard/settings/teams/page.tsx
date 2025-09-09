@@ -1571,7 +1571,7 @@ export default function TeamsPage() {
         <div className="mt-12 flex items-center justify-center text-gray-500 text-sm">
           <Info className="h-4 w-4 mr-2" />
           Need help? Contact us at{" "}
-          <a href="mailto:hello@betterstack.com" className="text-blue-600 ml-1 hover:underline">
+          <a href="mailto:hello@uptimematrix..com" className="text-blue-600 ml-1 hover:underline">
             atul.fzdlko2002@gmail.com
           </a>
         </div>

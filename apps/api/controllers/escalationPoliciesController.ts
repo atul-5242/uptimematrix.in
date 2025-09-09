@@ -7,7 +7,7 @@ import type { Request, Response } from "express";
 export const getEscalationPolicies = async (req: Request, res: Response) => {
   try {
     const policies = await prismaClient.escalationPolicy.findMany({
-      where: { userId: req.userId! },
+      where: { createdById: req.userId! },
       include: { steps: true },
       orderBy: { createdAt: "desc" },
     });
@@ -33,7 +33,7 @@ export const createEscalationPolicy = async (req: Request, res: Response) => {
           priorityLevel: (severity as string).toLowerCase() as Priority,  // must be a valid enum
           isActive,
           tags: Array.isArray(tags) ? tags : [], // ensure string[]
-          userId: req.userId!,
+          createdById: req.userId!,
           ...triggers,
           steps: {
             create: steps.map((step: any, idx: number) => ({
@@ -109,7 +109,7 @@ export const deleteEscalationPolicy = async (req: Request, res: Response) => {
       const policy = await prismaClient.escalationPolicy.findFirst({
         where: {
           id,
-          userId: req.userId!,
+          createdById: req.userId!,
         },
       });
   

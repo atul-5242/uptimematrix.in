@@ -35,7 +35,8 @@ export const addWebsite = async (req: Request, res: Response) => {
                 tags: tags || [],
                 timeAdded: new Date(),
                 nextCheckTime: new Date(Date.now() + 5000), // Set to 5 seconds from now for first monitoring cycle
-                user_id: req.userId!, // ✅ correct field name
+                createdById: req.userId!,
+                organizationId: req.organizationId!,
             },
         });
 
@@ -100,7 +101,7 @@ export const addWebsite = async (req: Request, res: Response) => {
 
 export const getWebsiteStatus = async (req: Request, res: Response) => {
     const website = await prismaClient.website.findFirst({
-      where: { user_id: req.userId!, id: req.params.websiteId },
+      where: { createdById: req.userId!, id: req.params.websiteId },
       include: { ticks: { orderBy: [{ createdAt: "desc" }], take: 20 } }, // fetch more ticks
       orderBy: { timeAdded: "desc" },
     });
@@ -115,7 +116,7 @@ export const getWebsiteStatus = async (req: Request, res: Response) => {
       url: website.url,
       status: website.ticks[0]?.status,
       id: website.id,
-      userId: website.user_id,
+      userId: website.createdById,
       incidents: website.incidents || 0,
       lastChecked: website.lastChecked || website.timeAdded,
       checkInterval: website.checkInterval,
@@ -123,7 +124,7 @@ export const getWebsiteStatus = async (req: Request, res: Response) => {
       monitorType: website.monitorType,
       regions: website.regions,
       tags: website.tags,
-      ticks: website.ticks.map((t:any) => ({
+      ticks: website.ticks.map((t) => ({
         response_time_ms: t.response_time_ms,
         createdAt: t.createdAt,
         status: t.status,
@@ -158,7 +159,7 @@ function calculateAvgResponseTime(ticks: any[], hours = 24) {
 export const getAllMonitors = async (req: Request, res: Response) => {
   try {
     const websites = await prismaClient.website.findMany({
-      where: { user_id: req.userId! },
+      where: { createdById: req.userId! },
       include: {
         ticks: {
           orderBy: { createdAt: "desc" },
@@ -168,7 +169,8 @@ export const getAllMonitors = async (req: Request, res: Response) => {
       orderBy: { timeAdded: "desc" },
     });
 
-    const result = websites.map((w) => {
+    type WebsiteWithTicks = typeof websites[number];
+    const result = websites.map((w: WebsiteWithTicks) => {
       const latestTick = w.ticks[0];
 
       return {
@@ -213,7 +215,7 @@ export const deleteWebsite = async (req: Request, res: Response) => {
     const website = await prismaClient.website.findFirst({
       where: {
         id,
-        user_id: req.userId!,
+        createdById: req.userId!,
       },
     });
 
