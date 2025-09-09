@@ -362,7 +362,7 @@ model Organization {
 model OrganizationMember {
   id             String       @id @default(cuid())
   name           String
-  email          String       @unique
+  email          String
   roleId         String
   role           Role         @relation(fields: [roleId], references: [id])
   organizationId String // AI-generated relation field
@@ -372,6 +372,8 @@ model OrganizationMember {
   isVerified     Boolean      @default(false)
   invitedBy      User?        @relation("InvitedBy", fields: [invitedById], references: [id]) // User who invited this member
   invitedById    String?
+
+  @@unique([email, organizationId])
 }
 
 model ReportService {
