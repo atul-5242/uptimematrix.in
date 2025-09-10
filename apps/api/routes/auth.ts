@@ -19,6 +19,33 @@ router.post('/auth/user/signup', signUp);
 router.post('/auth/validate-session', async (req, res) => {
   try {
     const { userId } = req.body;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization token not provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Token not provided' });
+    }
+
+    const JWT_SECRET = process.env.JWT_SECRET;
+
+    if (!JWT_SECRET) {
+      console.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch (error: any) {
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Token expired' });
+      }
+      return res.status(401).json({ error: 'Invalid token' });
+    }
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });

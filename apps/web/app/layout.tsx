@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/(landingpage)/theme-provider';
 import { Providers } from './providers';
+import { cookies } from 'next/headers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -63,10 +64,13 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = cookies();
+  const initialToken = cookieStore.get('auth_token')?.value || null;
+  const initialUserId = cookieStore.get('auth_userId')?.value || null;
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>
+        <Providers initialToken={initialToken} initialUserId={initialUserId}>
           <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
             {children}
           </ThemeProvider>
