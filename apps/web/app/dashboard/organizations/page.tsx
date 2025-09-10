@@ -18,93 +18,71 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
+import { useAppDispatch, useAppSelector } from '@/store';
+import { setCurrentOrganizationId } from '@/store/organizationSlice';
+import { fetchUserDetails } from '@/store/userSlice';
 
 // Demo data - replace with actual API calls
 interface Organization {
-  id: number;
+  id: string;
   name: string;
   description: string;
-  status: 'Active' | 'Inactive';
-  memberCount: number;
-  createdDate: string;
+  status: string;
+  totalMembers: number;
+  createdOn: string;
+  industry?: string;
+  location?: string;
+  memberSince?: string;
+  foundedYear?: number;
+  about?: string;
+  role: string;
   isSelected: boolean;
 }
 
-const initialOrganizations: Organization[] = [
-  {
-    id: 1,
-    name: 'Acme Inc.',
-    description: 'Leading provider of innovative solutions for modern businesses.',
-    status: 'Active',
-    memberCount: 12,
-    createdDate: 'Jan 15, 2023',
-    isSelected: true
-  },
-  {
-    id: 2,
-    name: 'TechFlow Solutions',
-    description: 'Cutting-edge software development and digital transformation services.',
-    status: 'Active',
-    memberCount: 25,
-    createdDate: 'Mar 22, 2023',
-    isSelected: false
-  },
-  {
-    id: 3,
-    name: 'DataSync Corp',
-    description: 'Enterprise data management and analytics platform for growing businesses.',
-    status: 'Inactive',
-    memberCount: 8,
-    createdDate: 'Dec 10, 2022',
-    isSelected: false
-  },
-  {
-    id: 4,
-    name: 'CloudVision Ltd',
-    description: 'Cloud infrastructure and DevOps consulting services for scalable solutions.',
-    status: 'Active',
-    memberCount: 18,
-    createdDate: 'Feb 05, 2023',
-    isSelected: false
-  },
-  {
-    id: 5,
-    name: 'InnovateLab',
-    description: 'Research and development hub for emerging technologies and AI solutions.',
-    status: 'Active',
-    memberCount: 15,
-    createdDate: 'Apr 18, 2023',
-    isSelected: false
-  },
-  {
-    id: 6,
-    name: 'SecureNet Systems',
-    description: 'Cybersecurity solutions and network protection services for enterprises.',
-    status: 'Inactive',
-    memberCount: 6,
-    createdDate: 'Nov 30, 2022',
-    isSelected: false
-  }
-];
-
 export default function OrganizationsPage() {
   const router = useRouter();
-  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations);
+  const dispatch = useAppDispatch();
+  const { organizations: userOrganizations, id: userId } = useAppSelector(state => state.user);
+  const { currentOrganizationId } = useAppSelector(state => state.organization);
+  
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgDescription, setNewOrgDescription] = useState('');
 
-  const handleSelectOrganization = (id: number) => {
-    setOrganizations(prev => 
-      prev.map(org => ({
-        ...org,
-        isSelected: org.id === id
-      }))
-    );
+  // Convert userOrganizations to match the local Organization interface and add isSelected
+  const organizations: Organization[] = React.useMemo(() => {
+    if (!userOrganizations) return [];
+    return userOrganizations.map(org => ({
+      ...org,
+      isSelected: org.id === currentOrganizationId,
+      // Add default values for optional fields if they are undefined
+      description: org.description || '',
+      status: org.status || 'Active',
+      totalMembers: org.totalMembers || 0,
+      createdOn: org.createdOn || new Date().toISOString(),
+      // Explicitly set optional fields to undefined if they are null or not present
+      industry: org.industry || undefined,
+      location: org.location || undefined,
+      memberSince: org.memberSince || undefined,
+      foundedYear: org.foundedYear || undefined,
+      about: org.about || undefined,
+    }));
+  }, [userOrganizations, currentOrganizationId]);
+
+  // Set initial selected organization if none is selected and there are organizations
+  React.useEffect(() => {
+    if (!currentOrganizationId && userOrganizations.length > 0) {
+      // Select the first organization by default
+      dispatch(setCurrentOrganizationId(userOrganizations[0].id));
+    }
+  }, [currentOrganizationId, userOrganizations, dispatch]);
+
+  const handleSelectOrganization = (id: string) => {
+    // No need to set local state, Redux will handle it
+    dispatch(setCurrentOrganizationId(id));
   };
 
-  const handleViewDetails = (id: number) => {
-    // Navigate to organization details page
+  const handleViewDetails = (id: string) => {
     router.push(`/dashboard/organizations/${id}`);
   };
 
@@ -114,24 +92,14 @@ export default function OrganizationsPage() {
       return;
     }
 
-    const newOrg: Organization = {
-      id: Math.max(...organizations.map(o => o.id)) + 1,
-      name: newOrgName,
-      description: newOrgDescription,
-      status: 'Active',
-      memberCount: 1,
-      createdDate: new Date().toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: '2-digit', 
-        year: 'numeric' 
-      }),
-      isSelected: false
-    };
-
-    setOrganizations(prev => [...prev, newOrg]);
+    // TODO: Implement actual API call to create organization and fetch updated user details
+    alert('Organization creation is not yet implemented fully with backend.');
+    
     setNewOrgName('');
     setNewOrgDescription('');
     setIsCreateDialogOpen(false);
+    // After creating, ideally re-fetch user details to get updated organizations list
+    // dispatch(fetchUserDetails());
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -261,11 +229,11 @@ export default function OrganizationsPage() {
                 <div className="flex items-center gap-4 text-xs text-gray-500">
                   <div className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {org.memberCount} members
+                    {org.totalMembers} members
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {org.createdDate}
+                    {org.createdOn}
                   </div>
                 </div>
 

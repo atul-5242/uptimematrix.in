@@ -5,6 +5,7 @@ import websiteRouter from "./routes/websiteRoute/websiteroute.js";
 import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.js";
 import userDetailsRouter from "./routes/userRoute/userRoutes.js";
 import sessionRouter from "./routes/authRoute/session.js";
+import organizationRouter from "./routes/organizationRoutes/organizationRoutes.js";
 import dotenv from "dotenv";
 
 
@@ -22,6 +23,7 @@ app.use("/auth", authRouter);
 app.use("/website", websiteRouter);
 app.use("/escalation-policies", escalationRouter);
 app.use("/userprofile", userDetailsRouter);
+app.use("/organization", organizationRouter);
 
 // Session validation endpoint
 app.use("/api", sessionRouter);

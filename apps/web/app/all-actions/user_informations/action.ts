@@ -1,3 +1,4 @@
+
 "use client";
 
 export interface UserData {
@@ -16,18 +17,29 @@ export interface UserData {
   organizations: {
     id: string;
     name: string;
+    description: string;
+    status: string;
+    totalMembers: number;
+    createdOn: string;
+    industry?: string;
+    location?: string;
+    memberSince?: string;
+    foundedYear?: number;
+    about?: string;
     role: string;
   }[];
 }
 
-export async function fetchUserDetailsAction(): Promise<UserData> {
-  const token = localStorage.getItem("auth_token");
+export async function fetchUserDetailsAction(organizationId?: string): Promise<UserData> {
+  // Fetch token securely from the API route
+  const tokenResponse = await fetch('/api/auth/get-token');
+  const { token } = await tokenResponse.json();
   
   if (!token) {
     throw new Error("Authentication token not found");
   }
 
-  const response = await fetch('/api/user-data', {
+  const response = await fetch('/api/user-data' + (organizationId ? `?organizationId=${organizationId}` : ''), {
     method: "GET",
     headers: {
       'Content-Type': 'application/json',
@@ -35,7 +47,6 @@ export async function fetchUserDetailsAction(): Promise<UserData> {
     },
     cache: 'no-store'
   });
-
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.message || "Failed to fetch user details");

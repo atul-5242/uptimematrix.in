@@ -21,9 +21,11 @@ const initialState: UserData = {
 
 export const fetchUserDetails = createAsyncThunk(
   'user/fetchDetails',
-  async (_, { rejectWithValue }) => {
+  async (organizationId: string | undefined, { rejectWithValue }) => {
     try {
-      return await fetchUserDetailsAction();
+      const data = await fetchUserDetailsAction(organizationId);
+      console.log('User details fetched:', data);
+      return data;
     } catch (error) {
       return rejectWithValue(
         error instanceof Error 

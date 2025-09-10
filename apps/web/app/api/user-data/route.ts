@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get the authorization header from the incoming request
     const authHeader = request.headers.get('authorization');
+    const organizationId = request.nextUrl.searchParams.get('organizationId');
 
     // If no authorization header, return unauthorized
     if (!authHeader) {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3001';
 
     // Proxy the request to the backend
-    const response = await fetch(`${backendUrl}/userprofile/me`, {
+    const response = await fetch(`${backendUrl}/userprofile/me` + (organizationId ? `?organizationId=${organizationId}` : ''), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

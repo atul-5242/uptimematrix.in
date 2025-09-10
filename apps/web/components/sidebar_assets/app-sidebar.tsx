@@ -138,10 +138,17 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const dispatch = useAppDispatch();
   const user = useAppSelector(state => state.user);
+  const { isAuthenticated, userId } = useAppSelector(state => state.auth);
+  const { currentOrganizationId } = useAppSelector(state => state.organization);
 
   useEffect(() => {
-    dispatch(fetchUserDetails());
-  }, [dispatch]);
+    if (isAuthenticated && userId) {
+      // Only fetch if user.id is not set OR if currentOrganizationId changed and the user data for that org is not loaded
+      if (!user.id || (currentOrganizationId && user.organizations.every(org => org.id !== currentOrganizationId))) {
+        dispatch(fetchUserDetails(currentOrganizationId || undefined));
+      }
+    }
+  }, [dispatch, isAuthenticated, userId, user.id, currentOrganizationId, user.organizations]);
 
   return (
     <Sidebar variant="inset" {...props}>

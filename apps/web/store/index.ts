@@ -4,11 +4,15 @@ import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector, TypedUseSelectorHook } from 'react-redux';
 import { authReducer } from './authSlice';
 import userReducer from './userSlice';
+import { organizationReducer } from './organizationSlice';
+import { selectedOrganizationReducer } from './selectedOrganizationSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    user: userReducer
+    user: userReducer,
+    organization: organizationReducer,
+    selectedOrganization: selectedOrganizationReducer,
   },
   middleware: (getDefaultMiddleware) => 
     getDefaultMiddleware({

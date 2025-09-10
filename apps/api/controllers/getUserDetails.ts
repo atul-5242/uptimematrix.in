@@ -5,6 +5,7 @@ export const getUserDetails = async (req: Request, res: Response) => {
   try {
     // Safely access user ID from the request
     const userId = req.user?.id;
+    const organizationId = req.query.organizationId as string | undefined;
 
     if (!userId) {
       return res.status(401).json({ message: 'Unauthorized: User ID not found' });
@@ -26,6 +27,7 @@ export const getUserDetails = async (req: Request, res: Response) => {
         lastLogin: true,
         isEmailVerified: true,
         organizationMembers: {
+          where: organizationId ? { organizationId: organizationId } : undefined,
           include: {
             organization: true,
             role: true
@@ -54,6 +56,15 @@ export const getUserDetails = async (req: Request, res: Response) => {
       organizations: user.organizationMembers.map((member) => ({
         id: member.organization.id,
         name: member.organization.name,
+        description: member.organization.description,
+        status: member.organization.status,
+        totalMembers: member.organization.totalMembers,
+        createdOn: member.organization.createdOn,
+        industry: member.organization.industry,
+        location: member.organization.location,
+        memberSince: member.organization.memberSince,
+        foundedYear: member.organization.foundedYear,
+        about: member.organization.about,
         role: member.role.name
       }))
     });
