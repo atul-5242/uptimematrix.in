@@ -3,8 +3,10 @@ import cors from "cors";
 import authRouter from "./routes/authRoute/authroute.js";
 import websiteRouter from "./routes/websiteRoute/websiteroute.js";
 import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.js";
+import userDetailsRouter from "./routes/userRoute/userRoutes.js";
 import sessionRouter from "./routes/authRoute/session.js";
 import dotenv from "dotenv";
+
 
 dotenv.config();
 const app = express();
@@ -19,6 +21,7 @@ app.use(express.json());
 app.use("/auth", authRouter);
 app.use("/website", websiteRouter);
 app.use("/escalation-policies", escalationRouter);
+app.use("/userprofile", userDetailsRouter);
 
 // Session validation endpoint
 app.use("/api", sessionRouter);
@@ -38,3 +41,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+export default app;

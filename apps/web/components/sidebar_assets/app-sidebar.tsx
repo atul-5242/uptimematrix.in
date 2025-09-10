@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useEffect } from "react"
 import {
   BookOpen,
   Bot,
@@ -16,7 +17,6 @@ import {
 } from "lucide-react"
 
 import { NavMain } from "@/components/sidebar_assets/nav-main"
-// import { NavProjects } from "@/components/sidebar_assets/nav-projects"
 import { NavSecondary } from "@/components/sidebar_assets/nav-secondary"
 import { NavUser } from "@/components/sidebar_assets/nav-user"
 import {
@@ -28,13 +28,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useAppSelector, useAppDispatch } from "@/store"
+import { fetchUserDetails } from "@/store/userSlice"
 
 const data = {
-  user: {
-    name: "Radha Krishna",
-    email: "radha.krishna16@gmail.com",
-    avatar: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIjwR4e4hMXd_lKAYUEKOaIxoy0mNe1ahJIw&s",
-  },
   navMain: [
     {
       title: "Uptime",
@@ -139,6 +136,13 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(state => state.user);
+
+  useEffect(() => {
+    dispatch(fetchUserDetails());
+  }, [dispatch]);
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -160,11 +164,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        {/* <NavProjects projects={data.projects} /> */}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser 
+          user={{
+            name: user.fullName || 'User',
+            email: user.email || '',
+            avatar: user.avatar || 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIjwR4e4hMXd_lKAYUEKOaIxoy0mNe1ahJIw&s'
+          }} 
+        />
       </SidebarFooter>
     </Sidebar>
   )
