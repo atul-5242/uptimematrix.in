@@ -225,7 +225,7 @@ export default function MonitorsDashboard() {
     // Create Date objects from the provided UTC string and the current time.
     // The Date constructor handles the 'Z' (UTC) correctly.
     const lastCheck = new Date(dateString);
-    return `Date: ${lastCheck.toLocaleDateString()} Time: ${lastCheck.toLocaleTimeString()}`;
+    return `Date: ${lastCheck.toLocaleDateString('en-US')} Time: ${lastCheck.toLocaleTimeString('en-US')}`;
 };
 
 

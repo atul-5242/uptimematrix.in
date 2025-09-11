@@ -29,7 +29,7 @@ interface Organization {
   description: string;
   status: string;
   totalMembers: number;
-  createdOn: string;
+  createdOn: string | undefined;
   industry?: string;
   location?: string;
   memberSince?: string;
@@ -59,7 +59,7 @@ export default function OrganizationsPage() {
       description: org.description || '',
       status: org.status || 'Active',
       totalMembers: org.totalMembers || 0,
-      createdOn: org.createdOn || new Date().toISOString(),
+      createdOn: org.createdOn || undefined,
       // Explicitly set optional fields to undefined if they are null or not present
       industry: org.industry || undefined,
       location: org.location || undefined,
@@ -233,7 +233,7 @@ export default function OrganizationsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {org.createdOn}
+                    {org.createdOn ? new Date(org.createdOn).toLocaleDateString('en-US') : "N/A"}
                   </div>
                 </div>
 

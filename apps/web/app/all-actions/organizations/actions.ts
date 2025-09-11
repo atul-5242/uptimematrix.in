@@ -18,13 +18,15 @@ export interface OrganizationDetailData {
   description: string;
   status: string;
   totalMembers: number;
-  createdOn: string;
+  createdOn: string | null | undefined;
   industry?: string;
   location?: string;
   memberSince?: string;
   foundedYear?: number;
   about?: string;
   members: MemberData[];
+  role: string;
+  permissions: string[];
 }
 
 export async function fetchOrganizationDetailsAction(organizationId: string): Promise<OrganizationDetailData> {

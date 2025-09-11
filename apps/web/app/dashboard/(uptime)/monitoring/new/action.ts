@@ -104,10 +104,10 @@ export async function getWebsiteStatusAction(websiteId: string) {
   return {
     id: data.data.id,
     incidents: data.data.incidents || 0,
-    lastChecked: data.data.lastChecked || new Date().toISOString(),
+    lastChecked: data.data.lastChecked || null,
     responseData: data.data.ticks
       ? data.data.ticks.map((tick: any) => ({
-          time: new Date(tick.createdAt).toLocaleTimeString(),
+          time: new Date(tick.createdAt).toISOString(),
           ms: tick.response_time_ms,
         }))
       : [],

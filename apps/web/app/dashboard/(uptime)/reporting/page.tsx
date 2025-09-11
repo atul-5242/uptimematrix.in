@@ -289,7 +289,7 @@ const ReportingPage = () => {
                   />
                   <YAxis tick={{ fontSize: 12 }} domain={[98, 100]} />
                   <Tooltip 
-                    labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                    labelFormatter={(value) => new Date(value).toLocaleDateString('en-US')}
                     formatter={(value, name) => [`${value}%`, name === 'uptime' ? 'Uptime' : 'Downtime']}
                   />
                   <Area type="monotone" dataKey="uptime" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />

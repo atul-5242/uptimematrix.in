@@ -30,8 +30,12 @@ export const getUserDetails = async (req: Request, res: Response) => {
           where: organizationId ? { organizationId: organizationId } : undefined,
           include: {
             organization: true,
-            role: true
-          }
+            role: {
+              include: {
+                permissions: true,
+              },
+            },
+          },
         }
       }
     });
@@ -65,7 +69,8 @@ export const getUserDetails = async (req: Request, res: Response) => {
         memberSince: member.organization.memberSince,
         foundedYear: member.organization.foundedYear,
         about: member.organization.about,
-        role: member.role.name
+        role: member.role.name,
+        permissions: member.role.permissions.map(p => p.name),
       }))
     });
   } catch (error) {

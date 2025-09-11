@@ -27,6 +27,7 @@ export interface UserData {
     foundedYear?: number;
     about?: string;
     role: string;
+    permissions: string[]; // Add permissions to the interface
   }[];
 }
 

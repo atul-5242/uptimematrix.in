@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Pause,
   Settings,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -40,7 +41,7 @@ interface WebsiteData {
   id: string;
   url: string;
   status: string;
-  lastChecked: string;
+  lastChecked: string | null;
   uptimeDuration: string;
   incidents: number;
   responseData: { time: string; ms: number }[];
@@ -66,6 +67,8 @@ export default function MonitorPage() {
   const [toDate, setToDate] = useState<Date | undefined>(
     new Date("2025-08-18")
   );
+
+  const [clientLastChecked, setClientLastChecked] = useState<string | null>(null);
 
   // Fetch website status
   useEffect(() => {
@@ -118,6 +121,12 @@ export default function MonitorPage() {
       isMounted = false;
     };
   }, [websiteId]); // Remove params dependency to prevent unnecessary re-renders
+
+  useEffect(() => {
+    if (website?.lastChecked) {
+      setClientLastChecked(website.lastChecked);
+    }
+  }, [website]);
 
   if (loading) {
     return (
@@ -206,7 +215,7 @@ export default function MonitorPage() {
             <div>
               <p className="text-sm text-muted-foreground">Last checked at</p>
               <p className="text-lg font-medium">
-                {format(new Date(website.lastChecked), "PPPpp")}
+                {clientLastChecked ? format(new Date(clientLastChecked), "PPPpp") : "N/A"}
               </p>
             </div>
             <div>
@@ -281,7 +290,10 @@ export default function MonitorPage() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={website.responseData}>
-                <XAxis dataKey="time" />
+                <XAxis 
+                  dataKey="time"
+                  tickFormatter={(isoString) => new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                />
                 <YAxis />
                 <Tooltip />
                 <Line

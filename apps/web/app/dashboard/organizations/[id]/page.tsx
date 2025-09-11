@@ -70,6 +70,7 @@ export default function OrganizationPage({ params }: { params: { id: string } })
   const dispatch = useAppDispatch();
   const { organization: selectedOrganization, loading, error } = useAppSelector(state => state.selectedOrganization);
   const [activeTab, setActiveTab] = useState('about');
+  const [clientCreatedOn, setClientCreatedOn] = useState<string | null>(null);
 
   useEffect(() => {
     if (organizationId) {
@@ -79,6 +80,12 @@ export default function OrganizationPage({ params }: { params: { id: string } })
       dispatch(clearSelectedOrganization());
     };
   }, [dispatch, organizationId]);
+
+  useEffect(() => {
+    if (selectedOrganization?.createdOn) {
+      setClientCreatedOn(selectedOrganization.createdOn);
+    }
+  }, [selectedOrganization?.createdOn]);
 
   const handleDeleteOrganization = async () => {
     try {
@@ -182,7 +189,9 @@ export default function OrganizationPage({ params }: { params: { id: string } })
                 <p className="text-sm font-medium text-gray-600">Created On</p>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-gray-400" />
-                  <span className="text-2xl font-bold text-gray-900">{new Date(selectedOrganization.createdOn).toLocaleDateString()}</span>
+                  <span className="text-2xl font-bold text-gray-900">
+                    {clientCreatedOn ? new Date(clientCreatedOn).toLocaleDateString('en-US') : "N/A"}
+                  </span>
                 </div>
               </div>
             </CardContent>

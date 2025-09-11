@@ -16,7 +16,16 @@ const initialState: UserData = {
   joinDate: new Date().toISOString(),
   lastLogin: undefined,
   isEmailVerified: false,
-  organizations: []
+  organizations: [{
+    id: '',
+    name: 'Default Organization',
+    description: '',
+    status: '',
+    totalMembers: 0,
+    createdOn: new Date().toISOString(),
+    role: '',
+    permissions: [],
+  }]
 };
 
 export const fetchUserDetails = createAsyncThunk(
