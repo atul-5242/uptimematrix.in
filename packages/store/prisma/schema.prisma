@@ -29,6 +29,9 @@ model User {
   isEmailVerified             Boolean              @default(false) // Added from frontend
   isPhoneVerified             Boolean              @default(false) // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
   password                    String
+  selectedOrganizationId      String?
+  selectedOrganizationRole    String? // Store role like "Admin", "Member", etc.
+  selectedOrganizationPermissions String[]             @default([]) // Store a list of permissions for the selected organization
   emailVerificationToken      String?
   emailVerificationExpires    DateTime?
   organizationMembers         OrganizationMember[] // Inverse relation for OrganizationMember's 'user' field AND ALSO  A list of OrganizationMember entries where this user is the member
@@ -372,6 +375,9 @@ model OrganizationMember {
   isVerified     Boolean      @default(false)
   invitedBy      User?        @relation("InvitedBy", fields: [invitedById], references: [id]) // User who invited this member
   invitedById    String?
+  invitationLink String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
 
   @@unique([email, organizationId])
 }

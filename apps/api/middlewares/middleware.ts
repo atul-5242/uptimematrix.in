@@ -29,20 +29,37 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string };
-        
-        const orgMember = await prismaClient.organizationMember.findFirst({
-            where: { userId: decoded.sub },
-            select: { organizationId: true },
+
+        // Verify user exists and get their current organization context
+        const user = await prismaClient.user.findUnique({
+          where: { id: decoded.sub },
+          select: {
+            id: true,
+            selectedOrganizationId: true,
+            organizationMembers: {
+              select: { organizationId: true },
+            },
+          },
         });
 
+        if (!user) {
+          return res.status(401).json({ message: 'Unauthorized: User not found' });
+        }
+        
+        // Determine organization ID to use (selected or first available)
+        let organizationId = user.selectedOrganizationId;
+        
+        if (!organizationId) {
+          return res.status(401).json({ message: 'Unauthorized: No organization access' });
+        }
+
         req.user = {
-            id: decoded.sub,
-            organizationId: orgMember?.organizationId
+          id: decoded.sub,
+          organizationId: organizationId,
         };
 
         next();
     } catch (error) {
-        console.error('Authentication error:', error);
         return res.status(401).json({
             message: "Authentication failed",
             error: error instanceof Error ? error.message : 'Unknown error'

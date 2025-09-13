@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,26 @@ import { MoreHorizontal, Users, Shield, Plus, UserPlus, Edit, Trash2, Info, More
 import { Command, CommandInput, CommandItem, CommandList, CommandEmpty } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+// Import API actions
+import { 
+  getTeams, 
+  createTeam, 
+  updateTeam, 
+  deleteTeam,
+  getTeamMembers,
+  addMemberToTeam,
+  removeMemberFromTeam,
+  updateTeamMember,
+  getAvailableUsers
+} from "@/app/all-actions/team-section/team/actions";
+import { 
+  inviteMember,
+  getMembers,
+  transferMember
+} from "@/app/all-actions/team-section/members/actions";
+import { getRoles } from "@/app/all-actions/team-section/roles/actions";
+import { useAppSelector } from "@/store";
+
 // Types
 interface Team {
   id: string;
@@ -33,12 +53,12 @@ interface Member {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   avatar?: string;
-  teams: string[];
+  teams: string[]; // Reverted to allow multiple teams
   role: string;
   twoFA: boolean;
-  status: 'active' | 'pending' | 'inactive';
+  isVerified: boolean;
   joinedAt: Date;
 }
 
@@ -66,7 +86,49 @@ const availablePermissions = [
   "analytics",
   "backup_restore",
   "audit_logs",
-  "custom_scripts"
+  "custom_scripts",
+  // Organization Permissions
+  "organization:create",
+  "organization:select", // Though likely implicit for any user with organization access
+  "organization:delete",
+  "organization:manage_team",
+
+  // Monitoring Permissions
+  "monitor:create",
+  "monitor:edit",
+  "monitor:delete",
+
+  // Escalation Policy Permissions
+  "escalation_policy:create",
+  "escalation_policy:edit",
+  "escalation_policy:delete",
+
+  // Integration Permissions
+  "integration:create",
+  "integration:edit",
+  "integration:delete",
+
+  // Status Page Permissions
+  "status_page:create",
+  "status_page:edit", // Assuming edit capability for existing status pages
+  "status_page:delete", // Assuming delete capability for existing status pages
+
+  // Team Management Permissions
+  "team:create",
+  "team:edit",
+  "team:delete",
+  "team:add_member",
+  "team:remove_member",
+
+  // Member Management Permissions
+  "member:invite",
+  "member:edit",
+
+  // Role Management Permissions
+  "role:create",
+  "role:edit",
+  "role:delete",
+  "role:manage_permissions",
 ];
 
 interface NotificationSettings {
@@ -77,141 +139,6 @@ interface NotificationSettings {
   maxMembersPerTeam: number;
 }
 
-// Demo Data
-const initialTeams: Team[] = [
-  {
-    id: "1",
-    name: "Engineering Team",
-    memberCount: 8,
-    description: "Core development and engineering team",
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-02-20'),
-  },
-  {
-    id: "2", 
-    name: "Design Team",
-    memberCount: 4,
-    description: "UI/UX and product design team",
-    createdAt: new Date('2024-02-01'),
-    updatedAt: new Date('2024-02-15'),
-  },
-  {
-    id: "3",
-    name: "Marketing Team", 
-    memberCount: 6,
-    description: "Marketing and growth team",
-    createdAt: new Date('2024-01-20'),
-    updatedAt: new Date('2024-02-18'),
-  }
-];
-
-const initialMembers: Member[] = [
-  {
-    id: "1",
-    name: "Atul Graphic",
-    email: "atul.fzdlko2001@gmail.com",
-    phone: "+91 63061 28371",
-    teams: ["Engineering Team"],
-    role: "Responder",
-    twoFA: true,
-    status: 'active',
-    joinedAt: new Date('2024-01-16'),
-  },
-  {
-    id: "2", 
-    name: "Atul2002 Maurya",
-    email: "atul.fzdlko2002@gmail.com",
-    phone: "+91 98765 43210",
-    teams: ["Engineering Team", "Design Team"],
-    role: "Team Lead",
-    twoFA: false,
-    status: 'active',
-    joinedAt: new Date('2024-01-18'),
-  },
-  {
-    id: "3",
-    name: "Taylor Bell", 
-    email: "atul.ddd1002@gmail.com",
-    phone: "+91 87654 32109",
-    teams: ["Engineering Team"],
-    role: "Admin",
-    twoFA: true,
-    status: 'active',
-    joinedAt: new Date('2024-01-20'),
-  },
-  {
-    id: "4",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@example.com", 
-    phone: "+91 76543 21098",
-    teams: ["Design Team"],
-    role: "Responder",
-    twoFA: false,
-    status: 'active',
-    joinedAt: new Date('2024-02-02'),
-  },
-  {
-    id: "5",
-    name: "Mike Chen",
-    email: "mike.chen@example.com",
-    phone: "+91 65432 10987", 
-    teams: ["Marketing Team"],
-    role: "Member",
-    twoFA: true,
-    status: 'pending',
-    joinedAt: new Date('2024-02-10'),
-  },
-  {
-    id: "6",
-    name: "Lisa Wang",
-    email: "lisa.wang@example.com",
-    phone: "+91 54321 09876",
-    teams: ["Marketing Team", "Design Team"],
-    role: "Team Lead", 
-    twoFA: true,
-    status: 'active',
-    joinedAt: new Date('2024-01-25'),
-  },
-];
-
-const initialRoles: Role[] = [
-  {
-    id: "1",
-    name: "Admin",
-    description: "Can access reporting. Can change billing, dashboards, global API tokens, heartbeats, incidents, integrations, live tail, monitors, on-call calendars, policies, severities, sources, status pages, team members, teams, and the organization.",
-    permissions: ["full_access", "billing", "reporting", "team_management"],
-    isCustom: false,
-  },
-  {
-    id: "2", 
-    name: "Billing Admin",
-    description: "Can access reporting and the organization. Can change billing.",
-    permissions: ["reporting", "billing"],
-    isCustom: false,
-  },
-  {
-    id: "3",
-    name: "Team Lead",
-    description: "Can access billing, global API tokens, reporting, teams, and the organization. Can change dashboards, heartbeats, incidents, integrations, live tail, monitors, on-call calendars, policies, severities, sources, and status pages.",
-    permissions: ["billing", "reporting", "team_management", "monitoring"],
-    isCustom: false,
-  },
-  {
-    id: "4",
-    name: "Responder", 
-    description: "Can access billing, reporting, team members, teams, and the organization. Can change dashboards, heartbeats, incidents, integrations, live tail, monitors, on-call calendars, policies, severities, sources, and status pages.",
-    permissions: ["billing", "reporting", "monitoring"],
-    isCustom: false,
-  },
-  {
-    id: "5",
-    name: "Member",
-    description: "Can access billing, reporting, team members, teams, and the organization. Can change dashboards, live tail, and sources.",
-    permissions: ["billing", "reporting", "basic_access"],
-    isCustom: false,
-  },
-];
-
 const initialSettings: NotificationSettings = {
   teamNotifications: true,
   autoAssignNewMembers: false,
@@ -221,11 +148,14 @@ const initialSettings: NotificationSettings = {
 };
 
 export default function TeamsPage() {
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("teams");
-  const [teams, setTeams] = useState<Team[]>(initialTeams);
-  const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [roles, setRoles] = useState<Role[]>(initialRoles);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [settings, setSettings] = useState<NotificationSettings>(initialSettings);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Modal states
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -240,7 +170,7 @@ export default function TeamsPage() {
 
   // Form states
   const [newTeam, setNewTeam] = useState({ name: "", description: "" });
-  const [newMember, setNewMember] = useState({ name: "", email: "", phone: "", role: "", team: "" });
+  const [newMember, setNewMember] = useState<{ name: string; email: string; phone?: string; role: string; team: string[] }>({ name: "", email: "", phone: "", role: "", team: [] });
   const [newRole, setNewRole] = useState({ name: "", description: "", permissions: [] as string[] });
 
   // Team expansion and member selection
@@ -251,6 +181,7 @@ export default function TeamsPage() {
   const [memberSearch, setMemberSearch] = useState("");
   const [rolePermissionOpen, setRolePermissionOpen] = useState(false);
   const [rolePermissionSearch, setRolePermissionSearch] = useState("");
+  const { currentOrganizationId } = useAppSelector(state => state.organization);
 
   // Utility functions
   const getInitials = (name: string) => {
@@ -268,16 +199,68 @@ export default function TeamsPage() {
     console.log(`${type.toUpperCase()}: ${message}`);
   };
 
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Load initial data
+  useEffect(() => {
+    if (!mounted) return;
+    
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [teamsResult, membersResult, rolesResult] = await Promise.all([
+          getTeams(),
+          getMembers(currentOrganizationId!),
+          getRoles()
+        ]);
+        
+        if (teamsResult.success && teamsResult.data) {
+          setTeams(teamsResult.data);
+        } else {
+          console.error('Failed to load teams:', teamsResult.error);
+        }
+        
+        if (membersResult.success && membersResult.data) {
+          console.log("All members fetched from backend (after initial load):", membersResult.data.members);
+          setMembers(membersResult.data.members);
+        } else {
+          console.error('Failed to load members:', membersResult.error);
+        }
+        
+        if (rolesResult.success && rolesResult.data) {
+          setRoles(rolesResult.data);
+        } else {
+          console.error('Failed to load roles:', rolesResult.error);
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError('Failed to load data. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [mounted]);
+
   // Available members for team assignment (not already in the selected team)
   const availableMembersForTeam = useMemo(() => {
     if (!selectedTeamForMembers) return [];
     return members.filter(member => 
-      !member.teams.includes(selectedTeamForMembers.name) &&
+      member.isVerified === true && // Ensure member is verified
+      !member.teams.includes(selectedTeamForMembers.name) && // Check if member.team is null or undefined
       (memberSearch === "" || 
        member.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
        member.email.toLowerCase().includes(memberSearch.toLowerCase()))
     );
   }, [members, selectedTeamForMembers, memberSearch]);
+
+  // console.log("Available members for team selection:", availableMembersForTeam);
 
   // Team management functions
   const toggleTeamExpand = (teamName: string) => {
@@ -300,7 +283,7 @@ export default function TeamsPage() {
     setIsTeamModalOpen(true);
   };
 
-  const handleSaveTeam = () => {
+  const handleSaveTeam = async () => {
     // Form validation
     if (!newTeam.name.trim()) {
       showToast("Team name is required", 'error');
@@ -329,50 +312,72 @@ export default function TeamsPage() {
       return;
     }
 
+    try {
     if (editingTeamId) {
-      const oldTeam = teams.find(t => t.id === editingTeamId);
+        const result = await updateTeam(editingTeamId, {
+          name: newTeam.name,
+          description: newTeam.description
+        });
+        
+        if (result.success && result.data) {
       setTeams(prev => prev.map(t => 
-        t.id === editingTeamId 
-          ? { ...t, name: newTeam.name, description: newTeam.description, updatedAt: new Date() }
-          : t
-      ));
-
-      if (oldTeam && oldTeam.name !== newTeam.name) {
-        setMembers(prev => prev.map(m => ({
-          ...m,
-          teams: m.teams.map(tn => tn === oldTeam.name ? newTeam.name : tn)
-        })));
-      }
-
+            t.id === editingTeamId ? result.data : t
+          ));
       showToast("Team updated successfully!");
     } else {
-      const team: Team = {
-        id: generateId(),
+          showToast(result.error || "Failed to update team", 'error');
+          return;
+        }
+      } else {
+        const result = await createTeam({
         name: newTeam.name,
-        description: newTeam.description,
-        memberCount: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setTeams(prev => [...prev, team]);
+          description: newTeam.description
+        });
+        
+        if (result.success && result.data) {
+          setTeams(prev => [...prev, result.data]);
       showToast("Team created successfully!");
+        } else {
+          showToast(result.error || "Failed to create team", 'error');
+          return;
+        }
     }
 
     setNewTeam({ name: "", description: "" });
     setEditingTeamId(null);
     setIsTeamModalOpen(false);
+    } catch (error) {
+      console.error('Error saving team:', error);
+      showToast("An error occurred while saving the team", 'error');
+    }
   };
 
-  const handleDeleteTeam = (teamId: string) => {
+  const handleDeleteTeam = async (teamId: string) => {
     const team = teams.find(t => t.id === teamId);
     if (!team) return;
 
+    try {
+      const result = await deleteTeam(teamId);
+      
+      if (result.success) {
     setTeams(prev => prev.filter(t => t.id !== teamId));
-    setMembers(prev => prev.map(m => ({
-      ...m,
-      teams: m.teams.filter(tn => tn !== team.name)
-    })));
+        // Refresh members to update their team associations
+        const membersResult = await getMembers(currentOrganizationId!);
+        console.log("Raw members data before setMembers (handleDeleteTeam):", membersResult.data);
+        console.log("membersResult",membersResult);
+        if (membersResult.success && membersResult.data) {
+          setMembers(membersResult.data.members);
+        }
     showToast("Team deleted successfully!");
+      } else {
+        showToast(result.error || "Failed to delete team", 'error');
+        return;
+      }
+    } catch (error) {
+      console.error('Error deleting team:', error);
+      showToast("An error occurred while deleting the team", 'error');
+      return;
+    }
 
     if (editingTeamId === teamId) {
       setEditingTeamId(null);
@@ -384,7 +389,7 @@ export default function TeamsPage() {
   // Member management functions
   const openCreateMember = () => {
     setEditingMemberId(null);
-    setNewMember({ name: "", email: "", phone: "", role: "", team: "" });
+    setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
     setIsMemberModalOpen(true);
   };
 
@@ -393,14 +398,14 @@ export default function TeamsPage() {
     setNewMember({
       name: member.name,
       email: member.email,
-      phone: member.phone === "Not provided" ? "" : member.phone,
+      phone: member.phone || "", // Use || "" to ensure a string
       role: member.role,
-      team: member.teams[0] || ""
+      team: member.teams 
     });
     setIsMemberModalOpen(true);
   };
 
-  const handleSaveMember = () => {
+  const handleSaveMember = async () => {
     // Form validation
     if (!newMember.name.trim()) {
       showToast("Full name is required", 'error');
@@ -424,70 +429,110 @@ export default function TeamsPage() {
       return;
     }
     
-    if (!newMember.team) {
-      showToast("Please select a team", 'error');
+    if (newMember.team.length === 0) {
+      showToast("Please select at least one team", 'error');
       return;
     }
     
     // Phone validation (optional but if provided, should be valid)
-    if (newMember.phone.trim() && !/^[\+]?[0-9\s\-\(\)]{10,}$/.test(newMember.phone.trim())) {
+    if (newMember.phone && newMember.phone.trim() !== '' && !/^[\+]?[0-9\\s\\-\\(\\)]{10,}$/.test(newMember.phone as string)) {
       showToast("Please enter a valid phone number", 'error');
       return;
     }
 
+    try {
     if (editingMemberId) {
-      const oldMember = members.find(m => m.id === editingMemberId);
-      setMembers(prev => prev.map(m => 
-        m.id === editingMemberId 
-          ? {
-              ...m,
-              name: newMember.name,
-              email: newMember.email,
-              phone: newMember.phone || "Not provided",
-              teams: [newMember.team],
-              role: newMember.role,
-            }
-          : m
-      ));
-
-      // Update team counts if team changed
-      if (oldMember && oldMember.teams[0] !== newMember.team) {
-        updateTeamCounts();
-      }
-
+        // For editing existing members, we need to use the transfer/update member API
+        const result = await transferMember(editingMemberId, {
+          teamIds: newMember.team.map(t => teams.find(team => team.name === t)?.id).filter((id): id is string => id !== undefined), 
+          role: newMember.role
+        });
+        
+        if (result.success) {
+          // Refresh members data
+          const membersResult = await getMembers( currentOrganizationId!);
+          console.log("Raw members data before setMembers (handleSaveMember):", membersResult.data);
+          if (membersResult.success && membersResult.data) {
+            setMembers(membersResult.data.members);
+          }
       showToast("Member updated successfully!");
     } else {
-      const member: Member = {
-        id: generateId(),
-        name: newMember.name,
+          showToast(result.error || "Failed to update member", 'error');
+          return;
+        }
+      } else {
+        // For new members, use invite member API
+        const result = await inviteMember({
         email: newMember.email,
-        phone: newMember.phone || "Not provided",
-        teams: [newMember.team],
+          name: newMember.name,
+          phone: newMember.phone || undefined,
         role: newMember.role,
-        twoFA: false,
-        status: 'pending',
-        joinedAt: new Date(),
-      };
-
-      setMembers(prev => [...prev, member]);
-      updateTeamCounts();
+          teamIds: newMember.team.map(t => teams.find(team => team.name === t)?.id).filter((id): id is string => id !== undefined) 
+        });
+        
+        if (result.success) {
+          // Refresh members data
+          const membersResult = await getMembers( currentOrganizationId!);
+          console.log("Raw members data before setMembers (handleSaveMember - invite):", membersResult.data);
+          if (membersResult.success && membersResult.data) {
+            setMembers(membersResult.data.members);
+          }
       showToast("Member invited successfully!");
+        } else {
+          showToast(result.error || "Failed to invite member", 'error');
+          return;
+        }
     }
 
-    setNewMember({ name: "", email: "", phone: "", role: "", team: "" });
+    setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
     setEditingMemberId(null);
     setIsMemberModalOpen(false);
+    } catch (error) {
+      console.error('Error saving member:', error);
+      showToast("An error occurred while saving the member", 'error');
+    }
   };
 
-  const handleDeleteMember = (memberId: string) => {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
-    updateTeamCounts();
-    showToast("Member removed successfully!");
+  const handleDeleteMember = async (memberId: string) => {
+    try {
+      const memberToDelete = members.find(m => m.id === memberId);
+      if (!memberToDelete || memberToDelete.teams.length === 0) return; 
+      
+      const removePromises = memberToDelete.teams.map(async (teamName) => {
+      const team = teams.find(t => t.name === teamName);
+        if (team) {
+          return removeMemberFromTeam(team.id, memberId);
+        }
+        return { success: false, error: 'Team not found' };
+      });
+
+      const results = await Promise.all(removePromises);
+      const failedRemovals = results.filter(r => !r.success);
+
+      if (failedRemovals.length === 0) {
+        showToast("Member removed from all teams successfully!");
+      } else if (failedRemovals.length === memberToDelete.teams.length) {
+        showToast("Failed to remove member from any team.", 'error');
+        return;
+      } else {
+        showToast(`Member removed from some teams, but failed for ${failedRemovals.length} team(s).`, 'error');
+      }
+
+        const membersResult = await getMembers(currentOrganizationId!);
+        if (membersResult.success && membersResult.data) {
+          setMembers(membersResult.data.members);
+        }
+
+    } catch (error) {
+      console.error('Error removing member:', error);
+      showToast("An error occurred while removing the member", 'error');
+      return;
+    }
 
     if (editingMemberId === memberId) {
       setEditingMemberId(null);
       setIsMemberModalOpen(false);
-      setNewMember({ name: "", email: "", phone: "", role: "", team: "" });
+      setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
     }
   };
 
@@ -627,17 +672,49 @@ export default function TeamsPage() {
     setNewRole(prev => ({ ...prev, permissions: prev.permissions.filter(p => p !== permission) }));
   };
 
-  const handleAddMembersToTeam = () => {
+  const handleAddMembersToTeam = async () => {
     if (!selectedTeamForMembers || selectedMembersForTeam.length === 0) return;
 
-    setMembers(prev => prev.map(m => 
-      selectedMembersForTeam.find(sm => sm.id === m.id)
-        ? { ...m, teams: Array.from(new Set([...m.teams, selectedTeamForMembers.name])) }
-        : m
-    ));
+    try {
+      const promises = selectedMembersForTeam.map(member => {
+        const role = roles.find(r => r.name === member.role);
+        if (!role) {
+          showToast(`Role '${member.role}' not found for member '${member.name}'`, 'error');
+          return { success: false, error: 'Role not found' };
+        }
+          return addMemberToTeam(selectedTeamForMembers.id, {
+            userId: member.id,
+            roleId: role.id
+          });
+      });
 
-    updateTeamCounts();
+      const results = await Promise.all(promises);
+      const failedCount = results.filter(r => !r.success).length;
+      
+      if (failedCount === 0) {
     showToast(`Added ${selectedMembersForTeam.length} member(s) to ${selectedTeamForMembers.name}`);
+      } else {
+        showToast(`Added ${selectedMembersForTeam.length - failedCount} member(s), ${failedCount} failed`, 'error');
+      }
+
+      // Refresh members and teams data
+      const [membersResult, teamsResult] = await Promise.all([
+        getMembers(currentOrganizationId!),
+        getTeams()
+      ]);
+      console.log("Raw members data before setMembers (handleAddMembersToTeam):", membersResult.data);
+      
+      if (membersResult.success && membersResult.data) {
+        setMembers(membersResult.data.members);
+      }
+      
+      if (teamsResult.success && teamsResult.data) {
+        setTeams(teamsResult.data);
+      }
+    } catch (error) {
+      console.error('Error adding members to team:', error);
+      showToast("An error occurred while adding members to team", 'error');
+    }
     
     setSelectedMembersForTeam([]);
     setSelectedTeamForMembers(null);
@@ -656,13 +733,45 @@ export default function TeamsPage() {
     updateTeamCounts();
   }, [members]);
 
-  const getStatusColor = (status: Member['status']) => {
+  const getStatusColor = (status: Member['isVerified']) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
+      case true: return 'bg-green-100 text-green-800';
+      case false: return 'bg-yellow-100 text-yellow-800';
     }
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading teams data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Data</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -801,14 +910,13 @@ export default function TeamsPage() {
                                       <span className="font-medium text-gray-900">{member.name}</span>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Badge variant="secondary" className={getStatusColor(member.status)}>
-                                            {member.status}
+                                          <Badge variant="secondary" className={getStatusColor(member.isVerified)}>
+                                            {member.isVerified ? 'Verified' : 'Unverified'}
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          {member.status === 'active' ? 'Member has accepted invitation and is active' : 
-                                           member.status === 'pending' ? 'Member has not accepted invitation yet' : 
-                                           'Member is inactive'}
+                                          {member.isVerified ? 'Member has accepted invitation and is active' : 
+                                           'Member has not accepted invitation yet'}
                                         </TooltipContent>
                                       </Tooltip>
                                     </div>
@@ -895,22 +1003,21 @@ export default function TeamsPage() {
                           <span className="text-sm text-gray-600">Status:</span>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge className={getStatusColor(member.status)}>
-                                {member.status}
+                              <Badge className={getStatusColor(member.isVerified)}>
+                                {member.isVerified ? 'Verified' : 'Unverified'}
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
-                              {member.status === 'active' ? 'Member has accepted invitation and is active' : 
-                               member.status === 'pending' ? 'Member has not accepted invitation yet' : 
-                               'Member is inactive'}
+                              {member.isVerified ? 'Member has accepted invitation and is active' : 
+                               'Member has not accepted invitation yet'}
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {member.teams.map((teamName, idx) => (
-                            <Badge key={idx} variant="secondary" className="bg-gray-100 text-xs">
+                          {member.teams.map((team) => (
+                            <Badge key={team} variant="secondary" className="bg-gray-100 text-xs">
                               <Users className="h-3 w-3 mr-1" />
-                              {teamName}
+                              {team}
                             </Badge>
                           ))}
                         </div>
@@ -942,7 +1049,7 @@ export default function TeamsPage() {
                 )).concat(
                   // Desktop Layout
                   members.map((member) => (
-                    <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-6 gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
+                    <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-orange-500 text-white text-sm">
@@ -957,10 +1064,10 @@ export default function TeamsPage() {
                       <div className="flex items-center text-gray-700">{member.phone}</div>
                       <div className="flex items-center">
                         <div className="flex flex-wrap gap-1">
-                          {member.teams.map((teamName, idx) => (
-                            <Badge key={idx} variant="secondary" className="bg-gray-100">
+                          {member.teams.map((team) => (
+                            <Badge key={team} variant="secondary" className="bg-gray-100">
                               <Users className="h-3 w-3 mr-1" />
-                              {teamName}
+                              {team}
                             </Badge>
                           ))}
                         </div>
@@ -969,14 +1076,13 @@ export default function TeamsPage() {
                       <div className="flex items-center">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Badge className={getStatusColor(member.status)}>
-                              {member.status}
+                            <Badge className={getStatusColor(member.isVerified)}>
+                              {member.isVerified ? 'Verified' : 'Unverified'}
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {member.status === 'active' ? 'Member has accepted invitation and is active' : 
-                             member.status === 'pending' ? 'Member has not accepted invitation yet' : 
-                             'Member is inactive'}
+                            {member.isVerified ? 'Member has accepted invitation and is active' : 
+                             'Member has not accepted invitation yet'}
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -1205,7 +1311,7 @@ export default function TeamsPage() {
                     >
                       <span className="flex items-center gap-2">
                         <Search className="h-4 w-4" />
-                        {availableMembersForTeam.length === 0 ? 'All members are already in this team' : 'Search and select members...'}
+                        {availableMembersForTeam.length === 0 ? 'No verified members available' : 'Search and select members...'}
                       </span>
                       <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
@@ -1330,7 +1436,7 @@ export default function TeamsPage() {
           setIsMemberModalOpen(open);
           if (!open) {
             setEditingMemberId(null);
-            setNewMember({ name: "", email: "", phone: "", role: "", team: "" });
+            setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
           }
         }}>
           <DialogContent className="w-[95vw] max-w-[425px] max-h-[90vh] overflow-y-auto">
@@ -1385,19 +1491,54 @@ export default function TeamsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="memberTeam">Team *</Label>
-                <Select value={newMember.team} onValueChange={(value) => setNewMember({ ...newMember, team: value || "" })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a team" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <Label htmlFor="memberTeam">Teams *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {newMember.team.length > 0
+                        ? newMember.team.map(teamName => (
+                            <Badge key={teamName} variant="secondary" className="mr-1">
+                              {teamName}
+                            </Badge>
+                          ))
+                        : "Select teams..."}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search teams..." />
+                      <CommandList>
+                        <CommandEmpty>No team found.</CommandEmpty>
                     {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.name}>
+                          <CommandItem
+                            key={team.id}
+                            onSelect={() => {
+                              setNewMember(prev => ({
+                                ...prev,
+                                team: prev.team.includes(team.name)
+                                  ? prev.team.filter(t => t !== team.name)
+                                  : [...prev.team, team.name]
+                              }));
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={newMember.team.includes(team.name)}
+                              readOnly
+                              className="mr-2"
+                            />
                         {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                          </CommandItem>
+                        ))}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <DialogFooter>
@@ -1406,7 +1547,7 @@ export default function TeamsPage() {
                 onClick={() => {
                   setIsMemberModalOpen(false);
                   setEditingMemberId(null);
-                  setNewMember({ name: "", email: "", phone: "", role: "", team: "" });
+                  setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
                 }}
               >
                 Cancel
@@ -1534,7 +1675,42 @@ export default function TeamsPage() {
                                    permission === 'analytics' ? 'Access to analytics dashboard' :
                                    permission === 'backup_restore' ? 'Backup and restore data' :
                                    permission === 'audit_logs' ? 'View audit logs' :
-                                   permission === 'custom_scripts' ? 'Run custom scripts' : 'Custom permission'}
+                                   permission === 'custom_scripts' ? 'Run custom scripts' :
+                                   // Organization Permissions
+                                   permission === 'organization:create' ? 'Create new organizations' :
+                                   permission === 'organization:select' ? 'Select and switch between organizations' :
+                                   permission === 'organization:delete' ? 'Delete organizations' :
+                                   permission === 'organization:manage_team' ? 'Manage organization team members' :
+                                   // Monitoring Permissions
+                                   permission === 'monitor:create' ? 'Create new monitors' :
+                                   permission === 'monitor:edit' ? 'Edit existing monitors' :
+                                   permission === 'monitor:delete' ? 'Delete monitors' :
+                                   // Escalation Policy Permissions
+                                   permission === 'escalation_policy:create' ? 'Create new escalation policies' :
+                                   permission === 'escalation_policy:edit' ? 'Edit existing escalation policies' :
+                                   permission === 'escalation_policy:delete' ? 'Delete escalation policies' :
+                                   // Integration Permissions
+                                   permission === 'integration:create' ? 'Create new integrations' :
+                                   permission === 'integration:edit' ? 'Edit existing integrations' :
+                                   permission === 'integration:delete' ? 'Delete integrations' :
+                                   // Status Page Permissions
+                                   permission === 'status_page:create' ? 'Create new status pages' :
+                                   permission === 'status_page:edit' ? 'Edit existing status pages' :
+                                   permission === 'status_page:delete' ? 'Delete status pages' :
+                                   // Team Management Permissions
+                                   permission === 'team:create' ? 'Create new teams' :
+                                   permission === 'team:edit' ? 'Edit existing teams' :
+                                   permission === 'team:delete' ? 'Delete teams' :
+                                   permission === 'team:add_member' ? 'Add members to teams' :
+                                   permission === 'team:remove_member' ? 'Remove members from teams' :
+                                   // Member Management Permissions
+                                   permission === 'member:invite' ? 'Invite new members' :
+                                   permission === 'member:edit' ? 'Edit member profiles' :
+                                   // Role Management Permissions
+                                   permission === 'role:create' ? 'Create new roles' :
+                                   permission === 'role:edit' ? 'Edit existing roles' :
+                                   permission === 'role:delete' ? 'Delete roles' :
+                                   permission === 'role:manage_permissions' ? 'Manage role permissions' : 'Custom permission'}
                                 </div>
                               </div>
                             </CommandItem>

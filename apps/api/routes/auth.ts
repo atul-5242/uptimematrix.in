@@ -1,8 +1,13 @@
 import { Router } from 'express';
 import { prismaClient } from '@uptimematrix/store';
 import jwt from 'jsonwebtoken';
-import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
-import { signUp } from '../controllers/authControl.js';
+import { scryptSync, randomBytes } from 'crypto';
+import { setSelectedOrganization, signUp } from "../controllers/authControl.js";
+import { authMiddleware } from "../middlewares/middleware.js";
+
+
+// IN MY OPNION THIS FILE IS OF NO USE
+
 
 // Password helpers (same as in authControl.ts)
 function hashPassword(password: string): string {
@@ -13,7 +18,8 @@ function hashPassword(password: string): string {
 
 const router = Router();
 
-router.post('/auth/user/signup', signUp);
+// ------------------------------------ Auth routes ------------------------------------
+router.post("/user/signup", signUp);
 
 // Add this new endpoint for session validation
 router.post('/auth/validate-session', async (req, res) => {
@@ -306,5 +312,7 @@ router.post('/auth/accept-invitation', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+router.post("/select-organization", authMiddleware, setSelectedOrganization);
 
 export default router;

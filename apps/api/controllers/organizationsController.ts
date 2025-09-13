@@ -6,6 +6,7 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id; // Assuming userId is available from auth middleware
+    const organizationId = req.user?.organizationId;
     console.log(`[Backend] GET /organization/${id} - UserId: ${userId}`);
 
     if (!userId) {
@@ -14,7 +15,7 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
     }
 
     const organization = await prismaClient.organization.findUnique({
-      where: { id: id },
+      where: { id: organizationId },
       select: {
         id: true,
         name: true,
@@ -28,9 +29,29 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
         foundedYear: true,
         about: true,
         members: {
-          include: {
-            user: { select: { id: true, fullName: true, email: true, avatar: true } },
-            role: { select: { name: true } }
+          select: {
+            userId: true, // Explicitly select userId
+            isVerified: true, // Also ensure isVerified is selected
+            email: true, // Also ensure email is selected
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                avatar: true,
+                phone: true,
+                memberOfTeamEntries: {
+                  select: {
+                    team: {
+                      select: {
+                        name: true
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            role: { select: { name: true } },
           }
         },
         websites: true,
@@ -55,7 +76,7 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Forbidden: Not a member of this organization' });
     }
 
-    console.log(`[Backend] Successfully fetched details for organization ${id}.`);
+    console.log(`[Backend] Successfully fetched details for organization ${organization.id}.`);
     // Format the response data
     const formattedOrganization = {
       id: organization.id,
@@ -69,14 +90,20 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
       memberSince: organization.memberSince,
       foundedYear: organization.foundedYear,
       about: organization.about,
-      members: organization.members.map(member => ({
-        id: member.user?.id || '',
-        name: member.user?.fullName || member.email,    
-        email: member.email,
-        role: member.role.name,
-        avatar: member.user?.avatar || null,
-        initials: "AD"
-      })),
+      members: organization.members.map(member => {
+        console.log(`[Backend] Member in getOrganizationDetails: userId = ${member.userId}, email = ${member.email}, isVerified = ${member.isVerified}`);
+        return {
+          id: member.userId,
+          name: member.user?.fullName || member.email,
+          email: member.email,
+          phone: member.user?.phone || 'Not provided',
+          teams: member.user?.memberOfTeamEntries.map(entry => entry.team.name) || [], // Reverted to return an array of team names
+          role: member.role.name,
+          avatar: member.user?.avatar || null,
+          initials: "AD",
+          isVerified: member.isVerified,
+        };
+      }),
     };
 
     res.json(formattedOrganization);

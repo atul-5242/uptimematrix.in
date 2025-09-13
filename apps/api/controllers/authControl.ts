@@ -22,6 +22,61 @@ function verifyPassword(password: string, stored: string): boolean {
 // ---------------------- CONFIG ----------------------
 const JWT_EXPIRES_IN = "7d";
 
+export const setSelectedOrganization = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { organizationId } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized: User ID not found' });
+    }
+
+    if (!organizationId) {
+      return res.status(400).json({ message: 'Bad Request: organizationId is required' });
+    }
+
+    // Verify that the user is a member of the selected organization
+    const organizationMember = await prismaClient.organizationMember.findFirst({
+      where: {
+        userId: userId,
+        organizationId: organizationId,
+      },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+      },
+    });
+
+    if (!organizationMember) {
+      return res.status(403).json({ message: 'Forbidden: User is not a member of this organization' });
+    }
+
+    const roleName = organizationMember.role.name;
+    const permissions = organizationMember.role.permissions.map(p => p.name);
+
+    await prismaClient.user.update({
+      where: { id: userId },
+      data: {
+        selectedOrganizationId: organizationId,
+        selectedOrganizationRole: roleName,
+        selectedOrganizationPermissions: permissions,
+      },
+    });
+
+    res.status(200).json({ message: 'Selected organization updated successfully' });
+
+  } catch (error) {
+    console.error('Error setting selected organization:', error);
+    res.status(500).json({
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
 // ---------------------- SIGN UP ----------------------
 export const signUp = async (req: Request, res: Response) => {
   const data = AuthInput.safeParse(req.body);
@@ -49,6 +104,22 @@ export const signUp = async (req: Request, res: Response) => {
     
     const { email, password, fullName, organizationName, invitationEmails } = data.data;
     
+    // Find or create 'Admin' role
+    let adminRole = await prismaClient.role.findUnique({
+      where: { name: "Admin" },
+      include: { permissions: true }, // Include permissions here
+    });
+    if (!adminRole) {
+      adminRole = await prismaClient.role.create({
+        data: {
+          name: "Admin",
+          description: "Administrator role",
+          // If creating, you might need to connect default permissions here if they exist
+        },
+        include: { permissions: true }, // Include permissions when creating as well
+      });
+    }
+
     // Create Organization
     const organization = await prismaClient.organization.create({
       data: {
@@ -63,14 +134,11 @@ export const signUp = async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         fullName,
+        selectedOrganizationId: organization.id,
+        selectedOrganizationRole: adminRole.name,
+        selectedOrganizationPermissions: adminRole.permissions.map(p => p.name),
       },
     });
-    
-    // Find or create 'Admin' role
-    let adminRole = await prismaClient.role.findUnique({ where: { name: "Admin" } });
-    if (!adminRole) {
-      adminRole = await prismaClient.role.create({ data: { name: "Admin", description: "Administrator role" } });
-    }
     
     // Create OrganizationMember for the user who signed up
     await prismaClient.organizationMember.create({

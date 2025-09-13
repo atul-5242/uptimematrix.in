@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @uptimematrix/store build && tsc --build && node dist/index.js",
+    "dev": "rmdir /s /q dist && pnpm --filter @uptimematrix/store build && tsc --build && node dist/index.js",
     "build": "tsc --build",
     "start": "node dist/index.js"
   },

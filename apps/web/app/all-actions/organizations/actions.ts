@@ -1,7 +1,9 @@
 
 "use client";
 
-// import { cookies } from "next/headers";
+import { fetchUserDetails } from "@/store/userSlice";
+import { setSelectedOrganization } from "@/store/organizationSlice";
+import { toast } from "@/hooks/use-toast";
 
 export interface MemberData {
   id: string;
@@ -10,6 +12,7 @@ export interface MemberData {
   role: string;
   avatar: string | null;
   initials: string;
+  isVerified: boolean;
 }
 
 export interface OrganizationDetailData {
@@ -77,4 +80,53 @@ export async function deleteOrganizationAction(organizationId: string): Promise<
   }
 
   return { success: true, message: "Organization deleted successfully" };
+}
+
+// New action to select an organization and sync user details
+export async function selectAndSyncOrganization(organizationId: string, dispatch: any) {
+  try {
+    // 1. Update frontend state immediately with the selected organization
+    dispatch(setSelectedOrganization({ organizationId: organizationId }));
+
+    // Fetch token securely from the API route
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
+
+    if (!token) {
+      throw new Error("Authentication token not found");
+    }
+
+    // 2. Call the frontend Next.js API route to update backend
+    const response = await fetch('/api/userprofile/selectorganization-updation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ organizationId: organizationId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[Action] Failed to update selected organization on frontend API:', errorData);
+      // You might want to revert the setSelectedOrganization dispatch here if the backend update fails
+      throw new Error(errorData.message || 'Failed to update selected organization');
+    }
+
+    // 3. Only if the backend update is successful, then dispatch fetchUserDetails() to re-sync full user data
+    dispatch(fetchUserDetails());
+
+    toast({
+      title: 'Organization Selected',
+      description: 'Your selected organization has been updated.',
+    });
+
+  } catch (error: any) {
+    console.error('[Action] Error during organization selection:', error);
+    toast({
+      title: 'Error',
+      description: error.message || 'Failed to select organization.',
+      variant: 'destructive',
+    });
+  }
 }

@@ -19,8 +19,10 @@ import {
 } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store';
-import { setCurrentOrganizationId } from '@/store/organizationSlice';
-import { fetchUserDetails } from '@/store/userSlice';
+// import { setCurrentOrganizationId } from '@/store/organizationSlice';
+// import { fetchUserDetails } from '@/store/userSlice';
+// import { setSelectedOrganization } from '@/store/organizationSlice';
+import { selectAndSyncOrganization } from '@/app/all-actions/organizations/actions'; // Import the new action
 
 // Demo data - replace with actual API calls
 interface Organization {
@@ -42,8 +44,8 @@ interface Organization {
 export default function OrganizationsPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { organizations: userOrganizations, id: userId } = useAppSelector(state => state.user);
-  const { currentOrganizationId } = useAppSelector(state => state.organization);
+  const { organizations: userOrganizations, id: userId , selectedOrganizationId} = useAppSelector(state => state.user);
+  // const { currentOrganizationId } = useAppSelector(state => state.organization);
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
@@ -54,7 +56,7 @@ export default function OrganizationsPage() {
     if (!userOrganizations) return [];
     return userOrganizations.map(org => ({
       ...org,
-      isSelected: org.id === currentOrganizationId,
+      isSelected: org.id === selectedOrganizationId,
       // Add default values for optional fields if they are undefined
       description: org.description || '',
       status: org.status || 'Active',
@@ -67,19 +69,21 @@ export default function OrganizationsPage() {
       foundedYear: org.foundedYear || undefined,
       about: org.about || undefined,
     }));
-  }, [userOrganizations, currentOrganizationId]);
+  }, [userOrganizations, selectedOrganizationId]);
 
   // Set initial selected organization if none is selected and there are organizations
-  React.useEffect(() => {
-    if (!currentOrganizationId && userOrganizations.length > 0) {
-      // Select the first organization by default
-      dispatch(setCurrentOrganizationId(userOrganizations[0].id));
-    }
-  }, [currentOrganizationId, userOrganizations, dispatch]);
+  // React.useEffect(() => {
+  //   if (!currentOrganizationId && userOrganizations.length > 0) {
+  //     // Select the first organization by default
+  //     dispatch(setCurrentOrganizationId(userOrganizations[0].id));
+  //   }
+  // }, [currentOrganizationId, userOrganizations, dispatch]);
+
+  // Remove the old handleSelectOrganization function
+  // const handleSelectOrganization = async (id: string) => { ... };
 
   const handleSelectOrganization = (id: string) => {
-    // No need to set local state, Redux will handle it
-    dispatch(setCurrentOrganizationId(id));
+    selectAndSyncOrganization(id, dispatch); // Call the new action
   };
 
   const handleViewDetails = (id: string) => {
@@ -215,9 +219,12 @@ export default function OrganizationsPage() {
                     </div>
                     <div className="space-y-1">
                       <CardTitle className="text-lg">{org.name}</CardTitle>
-                      <Badge variant={getStatusBadgeVariant(org.status)}>
-                        {org.status}
-                      </Badge>
+                      {org.isSelected && (
+                        <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+                          <Check className="mr-1 h-3 w-3" />
+                          Active
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -101,6 +101,10 @@ const data = {
           title: "Billing",
           url: "/dashboard/settings/billings",
         },
+        {
+          title: "Invites",
+          url: "/dashboard/settings/invites",
+        },
       ],
     },
   ],
@@ -141,11 +145,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isAuthenticated, userId } = useAppSelector(state => state.auth);
   const { currentOrganizationId } = useAppSelector(state => state.organization);
 
+  // Find the selected organization from the user's organizations list
+  const selectedOrganization = user.organizations.find(
+    (org) => org.id === user.selectedOrganizationId
+  );
+
   useEffect(() => {
     if (isAuthenticated && userId) {
       // Only fetch if user.id is not set OR if currentOrganizationId changed and the user data for that org is not loaded
       if (!user.id || (currentOrganizationId && user.organizations.every(org => org.id !== currentOrganizationId))) {
-        dispatch(fetchUserDetails(currentOrganizationId || undefined));
+        dispatch(fetchUserDetails());
       }
     }
   }, [dispatch, isAuthenticated, userId, user.id, currentOrganizationId, user.organizations]);
@@ -161,8 +170,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <Command className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Uptime Matrix</span>
-                  <span className="truncate text-xs">Enterprise</span>
+                  <span className="truncate font-semibold">{selectedOrganization?.name || "Uptime Matrix"}</span>
+                  <span className="truncate text-xs">{user.selectedOrganizationRole || "Enterprise"}</span>
                 </div>
               </a>
             </SidebarMenuButton>

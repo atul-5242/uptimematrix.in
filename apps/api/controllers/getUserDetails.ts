@@ -26,6 +26,9 @@ export const getUserDetails = async (req: Request, res: Response) => {
         joinDate: true,
         lastLogin: true,
         isEmailVerified: true,
+        selectedOrganizationId: true,
+        selectedOrganizationRole: true,
+        selectedOrganizationPermissions: true,
         organizationMembers: {
           where: organizationId ? { organizationId: organizationId } : undefined,
           include: {
@@ -57,6 +60,9 @@ export const getUserDetails = async (req: Request, res: Response) => {
       joinDate: user.joinDate,
       lastLogin: user.lastLogin,
       isEmailVerified: user.isEmailVerified,
+      selectedOrganizationId: user.selectedOrganizationId,
+      selectedOrganizationRole: user.selectedOrganizationRole,
+      selectedOrganizationPermissions: user.selectedOrganizationPermissions,
       organizations: user.organizationMembers.map((member) => ({
         id: member.organization.id,
         name: member.organization.name,

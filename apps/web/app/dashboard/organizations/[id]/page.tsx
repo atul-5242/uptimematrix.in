@@ -23,6 +23,7 @@ import { useAppDispatch, useAppSelector } from '@/store';
 import { fetchSelectedOrganizationDetails, clearSelectedOrganization, deleteOrganization } from '@/store/selectedOrganizationSlice';
 import { deleteOrganizationAction } from '@/app/all-actions/organizations/actions';
 import { fetchUserDetails } from '@/store/userSlice';
+import { MemberData } from '@/app/all-actions/organizations/actions';
 
 // Demo data - replace with actual API calls
 
@@ -215,7 +216,7 @@ export default function OrganizationPage({ params }: { params: { id: string } })
               </CardHeader>
               <CardContent className="space-y-6">
                 <p className="text-gray-700">{selectedOrganization.about}</p>
-                
+
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div className="space-y-4">
                     <div>
@@ -252,6 +253,9 @@ export default function OrganizationPage({ params }: { params: { id: string } })
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {`${
+                  console.log("selectedOrganization",selectedOrganization)
+                }`}
                 {selectedOrganization.members.map((member) => (
                   <div
                     key={member.id}
@@ -261,7 +265,7 @@ export default function OrganizationPage({ params }: { params: { id: string } })
                     <div className="flex items-center gap-4">
                       <Avatar className="h-12 w-12">
                         <AvatarFallback className="bg-gray-200 text-gray-700">
-                          {member.initials}
+                          {member.name ? member.name.split(' ').map((n) => n[0]).join('') : 'UN'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="space-y-1">
@@ -273,13 +277,24 @@ export default function OrganizationPage({ params }: { params: { id: string } })
                       </div>
                     </div>
 
-                    {/* Role Badge */}
-                    <Badge
-                      variant={getRoleBadgeVariant(member.role)}
-                      className="self-start sm:self-auto"
-                    >
-                      {member.role}
-                    </Badge>
+                    {/* Role and Verification Badges */}
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={getRoleBadgeVariant(member.role)}
+                        className="self-start sm:self-auto"
+                      >
+                        {member.role}
+                      </Badge>
+                      {member.isVerified ? (
+                        <Badge variant="default" className="bg-green-100 text-green-700 hover:bg-green-100">
+                          Active
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -308,7 +323,7 @@ export default function OrganizationPage({ params }: { params: { id: string } })
                       Once you delete an organization, there is no going back. All data will be permanently removed.
                     </p>
                   </div>
-                  
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" className="whitespace-nowrap">

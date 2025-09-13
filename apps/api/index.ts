@@ -6,6 +6,8 @@ import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.j
 import userDetailsRouter from "./routes/userRoute/userRoutes.js";
 import sessionRouter from "./routes/authRoute/session.js";
 import organizationRouter from "./routes/organizationRoutes/organizationRoutes.js";
+import teamRouter from "./routes/team-sectionRoutes/team/teamRoutes.js";
+import roleRouter from "./routes/team-sectionRoutes/roles/roleRoutes.js";
 import dotenv from "dotenv";
 
 
@@ -24,6 +26,10 @@ app.use("/website", websiteRouter);
 app.use("/escalation-policies", escalationRouter);
 app.use("/userprofile", userDetailsRouter);
 app.use("/organization", organizationRouter);
+
+// Team management routes
+app.use("/api/teams", teamRouter);
+app.use("/api/roles", roleRouter);
 
 // Session validation endpoint
 app.use("/api", sessionRouter);

@@ -4,10 +4,19 @@ import { cookies } from 'next/headers';
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const organizationId = params.id;
-    const authHeader = request.headers.get('authorization');
-    console.log(`[API Proxy] GET /api/organizations/${organizationId} - Auth Header: ${!!authHeader}`);
+    let authToken = request.headers.get('authorization');
 
-    if (!authHeader) {
+    if (!authToken) {
+      const cookieStore = cookies();
+      const sessionToken = cookieStore.get('session_token')?.value;
+      if (sessionToken) {
+        authToken = `Bearer ${sessionToken}`;
+      }
+    }
+
+    console.log(`[API Proxy] GET /api/organizations/${organizationId} - Auth Token: ${!!authToken}`);
+
+    if (!authToken) {
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
@@ -18,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
+        'Authorization': authToken,
       },
     });
 
@@ -45,10 +54,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const organizationId = params.id;
-    const authHeader = request.headers.get('authorization');
-    console.log(`[API Proxy] DELETE /api/organizations/${organizationId} - Auth Header: ${!!authHeader}`);
+    let authToken = request.headers.get('authorization');
 
-    if (!authHeader) {
+    if (!authToken) {
+      const cookieStore = cookies();
+      const sessionToken = cookieStore.get('session_token')?.value;
+      if (sessionToken) {
+        authToken = `Bearer ${sessionToken}`;
+      }
+    }
+
+    console.log(`[API Proxy] DELETE /api/organizations/${organizationId} - Auth Token: ${!!authToken}`);
+
+    if (!authToken) {
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
@@ -59,7 +77,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
+        'Authorization': authToken,
       },
     });
 
