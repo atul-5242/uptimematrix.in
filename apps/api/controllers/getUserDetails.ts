@@ -76,6 +76,7 @@ export const getUserDetails = async (req: Request, res: Response) => {
         foundedYear: member.organization.foundedYear,
         about: member.organization.about,
         role: member.role.name,
+        isVerified: member.isVerified,
         permissions: member.role.permissions.map(p => p.name),
       }))
     });

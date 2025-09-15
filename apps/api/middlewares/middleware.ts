@@ -9,6 +9,7 @@ declare global {
       user?: {
         id: string;
         organizationId?: string;
+        email?: string; // Add email to the user object
       };
     }
   }
@@ -35,6 +36,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
           where: { id: decoded.sub },
           select: {
             id: true,
+            email: true, // Select email
             selectedOrganizationId: true,
             organizationMembers: {
               select: { organizationId: true },
@@ -49,13 +51,15 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         // Determine organization ID to use (selected or first available)
         let organizationId = user.selectedOrganizationId;
         
-        if (!organizationId) {
-          return res.status(401).json({ message: 'Unauthorized: No organization access' });
-        }
+        // The following block can be removed if organizationId is not strictly required for every authenticated route
+        // if (!organizationId) {
+        //   return res.status(401).json({ message: 'Unauthorized: No organization access' });
+        // }
 
         req.user = {
           id: decoded.sub,
-          organizationId: organizationId,
+          email: user.email, // Populate email
+          organizationId: organizationId!,
         };
 
         next();

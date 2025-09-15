@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader // Forward the original authorization header
+        'Authorization': authHeader
       }
     });
 

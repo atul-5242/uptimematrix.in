@@ -2,7 +2,9 @@
 import express from 'express';
 import { getOrganizationDetails, deleteOrganization } from '../../controllers/organizationsController.js';
 import { getAllOrganizationMembers } from '../../controllers/teamsSectionController.js';
+import { getPendingInvitations } from '../../controllers/invitationController.js';
 import { authMiddleware } from '../../middlewares/middleware.js';
+import { acceptInvitation } from '../../controllers/invitationController.js';
 
 const router = express.Router();
 
@@ -14,5 +16,11 @@ router.delete('/:id', authMiddleware, deleteOrganization);
 
 // Route to get all organization members
 router.get('/members', authMiddleware, getAllOrganizationMembers);
+
+// Route to get all pending invitations for the current organization
+router.get('/invitations/pending', authMiddleware, getPendingInvitations);
+
+// Route to accept an organization invitation
+router.post('/invitations/accept', authMiddleware, acceptInvitation);
 
 export default router;

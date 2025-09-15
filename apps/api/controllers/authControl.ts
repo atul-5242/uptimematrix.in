@@ -161,18 +161,7 @@ export const signUp = async (req: Request, res: Response) => {
       }
       
       for (const invitedEmail of invitationEmails) {
-        // Create inactive OrganizationMember for the invited user (no User record yet)
-        await prismaClient.organizationMember.create({
-          data: {
-            organizationId: organization.id,
-            roleId: memberRole.id,
-            email: invitedEmail,
-            name: invitedEmail.split('@')[0] || invitedEmail, // Basic name from email
-            isVerified: false, // Will be true when they accept invitation
-            invitedById: user.id, // The user who created the organization invited them
-            userId: null, // No userId - will be set when they accept invitation and create/link account
-          },
-        });
+        
         
         // Generate invitation token (e.g., JWT) - No expiration until accepted
         const invitationToken = jwt.sign(
@@ -182,6 +171,22 @@ export const signUp = async (req: Request, res: Response) => {
         );
         
         const invitationLink = createInvitationLink(invitationToken);
+
+      // Create inactive OrganizationMember for the invited user (no User record yet)
+      await prismaClient.organizationMember.create({
+        data: {
+          organizationId: organization.id,
+          roleId: memberRole.id,
+          email: invitedEmail,
+          name: invitedEmail.split('@')[0] || invitedEmail, // Basic name from email
+          isVerified: false, // Will be true when they accept invitation
+          invitedById: user.id, // The user who created the organization invited them
+          userId: null, // No userId - will be set when they accept invitation and create/link account
+          invitationLink: invitationLink,
+        },
+      });
+
+
         const emailSubject = `You're invited to join ${organization.name} on UptimeMatrix.`;
         const emailBody = `
           <p>Hello,</p>

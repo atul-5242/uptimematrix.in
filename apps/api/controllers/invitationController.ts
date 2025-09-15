@@ -6,6 +6,7 @@ import { Request, Response } from "express";
 interface UserPayload {
   id: string;
   organizationId?: string;
+  email?: string; // Add email to UserPayload
 }
 
 interface CustomRequest extends Request {
@@ -15,7 +16,12 @@ interface CustomRequest extends Request {
 const createInvitationLink = (token: string) => {
   // In a real application, this would be a dynamic link to your frontend's invitation acceptance page
   // For now, we'll use a placeholder. The actual frontend will construct this.
-  return `${process.env.FRONTEND_URL}/accept-invitation?token=${token}`;
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (!frontendUrl) {
+    console.error("[API] FRONTEND_URL environment variable is not set.");
+    return null; // Return null if FRONTEND_URL is not set
+  }
+  return `${frontendUrl}/accept-invitation?token=${token}`;
 };
 
 export const sendInvitations = async (req: CustomRequest, res: Response) => {
@@ -82,18 +88,25 @@ export const sendInvitations = async (req: CustomRequest, res: Response) => {
       );
       
       const invitationLink = createInvitationLink(invitationToken);
+      if (!invitationLink) {
+        console.error(`[API] Failed to create invitation link for ${invitedEmail}. Skipping email.`);
+        continue;
+      }
 
       // Save invitation to database
+      const newInvitationData = {
+        email: invitedEmail,
+        organizationId: organization.id,
+        roleId: memberRole.id, // Use the retrieved/created role ID
+        isVerified: false,
+        invitedById: invitedById,
+        invitationLink: invitationLink,
+        name: invitedEmail.split('@')[0], // Use email prefix as default name for now
+      };
+      console.log("[API] Data sent to Prisma for new invitation:", newInvitationData);
+      
       const newInvitation = await prismaClient.organizationMember.create({
-        data: {
-          email: invitedEmail,
-          organizationId: organization.id,
-          roleId: memberRole.id, // Use the retrieved/created role ID
-          isVerified: false,
-          invitedById: invitedById,
-          invitationLink: invitationLink,
-          name: invitedEmail.split('@')[0], // Use email prefix as default name for now
-        },
+        data: newInvitationData,
         select: {
           id: true,
           email: true,
@@ -103,6 +116,7 @@ export const sendInvitations = async (req: CustomRequest, res: Response) => {
           invitationLink: true,
         },
       });
+      console.log("[API] New invitation created in DB:", newInvitation);
 
       // Send email (similar to signup process)
       const emailSubject = `You're invited to join ${organization.name} on UptimeMatrix.`;
@@ -134,5 +148,107 @@ export const sendInvitations = async (req: CustomRequest, res: Response) => {
   } catch (error: unknown) {
     console.error("[API] Error sending invitations:", error);
     return res.status(500).json({ message: "Failed to send invitations.", error: (error as Error).message });
+  }
+};
+
+export const getPendingInvitations = async (req: CustomRequest, res: Response) => {
+  console.log("Fetching pending invitations...>>>>>>>>>>>>>");
+  try {
+    const userEmail = req.user?.email; // Get the logged-in user's email
+
+    if (!userEmail) {
+      return res.status(401).json({ message: "Unauthorized: User email not found." });
+    }
+
+    const pendingInvitations = await prismaClient.organizationMember.findMany({
+      where: {
+        email: userEmail, // Filter by the logged-in user's email
+        isVerified: false,
+        userId: null, // Only fetch invitations that haven't been accepted by a user yet
+      },
+      select: {
+        id: true,
+        email: true,
+        createdAt: true,
+        invitationLink: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+          }
+        },
+        invitedBy: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const formattedInvitations = pendingInvitations.map(invite => ({
+      id: invite.id,
+      email: invite.email,
+      status: 'pending',
+      invitedBy: invite.invitedBy?.fullName || invite.invitedBy?.email || 'Unknown',
+      invitedAt: invite.createdAt,
+      invitationLink: invite.invitationLink,
+      organizationName: invite.organization.name, // Include organization name
+      organizationDescription: invite.organization.description, // Include organization description
+      invitedById: invite.invitedBy?.id, // Include invitedBy user's ID
+    }));
+
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(formattedInvitations);
+  } catch (error: unknown) {
+    console.error("[API] Error fetching pending invitations:", error);
+    return res.status(500).json({ message: "Failed to fetch pending invitations.", error: (error as Error).message });
+  }
+};
+
+export const acceptInvitation = async (req: CustomRequest, res: Response) => {
+  try {
+    const { invitationLink, name } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized: User ID not found." });
+    }
+
+    if (!invitationLink) {
+      return res.status(400).json({ message: "Invitation link not provided." });
+    }
+
+    const invitation = await prismaClient.organizationMember.findFirst({
+      where: {
+        invitationLink: invitationLink,
+        isVerified: false,
+        userId: null,
+      },
+      include: {
+        organization: true,
+      },
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ message: "Invalid or expired invitation link." });
+    }
+
+    // Update the invitation to mark as accepted
+    const updatedInvitation = await prismaClient.organizationMember.update({
+      where: { id: invitation.id },
+      data: {
+        userId: userId,
+        isVerified: true,
+        name: name, // Update the name here
+      },
+    });
+
+    return res.status(200).json({ message: "Invitation accepted successfully.", organizationId: updatedInvitation.organizationId });
+  } catch (error: unknown) {
+    console.error("[API] Error accepting invitation:", error);
+    return res.status(500).json({ message: "Failed to accept invitation.", error: (error as Error).message });
   }
 };

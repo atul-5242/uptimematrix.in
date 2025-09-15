@@ -9,14 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Plus, CheckCircle, Clock, Send, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useAppSelector } from "@/store";
 
 interface Invitation {
   id: string;
   email: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'exists';
   invitedBy: string;
   invitedAt: Date;
   invitationLink?: string; // Add invitationLink property
+  organizationName?: string; // Add organizationName for pending invites
+  organizationDescription?: string; // Add organizationDescription for pending invites
+  invitedById?: string; // Add invitedById property
 }
 
 interface AcceptedOrganization {
@@ -25,6 +29,30 @@ interface AcceptedOrganization {
   description: string;
   memberCount: number;
   joinedAt: Date;
+  isVerified: boolean;
+}
+
+interface UserOrganization extends AcceptedOrganization {
+  role: string;
+  permissions: string[];
+}
+
+interface UserDetailsPayload {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: number | undefined;
+  jobTitle: string | undefined;
+  location: string | undefined;
+  bio: string | undefined;
+  avatar: string | undefined;
+  joinDate: string;
+  lastLogin: string | undefined;
+  isEmailVerified: boolean;
+  selectedOrganizationId: string | null;
+  selectedOrganizationRole: string | null;
+  selectedOrganizationPermissions: string[];
+  organizations: UserOrganization[];
 }
 
 const getInitials = (name: string) => {
@@ -41,6 +69,10 @@ export default function InvitesPage() {
   const [loading, setLoading] = useState(true);
   const [invitationEmails, setInvitationEmails] = useState<string[]>([]);
   const [currentEmailInput, setCurrentEmailInput] = useState<string>('');
+  const { userId } = useAppSelector((state) => state.auth);
+  const { fullName } = useAppSelector((state) => state.user);
+  const [sendingInvitation, setSendingInvitation] = useState(false); // New loading state for send button
+  const [acceptingInvitationId, setAcceptingInvitationId] = useState<string | null>(null); // New loading state for accept button
 
   const handleAddInvitationEmail = (email: string) => {
     if (email.trim() && !invitationEmails.includes(email.trim()) && /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email.trim())) {
@@ -67,71 +99,69 @@ export default function InvitesPage() {
     setCurrentEmailInput('');
   };
 
-  const handleAcceptInvitation = (invitationLink: string) => {
-    // In a real app, you would make an API call to accept the invitation
-    console.log("Accepting invitation with link:", invitationLink);
-    // For demo, just remove from pending and add to accepted organizations
-    const acceptedInvite = pendingInvitations.find(inv => inv.invitationLink === invitationLink);
-    if (acceptedInvite) {
-      setPendingInvitations(prev => prev.filter(inv => inv.invitationLink !== invitationLink));
-      setAcceptedOrganizations(prev => [
-        ...prev,
-        {
-          id: `org-accepted-${acceptedInvite.id}`,
-          name: `New Org for ${acceptedInvite.email}`,
-          description: `Joined via invitation from ${acceptedInvite.invitedBy}`,
-          memberCount: 1,
-          joinedAt: new Date(),
+  const fetchInitialData = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch Accepted Organizations
+      const orgResponse = await fetch('/api/userprofile/me');
+      if (!orgResponse.ok) {
+        throw new Error(`Error fetching accepted organizations: ${orgResponse.statusText}`);
+      }
+      const userData: UserDetailsPayload = await orgResponse.json();
+      const verifiedOrganizations = userData.organizations.filter(org => org.isVerified);
+      setAcceptedOrganizations(verifiedOrganizations);
+
+      // Fetch Pending Invitations
+      const inviteResponse = await fetch('/api/organizations/invitations/pending');
+      if (!inviteResponse.ok) {
+        throw new Error(`Error fetching pending invitations: ${inviteResponse.statusText}`);
+      }
+      const pendingData: Invitation[] = await inviteResponse.json();
+      setPendingInvitations(pendingData);
+
+    } catch (error) {
+      console.error("Failed to fetch initial data:", error);
+      setAcceptedOrganizations([]); 
+      setPendingInvitations([]); // Ensure pending invitations is an array on error
+      // Optionally, display an error message to the user
+    } finally {
+      setLoading(false);
+    }
+  }, []); // Empty dependency array means this function is created once
+
+  const handleAcceptInvitation = async (invitationLink: string) => {
+    console.log("Accepting invitation:", invitationLink);
+    console.log("Full name:", fullName);
+    try {
+      setAcceptingInvitationId(invitationLink); // Set loading for this specific invitation
+      const response = await fetch('/api/organizations/invitations/accept', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ]);
-      alert(`Invitation from ${acceptedInvite.invitedBy} for ${acceptedInvite.email} accepted!`);
+        body: JSON.stringify({ invitationLink, name: fullName }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to accept invitation.");
+      }
+
+      alert(result.message);
+      // Refresh data after accepting
+      fetchInitialData(); 
+    } catch (error: any) {
+      console.error("Error accepting invitation:", error);
+      alert(error.message || "Failed to accept invitation. Please try again.");
+    } finally {
+      setAcceptingInvitationId(null); // Reset loading state
     }
   };
 
-  // Simulate data loading
   React.useEffect(() => {
-    setLoading(true);
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setPendingInvitations([
-        {
-          id: "inv1",
-          email: "org1",
-          status: "pending",
-          invitedBy: "Admin User",
-          invitedAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
-          invitationLink: "http://localhost:3000/accept-invitation?token=demotoken1",
-        },
-        {
-          id: "inv2",
-          email: "org2",
-          status: "pending",
-          invitedBy: "Admin User",
-          invitedAt: new Date(Date.now() - 86400000), // 1 day ago
-          invitationLink: "http://localhost:3000/accept-invitation?token=demotoken2",
-        },
-      ]);
-      setAcceptedOrganizations([
-        {
-          id: "org1",
-          name: "Acme Corp",
-          description: "Leading in widgets production.",
-          memberCount: 15,
-          joinedAt: new Date(Date.now() - 86400000 * 30),
-        },
-        {
-          id: "org2",
-          name: "Globex Inc.",
-          description: "Innovating in global solutions.",
-          memberCount: 22,
-          joinedAt: new Date(Date.now() - 86400000 * 60),
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const handleSendInvitation = async () => {
     if (invitationEmails.length === 0) {
@@ -140,6 +170,7 @@ export default function InvitesPage() {
     }
 
     try {
+      setSendingInvitation(true); // Set loading true
       const response = await fetch('/api/organizations/invite', {
         method: 'POST',
         headers: {
@@ -154,14 +185,36 @@ export default function InvitesPage() {
         throw new Error(result.message || "Failed to send invitations.");
       }
 
-      // Assuming the backend returns the newly created invitations
-      setPendingInvitations(prev => [...prev, ...result.sentInvitations]);
-      setInvitationEmails([]); // Clear the input after sending
-      alert(`Invitations sent to ${invitationEmails.join(', ')}.`);
+      const newPending: Invitation[] = [];
+      const existingMessages: string[] = [];
 
+      result.sentInvitations.forEach((inv: Invitation & { message?: string }) => {
+        if (inv.status === 'pending') {
+          newPending.push(inv);
+        } else if (inv.status === 'exists') {
+          existingMessages.push(inv.message || `Invitation for ${inv.email} already exists or user is a member.`);
+        }
+      });
+
+      setPendingInvitations(prev => [...prev, ...newPending]);
+      setInvitationEmails([]); // Clear the input after sending
+
+      let successMessage = `Invitations sent successfully.`;
+      if (newPending.length > 0) {
+        successMessage = `Invitations sent to ${newPending.map(inv => inv.email).join(', ')}.`;
+      }
+
+      if (existingMessages.length > 0) {
+        successMessage += `\n${existingMessages.join('\n')}`;
+      }
+
+      alert(successMessage);
+      fetchInitialData();
     } catch (error: any) {
       console.error("Error sending invitations:", error);
       alert(error.message || "Failed to send invitations. Please try again.");
+    } finally {
+      setSendingInvitation(false); // Set loading false after completion or error
     }
   };
 
@@ -233,9 +286,21 @@ export default function InvitesPage() {
                       </div>
                     )}
                   </div>
-                  <Button onClick={handleSendInvitation} className="bg-gray-900 hover:bg-gray-800">
-                    <Send className="h-4 w-4 mr-2" />
-                    Send Invitation
+                  <Button onClick={handleSendInvitation} className="bg-gray-900 hover:bg-gray-800" disabled={sendingInvitation}>
+                    {sendingInvitation ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Sending...
+                      </span>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -254,31 +319,48 @@ export default function InvitesPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {pendingInvitations.map((invite) => (
-                  <Card key={invite.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex flex-col sm:flex-row items-center space-x-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-blue-500 text-white text-sm">
-                            {getInitials(invite.email.split('@')[0])}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-gray-900">{invite.email}</p>
-                          <p className="text-sm text-gray-500">Invited by {invite.invitedBy} on {new Date(invite.invitedAt).toLocaleDateString()}</p>
+                {pendingInvitations.map((invite) => {
+                  const isCurrentUserInviter = userId === invite.invitedById;
+                  return (
+                    <Card key={invite.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4 flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row items-center space-x-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="bg-blue-500 text-white text-sm">
+                              {getInitials(invite.email.split('@')[0])}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-gray-900">{isCurrentUserInviter ? `You invited ${invite.email} to join ${invite.organizationName}` : `${invite.email} is invited to join ${invite.organizationName}`}</p>
+                            <p className="text-sm text-gray-500">Invited by {invite.invitedBy} on {new Date(invite.invitedAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                      </div>
-                      <Button 
-                        onClick={() => handleAcceptInvitation(invite.invitationLink!)} 
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
-                      >
-                        Accept
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <Button 
+                          onClick={() => handleAcceptInvitation(invite.invitationLink!)} 
+                          className={`${isCurrentUserInviter ? "bg-green-500 hover:bg-green-600" : "bg-blue-600 hover:bg-blue-700"} text-white rounded-md px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200`}
+                          disabled={isCurrentUserInviter || acceptingInvitationId === invite.id}
+                        >
+                          {isCurrentUserInviter ? (
+                            'Invitation Sent'
+                          ) : acceptingInvitationId === invite.id ? (
+                            <span className="flex items-center">
+                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Accepting...
+                            </span>
+                          ) : (
+                            'Accept'
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
+
           </TabsContent>
 
           <TabsContent value="accepted" className="space-y-6">
