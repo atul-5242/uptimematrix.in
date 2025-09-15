@@ -45,6 +45,7 @@ model User {
   memberOfTeamEntries         TeamMember[] // TeamMember entries where this user is the member
   createdTeams                Team[]               @relation("CreatedTeam") // Teams created by this user
   sentInvitations             OrganizationMember[] @relation("InvitedBy") // Invitations sent by this user
+  onCallUserAssignments       OnCallUserAssignment[]
 }
 
 model website {
@@ -154,16 +155,17 @@ model Integration {
 }
 
 model Team {
-  id             String       @id @default(uuid())
+  id             String                 @id @default(uuid())
   name           String
   description    String?
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization           @relation(fields: [organizationId], references: [id])
   members        TeamMember[] // Team members linked via TeamMember model
-  createdBy      User         @relation("CreatedTeam", fields: [createdById], references: [id]) // Tracks who created this team
+  createdBy      User                   @relation("CreatedTeam", fields: [createdById], references: [id]) // Tracks who created this team
   createdById    String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  onCallTeamAssignments OnCallTeamAssignment[]
 }
 
 model TeamMember {
@@ -360,6 +362,7 @@ model Organization {
   reportServices     ReportService[]
   incidents          Incident[]
   teams              Team[] // AI-generated relation to Team
+  onCallSchedules    OnCallSchedule[]
 }
 
 model OrganizationMember {
@@ -424,4 +427,42 @@ model Incident {
 enum UptimeTrend {
   ONLINE // Added from frontend
   OFFLINE // Added from frontend
+}
+
+model OnCallSchedule {
+  id             String               @id @default(uuid())
+  name           String
+  description    String?
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  organizationId String
+  userAssignments OnCallUserAssignment[]
+  teamAssignments OnCallTeamAssignment[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([name, organizationId])
+}
+
+model OnCallUserAssignment {
+  id         String         @id @default(uuid())
+  schedule   OnCallSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String
+  user       User           @relation(fields: [userId], references: [id])
+  userId     String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([userId, scheduleId])
+}
+
+model OnCallTeamAssignment {
+  id         String         @id @default(uuid())
+  schedule   OnCallSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  scheduleId String
+  team       Team           @relation(fields: [teamId], references: [id])
+  teamId     String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([teamId, scheduleId])
 }

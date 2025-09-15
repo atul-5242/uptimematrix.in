@@ -32,27 +32,39 @@ import {
   Eye,
   PersonStanding
 } from 'lucide-react'
+// import axios from 'axios'; // Removed axios import
 
-type OnCallPerson = {
+type UserData = {
   id: string;
-  name: string;
+  fullName: string;
   email: string;
-  phone: string;
-  role: string;
+  phone?: string;
+  role?: string; // This will come from OrganizationMember or TeamMember
   avatar?: string;
-  isActive: boolean;
+  isActive?: boolean; // Based on user activity or presence, not directly from DB
 }
 
-type OnCallTeam = {
+type TeamData = {
   id: string;
   name: string;
   description: string;
-  members: OnCallPerson[];
-  schedule: string;
-  isActive: boolean;
+  members: UserData[]; // Assuming members are fetched separately or via a nested query
+  // schedule: string; // Removed as per new schema
+  // isActive: boolean; // Removed as per new schema
+}
+
+type OnCallScheduleData = {
+  id: string;
+  name: string;
+  description?: string;
+  userAssignments: { id: string; userId: string; user: UserData }[];
+  teamAssignments: { id: string; teamId: string; team: TeamData }[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 type OnCallConfig = {
+  scheduleName: string; // Add scheduleName to config
   selectedPersons: string[];
   selectedTeams: string[];
   notes: string;
@@ -60,7 +72,7 @@ type OnCallConfig = {
 }
 
 // Modal Component for Person Details
-function PersonDetailsModal({ person, isOpen, onClose }: { person: OnCallPerson, isOpen: boolean, onClose: () => void }) {
+function PersonDetailsModal({ person, isOpen, onClose }: { person: UserData, isOpen: boolean, onClose: () => void }) {
   if (!isOpen) return null;
   
   return (
@@ -76,11 +88,11 @@ function PersonDetailsModal({ person, isOpen, onClose }: { person: OnCallPerson,
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-lg font-bold">
-              {person.name.split(' ').map(n => n[0]).join('')}
+              {person.fullName.split(' ').map(n => n[0]).join('')}
             </div>
             <div>
-              <h4 className="font-medium text-gray-900">{person.name}</h4>
-              <p className="text-sm text-gray-600">{person.role}</p>
+              <h4 className="font-medium text-gray-900">{person.fullName}</h4>
+              <p className="text-sm text-gray-600">{person.role || 'N/A'}</p>
               <div className="flex items-center gap-1 mt-1">
                 <div className={`w-2 h-2 rounded-full ${person.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                 <span className={`text-xs font-medium ${person.isActive ? 'text-green-600' : 'text-gray-500'}`}>
@@ -104,15 +116,15 @@ function PersonDetailsModal({ person, isOpen, onClose }: { person: OnCallPerson,
               <Phone className="h-4 w-4 text-gray-500" />
               <div>
                 <p className="text-sm font-medium">Phone</p>
-                <p className="text-sm text-gray-600">{person.phone}</p>
+                <p className="text-sm text-gray-600">{person.phone || 'N/A'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Shield className="h-4 w-4 text-gray-500" />
               <div>
                 <p className="text-sm font-medium">Role Type</p>
-                <Badge variant={person.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
-                  {person.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                <Badge variant={person.role?.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                  {person.role?.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
                 </Badge>
               </div>
             </div>
@@ -124,10 +136,48 @@ function PersonDetailsModal({ person, isOpen, onClose }: { person: OnCallPerson,
 }
 
 // Modal Component for Team Details
-function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen: boolean, onClose: () => void }) {
-  const [selectedMember, setSelectedMember] = useState<OnCallPerson | null>(null);
+function TeamDetailsModal({ team, isOpen, onClose }: { team: TeamData, isOpen: boolean, onClose: () => void }) {
+  const [selectedMember, setSelectedMember] = useState<UserData | null>(null);
+  const [fetchedMembers, setFetchedMembers] = useState<UserData[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (isOpen && team.id && team.members.length === 0) {
+        setLoadingMembers(true);
+        try {
+          const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+          if (!token) {
+            throw new Error('No authentication token found.');
+          }
+          const res = await fetch(`/api/teams/${team.id}/members`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            throw new Error('Failed to fetch team members');
+          }
+          const { data } = await res.json();
+          setFetchedMembers(data.data.map((member: any) => ({
+            id: member.userId,
+            fullName: member.name,
+            email: member.email,
+            phone: member.phone,
+            role: member.role,
+            isActive: member.status === 'active',
+          })));
+        } catch (error) {
+          console.error('Error fetching team members:', error);
+        } finally {
+          setLoadingMembers(false);
+        }
+      }
+    };
+    fetchTeamMembers();
+  }, [isOpen, team.id, team.members.length]);
   
   if (!isOpen) return null;
+
+  const membersToDisplay = team.members.length > 0 ? team.members : fetchedMembers;
   
   return (
     <>
@@ -148,10 +198,7 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen:
               <div>
                 <h4 className="font-medium text-gray-900">{team.name}</h4>
                 <p className="text-sm text-gray-600">{team.description}</p>
-                <Badge variant="outline" className="text-xs mt-1">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {team.schedule}
-                </Badge>
+                {/* Removed schedule display */}
               </div>
             </div>
             
@@ -160,21 +207,26 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen:
             <div>
               <h5 className="font-medium mb-3 flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Team Members ({team.members.length})
+                Team Members ({membersToDisplay.length})
               </h5>
+              {loadingMembers ? (
+                <div className="flex justify-center items-center h-24">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                </div>
+              ) : membersToDisplay.length > 0 ? (
               <div className="space-y-2">
-                {team.members.map((member) => (
+                  {membersToDisplay.map((member) => (
                   <div key={member.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-medium">
-                        {member.name.split(' ').map(n => n[0]).join('')}
+                          {member.fullName.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <p className="text-sm font-medium">{member.name}</p>
-                        <p className="text-xs text-gray-500">{member.role}</p>
+                          <p className="text-sm font-medium">{member.fullName}</p>
+                          <p className="text-xs text-gray-500">{member.role || 'N/A'}</p>
                       </div>
-                      <Badge variant={member.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
-                        {member.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                        <Badge variant={member.role?.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                          {member.role?.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
                       </Badge>
                     </div>
                     <Button 
@@ -188,6 +240,11 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen:
                   </div>
                 ))}
               </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  No members found for this team.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -206,10 +263,10 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: OnCallTeam, isOpen:
 }
 
 // Tabs Component for On-Call Status
-function OnCallStatusTabs({ persons, teams, notes }: { persons: OnCallPerson[], teams: OnCallTeam[], notes: string }) {
+function OnCallStatusTabs({ persons, teams, notes }: { persons: UserData[], teams: TeamData[], notes: string }) {
   const [activeTab, setActiveTab] = useState<'engineers' | 'teams'>('engineers');
-  const [selectedPerson, setSelectedPerson] = useState<OnCallPerson | null>(null);
-  const [selectedTeam, setSelectedTeam] = useState<OnCallTeam | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<UserData | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<TeamData | null>(null);
   
   return (
     <div className="space-y-4">
@@ -253,14 +310,14 @@ function OnCallStatusTabs({ persons, teams, notes }: { persons: OnCallPerson[], 
                   <div key={person.id} className="flex items-center justify-between p-4 border border-gray-200/70 rounded-lg bg-blue-50/50 hover:bg-blue-100/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                        {person.name.split(' ').map(n => n[0]).join('')}
+                        {person.fullName.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <h4 className="font-medium text-gray-900">{person.name}</h4>
-                        <p className="text-sm text-gray-600">{person.role}</p>
+                        <h4 className="font-medium text-gray-900">{person.fullName}</h4>
+                        <p className="text-sm text-gray-600">{person.role || 'N/A'}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant={person.role.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
-                            {person.role.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
+                          <Badge variant={person.role?.toLowerCase().includes('admin') ? 'default' : 'secondary'} className="text-xs">
+                            {person.role?.toLowerCase().includes('admin') ? 'Admin' : 'Responder'}
                           </Badge>
                           <div className="flex items-center gap-1">
                             <div className={`w-2 h-2 rounded-full ${person.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
@@ -306,10 +363,7 @@ function OnCallStatusTabs({ persons, teams, notes }: { persons: OnCallPerson[], 
                         <h4 className="font-medium text-gray-900">{team.name}</h4>
                         <p className="text-sm text-gray-600">{team.description}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {team.schedule}
-                          </Badge>
+                          {/* Removed schedule display */}
                           <Badge variant="secondary" className="text-xs">
                             {team.members.length} members
                           </Badge>
@@ -387,8 +441,8 @@ function OnCallStatusTabs({ persons, teams, notes }: { persons: OnCallPerson[], 
 export default function OnCallPage() {
   const router = useRouter()
   const [currentOnCall, setCurrentOnCall] = useState<{
-    persons: OnCallPerson[];
-    teams: OnCallTeam[];
+    persons: UserData[];
+    teams: TeamData[];
     notes: string;
     lastUpdated: string;
   }>({
@@ -399,319 +453,124 @@ export default function OnCallPage() {
   })
 
   const [config, setConfig] = useState<OnCallConfig>({
+    scheduleName: '', // Initialize scheduleName
     selectedPersons: [],
     selectedTeams: [],
     notes: '',
     fallbackToAdmin: true
   })
 
-  const [availablePersons, setAvailablePersons] = useState<OnCallPerson[]>([])
-  const [availableTeams, setAvailableTeams] = useState<OnCallTeam[]>([])
+  const [availablePersons, setAvailablePersons] = useState<UserData[]>([])
+  const [availableTeams, setAvailableTeams] = useState<TeamData[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [onCallSchedule, setOnCallSchedule] = useState<OnCallScheduleData | null>(null);
 
-  // Demo data - replace with actual API calls
-  useEffect(() => {
-    // Set current on-call data
-    setCurrentOnCall({
-      persons: [
-        {
-          id: 'john-doe',
-          name: 'John Doe',
-          email: 'john@company.com',
-          phone: '+1 (555) 123-4567',
-          role: 'Lead Developer',
-          isActive: true
-        },
-        {
-          id: 'jane-smith',
-          name: 'Jane Smith',
-          email: 'jane@company.com',
-          phone: '+1 (555) 234-5678',
-          role: 'DevOps Engineer',
-          isActive: true
-        },
-        {
-          id: 'mike-wilson',
-          name: 'Mike Wilson',
-          email: 'mike@company.com',
-          phone: '+1 (555) 987-6543',
-          role: 'System Admin',
-          isActive: true
-        },
-        {
-          id: 'sarah-johnson',
-          name: 'Sarah Johnson',
-          email: 'sarah@company.com',
-          phone: '+1 (555) 345-6789',
-          role: 'Senior Engineer',
-          isActive: false
-        },
-        {
-          id: 'admin',
-          name: 'System Admin',
-          email: 'admin@company.com',
-          phone: '+1 (555) 000-0000',
-          role: 'Administrator',
-          isActive: true
-        },  
-      ],
-      teams: [
-        {
-          id: 'night-shift',
-          name: 'Night Shift Team',
-          description: 'Handles overnight incidents',
-          members: [
-            {
-              id: 'mike-wilson',
-              name: 'Mike Wilson',
-              email: 'mike@company.com',
-              phone: '+1 (555) 987-6543',
-              role: 'System Admin',
-              isActive: true
-            },
-            {
-              id: 'jane-smith',
-              name: 'Jane Smith',
-              email: 'jane@company.com',
-              phone: '+1 (555) 234-5678',
-              role: 'DevOps Engineer',
-              isActive: true
-            },
-            {
-              id: 'jane-smith',
-              name: 'Jane Smith',
-              email: 'jane@company.com',
-              phone: '+1 (555) 234-5678',
-              role: 'DevOps Engineer',
-              isActive: true
-            },
-            {
-              id: 'jane-smith',
-              name: 'Jane Smith',
-              email: 'jane@company.com',
-              phone: '+1 (555) 234-5678',
-              role: 'DevOps Engineer',
-              isActive: true
-            },
-            {
-              id: 'jane-smith',
-              name: 'Jane Smith',
-              email: 'jane@company.com',
-              phone: '+1 (555) 234-5678',
-              role: 'DevOps Engineer',
-              isActive: true
-            },
-          ],
-          schedule: '10:00 PM - 6:00 AM',
-          isActive: true
-        },
-        {
-          id: 'office-hours',
-          name: 'Office Hours Team',
-          description: 'Handles incidents during business hours (9 AM - 5 PM)',
-          members: [
-            {
-              id: 'john-doe', 
-              name: 'John Doe',
-              email: 'john@company.com',
-              phone: '+1 (555) 123-4567',
-              role: 'Lead Developer',
-              isActive: true
-            },
-            {
-              id: 'jane-smith',
-              name: 'Jane Smith',
-              email: 'jane@company.com',
-              phone: '+1 (555) 234-5678',
-              role: 'DevOps Engineer',
-              isActive: true
-            }
-          ],
-          schedule: '9:00 AM - 5:00 PM',
-          isActive: true
-        },
-        {
-          id: 'night-shift',
-          name: 'Night Shift Team',
-          description: 'Handles overnight incidents and monitoring',
-          members: [
-            {
-              id: 'mike-wilson',
-              name: 'Mike Wilson',
-              email: 'mike@company.com',
-              phone: '+1 (555) 987-6543',
-              role: 'System Admin',
-              isActive: true
-            }
-          ],
-          schedule: '10:00 PM - 6:00 AM',
-          isActive: true
-        },
-        {
-          id: 'weekend-team',
-          name: 'Weekend Team',
-          description: 'Coverage for weekends and holidays',
-          members: [
-            {
-              id: 'sarah-johnson',
-              name: 'Sarah Johnson',
-              email: 'sarah@company.com',
-              phone: '+1 (555) 345-6789',
-              role: 'Senior Engineer',
-              isActive: false
-            }
-          ],
-          schedule: 'Saturday - Sunday',
-          isActive: true
-        },
-        {
-          id: 'escalation-team', 
-          name: 'Escalation Team',
-          description: 'Secondary escalation for critical issues',
-          members: [
-            {
-              id: 'john-doe',
-              name: 'John Doe',
-              email: 'john@company.com',
-              phone: '+1 (555) 123-4567',
-              role: 'Lead Developer',
-              isActive: true
-            }
-          ],
-          schedule: 'Always Available',
-          isActive: false
-        } 
+  const fetchOnCallData = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+    if (!token) {
+      console.error('No authentication token found.');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Fetch on-call schedules (expecting one for now)
+      const schedulesRes = await fetch('/api/oncall/schedules', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!schedulesRes.ok) throw new Error('Failed to fetch schedules');
+      const schedules: OnCallScheduleData[] = await schedulesRes.json();
+      console.log('Fetched on-call schedules:', schedules);
+      
+      if (schedules.length > 0) {
+        const activeSchedule = schedules[0]; // Assuming only one active schedule
+        setOnCallSchedule(activeSchedule);
         
-      ],
-      notes: 'Currently handling deployment issues. Contact immediately for any critical alerts.',
-      lastUpdated: '2 hours ago'
-    })
+        // Fetch members for each team in the active schedule
+        const teamsWithMembers = await Promise.all(activeSchedule.teamAssignments.map(async (assignment) => {
+          const membersRes = await fetch(`/api/teams/${assignment.teamId}/members`, {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!membersRes.ok) throw new Error(`Failed to fetch members for team ${assignment.teamId}`);
+          const { data: membersData } = await membersRes.json();
+          const members: UserData[] = membersData.data.map((member: any) => ({
+            id: member.userId,
+            fullName: member.name,
+            email: member.email,
+            phone: member.phone,
+            role: member.role,
+            isActive: member.status === 'active',
+          }));
+          return { ...assignment.team, members: members, description: assignment.team.description || '' };
+        }));
 
-    // Set available persons
-    setAvailablePersons([
-      {
-        id: 'john-doe',
-        name: 'John Doe',
-        email: 'john@company.com',
-        phone: '+1 (555) 123-4567',
-        role: 'Lead Developer',
-        isActive: true
-      },
-      {
-        id: 'jane-smith',
-        name: 'Jane Smith',
-        email: 'jane@company.com',
-        phone: '+1 (555) 234-5678',
-        role: 'DevOps Engineer',
-        isActive: true
-      },
-      {
-        id: 'mike-wilson',
-        name: 'Mike Wilson',
-        email: 'mike@company.com',
-        phone: '+1 (555) 987-6543',
-        role: 'System Admin',
-        isActive: true
-      },
-      {
-        id: 'sarah-johnson',
-        name: 'Sarah Johnson',
-        email: 'sarah@company.com',
-        phone: '+1 (555) 345-6789',
-        role: 'Senior Engineer',
-        isActive: false
-      },
-      {
-        id: 'admin',
-        name: 'System Admin',
-        email: 'admin@company.com',
-        phone: '+1 (555) 000-0000',
-        role: 'Administrator',
-        isActive: true
+        setCurrentOnCall({
+          persons: activeSchedule.userAssignments.map(assignment => ({ ...assignment.user, role: assignment.user.role || 'Responder', isActive: true })),
+          teams: teamsWithMembers,
+          notes: activeSchedule.description || '',
+          lastUpdated: new Date(activeSchedule.updatedAt).toLocaleString(),
+        });
+        setConfig({
+          scheduleName: activeSchedule.name, // Set scheduleName from fetched data
+          selectedPersons: activeSchedule.userAssignments.map(assignment => assignment.userId),
+          selectedTeams: activeSchedule.teamAssignments.map(assignment => assignment.teamId),
+          notes: activeSchedule.description || '',
+          fallbackToAdmin: true, // Assuming default true for now
+        });
+      } else {
+        // No schedule exists, prompt to create one or display empty state
+        setCurrentOnCall({
+          persons: [],
+          teams: [],
+          notes: '',
+          lastUpdated: 'Never',
+        });
+        setConfig(prev => ({ ...prev, scheduleName: '', selectedPersons: [], selectedTeams: [], notes: '' }));
       }
-    ])
 
-    // Set available teams
-    setAvailableTeams([
-      {
-        id: 'office-hours',
-        name: 'Office Hours Team',
-        description: 'Handles incidents during business hours (9 AM - 5 PM)',
-        schedule: '9:00 AM - 5:00 PM',
-        isActive: true,
-        members: [
-          {
-            id: 'john-doe',
-            name: 'John Doe',
-            email: 'john@company.com',
-            phone: '+1 (555) 123-4567',
-            role: 'Lead Developer',
-            isActive: true
-          },
-          {
-            id: 'jane-smith',
-            name: 'Jane Smith',
-            email: 'jane@company.com',
-            phone: '+1 (555) 234-5678',
-            role: 'DevOps Engineer',
-            isActive: true
-          }
-        ]
-      },
-      {
-        id: 'night-shift',
-        name: 'Night Shift Team',
-        description: 'Handles overnight incidents and monitoring',
-        schedule: '10:00 PM - 6:00 AM',
-        isActive: true,
-        members: [
-          {
-            id: 'mike-wilson',
-            name: 'Mike Wilson',
-            email: 'mike@company.com',
-            phone: '+1 (555) 987-6543',
-            role: 'System Admin',
-            isActive: true
-          }
-        ]
-      },
-      {
-        id: 'weekend-team',
-        name: 'Weekend Team',
-        description: 'Coverage for weekends and holidays',
-        schedule: 'Saturday - Sunday',
-        isActive: true,
-        members: [
-          {
-            id: 'sarah-johnson',
-            name: 'Sarah Johnson',
-            email: 'sarah@company.com',
-            phone: '+1 (555) 345-6789',
-            role: 'Senior Engineer',
-            isActive: false
-          }
-        ]
-      },
-      {
-        id: 'escalation-team',
-        name: 'Escalation Team',
-        description: 'Secondary escalation for critical issues',
-        schedule: 'Always Available',
-        isActive: false,
-        members: [
-          {
-            id: 'john-doe',
-            name: 'John Doe',
-            email: 'john@company.com',
-            phone: '+1 (555) 123-4567',
-            role: 'Lead Developer',
-            isActive: true
-          }
-        ]
-      }
-    ])
-  }, [])
+      // Fetch available users (from user management API)
+      const usersRes = await fetch('/api/users/organization-members', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!usersRes.ok) throw new Error('Failed to fetch available users');
+      const usersData = await usersRes.json();
+      console.log('Fetched available users:', usersData.data);
+      setAvailablePersons(usersData.data.map((user: any) => ({
+        id: user.id,
+        fullName: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.organizationRole || 'Member', // Default role
+        isActive: true, // Assuming all fetched users are active
+      })));
+
+      // Fetch available teams (from team management API)
+      const teamsRes = await fetch('/api/teams', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!teamsRes.ok) throw new Error('Failed to fetch available teams');
+      const teamsData = await teamsRes.json();
+      console.log('Fetched available teams:', teamsData.data);
+      setAvailableTeams(teamsData.data.map((team: any) => ({
+        id: team.id,
+        name: team.name,
+        description: team.description,
+        members: [], // Members will be fetched on demand for modal if needed
+      })));
+
+    } catch (error) {
+      console.error('Error fetching on-call data:', error);
+      // Handle error display to user
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOnCallData();
+  }, []);
 
   const addPerson = (personId: string) => {
     if (!config.selectedPersons.includes(personId)) {
@@ -750,6 +609,10 @@ export default function OnCallPage() {
   }
 
   const getTeamById = (id: string) => {
+    // Check currentOnCall.teams first
+    const foundInCurrent = currentOnCall.teams.find(team => team.id === id);
+    if (foundInCurrent) return foundInCurrent;
+    // Then check availableTeams
     return availableTeams.find(team => team.id === id)
   }
 
@@ -757,27 +620,79 @@ export default function OnCallPage() {
     e.preventDefault()
     setSaving(true)
     
+    const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+    if (!token) {
+      console.error('No authentication token found for submission.');
+      setSaving(false);
+      return;
+    }
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      let currentScheduleId = onCallSchedule?.id;
+
+      if (!currentScheduleId) {
+        // Create a new schedule if none exists
+        const createScheduleRes = await fetch('/api/oncall/schedules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            name: config.scheduleName || 'Default On-Call Schedule', // Use new scheduleName from config
+            description: config.notes,
+          }),
+        });
+        if (!createScheduleRes.ok) throw new Error('Failed to create schedule');
+        const newSchedule = await createScheduleRes.json();
+        currentScheduleId = newSchedule.id;
+        setOnCallSchedule(newSchedule);
+      }
+
+      // Update schedule name and description if an existing schedule is present
+      if (onCallSchedule) {
+        await fetch(`/api/oncall/schedules/${currentScheduleId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            name: config.scheduleName, // Use new scheduleName from config
+            description: config.notes,
+          }),
+        });
+      }
+
+      // Update user assignments
+      const existingUserAssignments = onCallSchedule?.userAssignments.map(ua => ua.userId) || [];
+      const usersToAdd = config.selectedPersons.filter(userId => !existingUserAssignments.includes(userId));
+      // const usersToRemove = existingUserAssignments.filter(userId => !config.selectedPersons.includes(userId)); // Deletion not requested
+
+      for (const userId of usersToAdd) {
+        await fetch(`/api/oncall/schedules/${currentScheduleId}/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ userId }),
+        });
+      }
+
+      // Update team assignments
+      const existingTeamAssignments = onCallSchedule?.teamAssignments.map(ta => ta.teamId) || [];
+      const teamsToAdd = config.selectedTeams.filter(teamId => !existingTeamAssignments.includes(teamId));
+      // const teamsToRemove = existingTeamAssignments.filter(teamId => !config.selectedTeams.includes(teamId)); // Deletion not requested
+
+      for (const teamId of teamsToAdd) {
+        await fetch(`/api/oncall/schedules/${currentScheduleId}/teams`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ teamId }),
+        });
+      }
       
-      // Update current on-call with new configuration
-      const selectedPersonsData = config.selectedPersons.map(id => getPersonById(id)).filter(Boolean) as OnCallPerson[]
-      const selectedTeamsData = config.selectedTeams.map(id => getTeamById(id)).filter(Boolean) as OnCallTeam[]
+      // Refetch data to update UI
+      await fetchOnCallData();
       
-      setCurrentOnCall({
-        persons: selectedPersonsData,
-        teams: selectedTeamsData,
-        notes: config.notes,
-        lastUpdated: 'Just now'
-      })
-      
-      alert('On-call configuration updated successfully!')
+      alert('On-call configuration updated successfully!');
     } catch (error) {
-      console.error('Error updating on-call config:', error)
-      alert('Failed to update on-call configuration. Please try again.')
+      console.error('Error updating on-call config:', error);
+      alert('Failed to update on-call configuration. Please try again.');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -807,20 +722,36 @@ export default function OnCallPage() {
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-green-600" />
               Current On-Call Status
+              {onCallSchedule && (
               <Badge variant="secondary" className="ml-2">
                 <Clock className="h-3 w-3 mr-1" />
                 Updated {currentOnCall.lastUpdated}
               </Badge>
+              )}
             </CardTitle>
             <p className="text-sm text-gray-600">Who's currently handling alerts and incidents</p>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Tabbed Interface */}
+            {loading ? (
+              <div className="flex justify-center items-center h-48">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              onCallSchedule ? (
             <OnCallStatusTabs 
               persons={currentOnCall.persons} 
               teams={currentOnCall.teams} 
               notes={currentOnCall.notes}
             />
+              ) : (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">No On-Call Schedule Found</h4>
+                  <p className="text-gray-600 mb-4">Please configure an on-call schedule below.</p>
+                  {/* Removed Create Default Schedule button */}
+                </div>
+              )
+            )}
           </CardContent>
         </Card>
 
@@ -835,13 +766,29 @@ export default function OnCallPage() {
               <p className="text-sm text-gray-600">Select teams or individual engineers for on-call duties</p>
             </CardHeader>
             <CardContent className="space-y-8">
+              {/* Schedule Name Input */}
+              <div className="space-y-4">
+                <Label htmlFor="scheduleName" className="text-base font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-600" />
+                  On-Call Schedule Name
+                </Label>
+                <Input
+                  id="scheduleName"
+                  placeholder="e.g., Primary On-Call, Weekend Support"
+                  value={config.scheduleName}
+                  onChange={(e) => setConfig(prev => ({ ...prev, scheduleName: e.target.value }))}
+                  disabled={loading || saving}
+                />
+                <p className="text-xs text-gray-500">A descriptive name for this on-call schedule</p>
+              </div>
+
               {/* Team Selection */}
               <div className="space-y-4">
                 <Label className="text-base font-medium flex items-center gap-2">
                   <Users className="h-4 w-4 text-purple-600" />
                   Select Teams
                 </Label>
-                <Select onValueChange={(value) => addTeam(value)}>
+                <Select onValueChange={(value) => addTeam(value)} disabled={loading || saving}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose teams for on-call duty" />
                   </SelectTrigger>
@@ -852,13 +799,8 @@ export default function OnCallPage() {
                           {/* <Team className="h-4 w-4" /> */}
                           <div className="flex flex-col">
                             <span className="font-medium">{team.name}</span>
-                            <span className="text-xs text-gray-500">{team.schedule} • {team.members.length} members</span>
+                            <span className="text-xs text-gray-500">{team.description}</span>
                           </div>
-                          {team.isActive ? (
-                            <Badge variant="outline" className="text-green-600 border-green-300">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary">Inactive</Badge>
-                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -896,7 +838,7 @@ export default function OnCallPage() {
                   <User className="h-4 w-4 text-blue-600" />
                   Select Individual Engineers
                 </Label>
-                <Select onValueChange={(value) => addPerson(value)}>
+                <Select onValueChange={(value) => addPerson(value)} disabled={loading || saving}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose individual engineers for on-call" />
                   </SelectTrigger>
@@ -905,11 +847,11 @@ export default function OnCallPage() {
                       <SelectItem key={person.id} value={person.id} disabled={config.selectedPersons.includes(person.id)}>
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs">
-                            {person.name.split(' ').map(n => n[0]).join('')}
+                            {person.fullName.split(' ').map(n => n[0]).join('')}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-medium">{person.name}</span>
-                            <span className="text-xs text-gray-500">{person.role} • {person.email}</span>
+                            <span className="font-medium">{person.fullName}</span>
+                            <span className="text-xs text-gray-500">{person.role || 'Member'} • {person.email}</span>
                           </div>
                           {person.isActive ? (
                             <Badge variant="outline" className="text-green-600 border-green-300">Available</Badge>
@@ -932,7 +874,7 @@ export default function OnCallPage() {
                         return person ? (
                           <Badge key={personId} variant="default" className="flex items-center gap-1 bg-blue-600">
                             {/* <User className="h-3 w-3" /> */}
-                            {person.name}
+                            {person.fullName}
                             <X 
                               className="h-3 w-3 cursor-pointer hover:text-red-200" 
                               onClick={() => removePerson(personId)}
@@ -943,6 +885,7 @@ export default function OnCallPage() {
                     </div>
                   </div>
                 )}
+
               </div>
 
               <Separator />
@@ -960,6 +903,7 @@ export default function OnCallPage() {
                   onChange={(e) => setConfig(prev => ({ ...prev, notes: e.target.value }))}
                   rows={4}
                   className="min-h-[100px]"
+                  disabled={loading || saving}
                 />
                 <p className="text-xs text-gray-500">These notes will be included in all alert notifications to provide context</p>
               </div>
@@ -974,6 +918,7 @@ export default function OnCallPage() {
                       ...prev, 
                       fallbackToAdmin: checked 
                     }))}
+                    disabled={loading || saving}
                   />
                   <div className="flex-1">
                     <Label htmlFor="fallback" className="font-medium flex items-center gap-2">
@@ -994,12 +939,14 @@ export default function OnCallPage() {
                   variant="outline"
                   onClick={() => {
                     setConfig({
+                      scheduleName: '',
                       selectedPersons: [],
                       selectedTeams: [],
                       notes: '',
                       fallbackToAdmin: true
                     })
                   }}
+                  disabled={loading || saving}
                 >
                   Clear Selection
                 </Button>
@@ -1012,7 +959,7 @@ export default function OnCallPage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Update On-Call Assignment
+                      {onCallSchedule ? "Update On-Call Assignment" : "Create On-Call Assignment"}
                     </>
                   )}
                 </Button>

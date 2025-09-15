@@ -59,7 +59,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         req.user = {
           id: decoded.sub,
           email: user.email, // Populate email
-          organizationId: organizationId!,
+          ...(organizationId && { organizationId }), // Only add organizationId if it exists
         };
 
         next();
