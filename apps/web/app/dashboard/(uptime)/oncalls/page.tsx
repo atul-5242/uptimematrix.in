@@ -32,6 +32,7 @@ import {
   Eye,
   PersonStanding
 } from 'lucide-react'
+import { fetchOnCallSchedules, fetchTeamMembers, fetchOrganizationMembers, fetchAvailableTeams, createOnCallSchedule, updateOnCallSchedule, addUsersToOnCallSchedule, addTeamsToOnCallSchedule, removeUsersFromOnCallSchedule, removeTeamsFromOnCallSchedule } from '../../../all-actions/oncall/api';
 // import axios from 'axios'; // Removed axios import
 
 type UserData = {
@@ -142,21 +143,15 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: TeamData, isOpen: b
   const [loadingMembers, setLoadingMembers] = useState(false);
   
   useEffect(() => {
-    const fetchTeamMembers = async () => {
+    const fetchTeamMembersData = async () => {
       if (isOpen && team.id && team.members.length === 0) {
         setLoadingMembers(true);
         try {
-          const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+          const token = localStorage.getItem('token');
           if (!token) {
             throw new Error('No authentication token found.');
           }
-          const res = await fetch(`/api/teams/${team.id}/members`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (!res.ok) {
-            throw new Error('Failed to fetch team members');
-          }
-          const { data } = await res.json();
+          const { data } = await fetchTeamMembers(team.id);
           setFetchedMembers(data.data.map((member: any) => ({
             id: member.userId,
             fullName: member.name,
@@ -172,7 +167,7 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: TeamData, isOpen: b
         }
       }
     };
-    fetchTeamMembers();
+    fetchTeamMembersData();
   }, [isOpen, team.id, team.members.length]);
   
   if (!isOpen) return null;
@@ -468,34 +463,28 @@ export default function OnCallPage() {
 
   const fetchOnCallData = async () => {
     setLoading(true);
-    const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
-    if (!token) {
-      console.error('No authentication token found.');
-      setLoading(false);
-      return;
-    }
+    // const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+    // if (!token) {
+    //   console.error('No authentication token found.');
+    //   setLoading(false);
+    //   return;
+    // }
 
     try {
-      // Fetch on-call schedules (expecting one for now)
-      const schedulesRes = await fetch('/api/oncall/schedules', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!schedulesRes.ok) throw new Error('Failed to fetch schedules');
-      const schedules: OnCallScheduleData[] = await schedulesRes.json();
+      const schedules: OnCallScheduleData[] = await fetchOnCallSchedules();
       console.log('Fetched on-call schedules:', schedules);
       
       if (schedules.length > 0) {
         const activeSchedule = schedules[0]; // Assuming only one active schedule
         setOnCallSchedule(activeSchedule);
+        console.log('Active Schedule:', activeSchedule);
         
         // Fetch members for each team in the active schedule
         const teamsWithMembers = await Promise.all(activeSchedule.teamAssignments.map(async (assignment) => {
-          const membersRes = await fetch(`/api/teams/${assignment.teamId}/members`, {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (!membersRes.ok) throw new Error(`Failed to fetch members for team ${assignment.teamId}`);
-          const { data: membersData } = await membersRes.json();
-          const members: UserData[] = membersData.data.map((member: any) => ({
+          console.log('Fetching members for teamId:', assignment.teamId);
+          const { data: membersData } = await fetchTeamMembers(assignment.teamId);
+          console.log(`Members data for team ${assignment.teamId}:`, membersData);
+          const members: UserData[] = membersData.map((member: any) => ({
             id: member.userId,
             fullName: member.name,
             email: member.email,
@@ -505,8 +494,19 @@ export default function OnCallPage() {
           }));
           return { ...assignment.team, members: members, description: assignment.team.description || '' };
         }));
+        console.log('Teams with members:', teamsWithMembers);
 
         setCurrentOnCall({
+          persons: activeSchedule.userAssignments.map(assignment => ({
+            ...assignment.user,
+            role: assignment.user.role || 'Responder',
+            isActive: true
+          })),
+          teams: teamsWithMembers,
+          notes: activeSchedule.description || '',
+          lastUpdated: new Date(activeSchedule.updatedAt).toLocaleString(),
+        });
+        console.log('Current On-Call State:', {
           persons: activeSchedule.userAssignments.map(assignment => ({ ...assignment.user, role: assignment.user.role || 'Responder', isActive: true })),
           teams: teamsWithMembers,
           notes: activeSchedule.description || '',
@@ -531,11 +531,8 @@ export default function OnCallPage() {
       }
 
       // Fetch available users (from user management API)
-      const usersRes = await fetch('/api/users/organization-members', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!usersRes.ok) throw new Error('Failed to fetch available users');
-      const usersData = await usersRes.json();
+      const usersData = await fetchOrganizationMembers();
+      console.log('Raw Available Users Data:', usersData);
       console.log('Fetched available users:', usersData.data);
       setAvailablePersons(usersData.data.map((user: any) => ({
         id: user.id,
@@ -547,11 +544,8 @@ export default function OnCallPage() {
       })));
 
       // Fetch available teams (from team management API)
-      const teamsRes = await fetch('/api/teams', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (!teamsRes.ok) throw new Error('Failed to fetch available teams');
-      const teamsData = await teamsRes.json();
+      const teamsData = await fetchAvailableTeams();
+      console.log('Raw Available Teams Data:', teamsData);
       console.log('Fetched available teams:', teamsData.data);
       setAvailableTeams(teamsData.data.map((team: any) => ({
         id: team.id,
@@ -620,68 +614,62 @@ export default function OnCallPage() {
     e.preventDefault()
     setSaving(true)
     
-    const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
-    if (!token) {
-      console.error('No authentication token found for submission.');
-      setSaving(false);
-      return;
-    }
+    // const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+    // if (!token) {
+    //   console.error('No authentication token found for submission.');
+    //   setSaving(false);
+    //   return;
+    // }
 
     try {
       let currentScheduleId = onCallSchedule?.id;
 
       if (!currentScheduleId) {
         // Create a new schedule if none exists
-        const createScheduleRes = await fetch('/api/oncall/schedules', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({
-            name: config.scheduleName || 'Default On-Call Schedule', // Use new scheduleName from config
-            description: config.notes,
-          }),
-        });
-        if (!createScheduleRes.ok) throw new Error('Failed to create schedule');
-        const newSchedule = await createScheduleRes.json();
+        const newSchedule = await createOnCallSchedule(config.scheduleName || 'Default On-Call Schedule', config.notes);
         currentScheduleId = newSchedule.id;
         setOnCallSchedule(newSchedule);
       }
 
       // Update schedule name and description if an existing schedule is present
-      if (onCallSchedule) {
-        await fetch(`/api/oncall/schedules/${currentScheduleId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({
-            name: config.scheduleName, // Use new scheduleName from config
-            description: config.notes,
-          }),
-        });
+      if (onCallSchedule && currentScheduleId) {
+        await updateOnCallSchedule(currentScheduleId, config.scheduleName, config.notes);
       }
 
       // Update user assignments
-      const existingUserAssignments = onCallSchedule?.userAssignments.map(ua => ua.userId) || [];
-      const usersToAdd = config.selectedPersons.filter(userId => !existingUserAssignments.includes(userId));
-      // const usersToRemove = existingUserAssignments.filter(userId => !config.selectedPersons.includes(userId)); // Deletion not requested
+      const existingUserAssignments = onCallSchedule?.userAssignments || [];
+      const existingUserIds = existingUserAssignments.map(ua => ua.userId);
+      const usersToAdd = config.selectedPersons.filter(userId => !existingUserIds.includes(userId));
+      const usersToRemoveAssignments = existingUserAssignments.filter(assignment => !config.selectedPersons.includes(assignment.userId));
 
       for (const userId of usersToAdd) {
-        await fetch(`/api/oncall/schedules/${currentScheduleId}/users`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ userId }),
-        });
+        if (currentScheduleId) {
+          await addUsersToOnCallSchedule(currentScheduleId, userId);
+        }
+      }
+
+      for (const assignment of usersToRemoveAssignments) {
+        if (currentScheduleId) {
+          await removeUsersFromOnCallSchedule(currentScheduleId, assignment.id);
+        }
       }
 
       // Update team assignments
-      const existingTeamAssignments = onCallSchedule?.teamAssignments.map(ta => ta.teamId) || [];
-      const teamsToAdd = config.selectedTeams.filter(teamId => !existingTeamAssignments.includes(teamId));
-      // const teamsToRemove = existingTeamAssignments.filter(teamId => !config.selectedTeams.includes(teamId)); // Deletion not requested
+      const existingTeamAssignments = onCallSchedule?.teamAssignments || [];
+      const existingTeamIds = existingTeamAssignments.map(ta => ta.teamId);
+      const teamsToAdd = config.selectedTeams.filter(teamId => !existingTeamIds.includes(teamId));
+      const teamsToRemoveAssignments = existingTeamAssignments.filter(assignment => !config.selectedTeams.includes(assignment.teamId));
 
       for (const teamId of teamsToAdd) {
-        await fetch(`/api/oncall/schedules/${currentScheduleId}/teams`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ teamId }),
-        });
+        if (currentScheduleId) {
+          await addTeamsToOnCallSchedule(currentScheduleId, teamId);
+        }
+      }
+
+      for (const assignment of teamsToRemoveAssignments) {
+        if (currentScheduleId) {
+          await removeTeamsFromOnCallSchedule(currentScheduleId, assignment.id);
+        }
       }
       
       // Refetch data to update UI

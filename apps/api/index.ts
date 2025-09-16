@@ -1,36 +1,54 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import WebsiteRoutes from './routes/websiteRoute/websiteroute.js';
-import authRoutes from './routes/authRoute/authroute.js';
-import escalationPolicyRoutes from './routes/escalationRoute/escalationPoliciesRoute.js';
-import organizationRoutes from './routes/organizationRoutes/organizationRoutes.js';
-import teamRoutes from './routes/team-sectionRoutes/team/teamRoutes.js';
-import roleRoutes from './routes/team-sectionRoutes/roles/roleRoutes.js';
-import userRoutes from './routes/userRoute/userRoutes.js';
+import express from "express";
+import cors from "cors";
+import authRouter from "./routes/authRoute/authroute.js";
+import websiteRouter from "./routes/websiteRoute/websiteroute.js";
+import escalationRouter from "./routes/escalationRoute/escalationPoliciesRoute.js";
+import userDetailsRouter from "./routes/userRoute/userRoutes.js";
+import sessionRouter from "./routes/authRoute/session.js";
+import organizationRouter from "./routes/organizationRoutes/organizationRoutes.js";
+import teamRouter from "./routes/team-sectionRoutes/team/teamRoutes.js";
+import roleRouter from "./routes/team-sectionRoutes/roles/roleRoutes.js";
 import onCallRoutes from './routes/oncallRoute/oncallRoutes.js';
+import dotenv from "dotenv";
+
 
 dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 3001;
+app.use(cors({ 
+  origin: process.env.CORS_ORIGIN?.split(',') || '*',
+  credentials: true 
+}));
 
 app.use(express.json());
-app.use(cors());
 
-app.get('/', (req, res) => {
-  res.send('Hello from API!');
-});
+// Routes
+app.use("/auth", authRouter);
+app.use("/website", websiteRouter);
+app.use("/escalation-policies", escalationRouter);
+app.use("/userprofile", userDetailsRouter);
+app.use("/organization", organizationRouter);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/website', WebsiteRoutes);
-app.use('/api/escalation-policies', escalationPolicyRoutes);
-app.use('/api/organizations', organizationRoutes);
-app.use('/api/teams', teamRoutes);
-app.use('/api/roles', roleRoutes);
-app.use('/api/users', userRoutes);
+// Team management routes
+app.use("/api/teams", teamRouter);
+app.use("/api/roles", roleRouter);
 app.use('/api/oncall', onCallRoutes);
+// Session validation endpoint
+app.use("/api", sessionRouter);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Error handling middleware
+app.use((err: any, _req: any, res: any, _next: any) => {
+  console.error('API Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
+
+// Not found handler
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+export default app;

@@ -352,3 +352,77 @@ export const getOnCallTeams = async (req: AuthenticatedRequest, res: Response) =
     res.status(500).json({ message: 'Failed to retrieve on-call teams.' });
   }
 };
+
+export const removeUserFromOnCall = async (req: AuthenticatedRequest, res: Response) => {
+  const { scheduleId, onCallUserAssignmentId } = req.params;
+  const organizationId = req.user?.organizationId;
+
+  if (!organizationId) {
+    return res.status(400).json({ message: 'Organization ID is required.' });
+  }
+
+  if (!scheduleId || !onCallUserAssignmentId) {
+    return res.status(400).json({ message: 'Schedule ID and On-Call User Assignment ID are required.' });
+  }
+
+  try {
+    // Verify the assignment exists and belongs to the organization
+    const assignment = await prismaClient.onCallUserAssignment.findFirst({
+      where: {
+        id: onCallUserAssignmentId,
+        scheduleId,
+        schedule: { organizationId },
+      },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'On-call user assignment not found.' });
+    }
+
+    await prismaClient.onCallUserAssignment.delete({
+      where: { id: onCallUserAssignmentId },
+    });
+
+    res.status(200).json({ message: 'User removed from on-call schedule successfully.' });
+  } catch (error) {
+    console.error('Error removing user from on-call schedule:', error);
+    res.status(500).json({ message: 'Failed to remove user from on-call schedule.' });
+  }
+};
+
+export const removeTeamFromOnCall = async (req: AuthenticatedRequest, res: Response) => {
+  const { scheduleId, onCallTeamAssignmentId } = req.params;
+  const organizationId = req.user?.organizationId;
+
+  if (!organizationId) {
+    return res.status(400).json({ message: 'Organization ID is required.' });
+  }
+
+  if (!scheduleId || !onCallTeamAssignmentId) {
+    return res.status(400).json({ message: 'Schedule ID and On-Call Team Assignment ID are required.' });
+  }
+
+  try {
+    // Verify the assignment exists and belongs to the organization
+    const assignment = await prismaClient.onCallTeamAssignment.findFirst({
+      where: {
+        id: onCallTeamAssignmentId,
+        scheduleId,
+        schedule: { organizationId },
+      },
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'On-call team assignment not found.' });
+    }
+
+    await prismaClient.onCallTeamAssignment.delete({
+      where: { id: onCallTeamAssignmentId },
+    });
+
+    res.status(200).json({ message: 'Team removed from on-call schedule successfully.' });
+  } catch (error) {
+    console.error('Error removing team from on-call schedule:', error);
+    res.status(500).json({ message: 'Failed to remove team from on-call schedule.' });
+  }
+};
