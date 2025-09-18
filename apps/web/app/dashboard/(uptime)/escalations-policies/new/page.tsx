@@ -15,13 +15,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type EscalationStep = {
   id: number;
+  repeatCount: number; // Added repeatCount
   alertMethod: {
     primary: string[];
     additional: string[];
   };
   recipients: string[];
   delayMinutes: number;
-  repeatCount: number;
   escalateAfter: number;
   customMessage?: string;
 }
@@ -46,6 +46,8 @@ type EscalationPolicyFormData = {
   isActive: boolean;
   steps: EscalationStep[];
   tags: string[];
+  terminationCondition: 'stop_after_last_step' | 'repeat_last_step' | ''; // New field
+  repeatLastStepIntervalMinutes?: number; // New field for configurable interval
 }
 
 type ErrorState = {
@@ -90,7 +92,9 @@ export default function EscalationPolicyCreatePage() {
         customMessage: ''
       }
     ],
-    tags: []
+    tags: [],
+    terminationCondition: '',
+    repeatLastStepIntervalMinutes: 30 // Default to 30 minutes
   })
 
   const [loading, setLoading] = useState(false)
@@ -265,9 +269,7 @@ export default function EscalationPolicyCreatePage() {
 
     // Check if at least one trigger condition is enabled
     const conditions = formData.triggerConditions
-    const hasEnabledCondition = conditions.monitorsDown || conditions.responseTimeThreshold || 
-                               conditions.sslExpiry || conditions.domainExpiry || 
-                               conditions.statusCodeErrors || conditions.heartbeatMissed
+    const hasEnabledCondition = conditions.monitorsDown
     
     if (!hasEnabledCondition) {
       newErrors.triggerConditions = 'At least one trigger condition must be enabled'
@@ -302,16 +304,21 @@ export default function EscalationPolicyCreatePage() {
   
       const payload = {
         ...rest,
-        ...triggerConditions, // 👈 spread them here
+        monitorsDown: triggerConditions.monitorsDown, // Flatten monitorsDown
         steps: steps.map((s, index) => ({
           stepOrder: index + 1, // Prisma requires stepOrder
           primaryMethods: s.alertMethod.primary,
           additionalMethods: s.alertMethod.additional,
           recipients: s.recipients,
           delayMinutes: s.delayMinutes,
+          repeatCount: s.repeatCount,
           escalateAfter: s.escalateAfter,
           customMessage: s.customMessage
-        }))
+        })),
+        // Include repeatLastStepIntervalMinutes if terminationCondition is repeat_last_step
+        ...(formData.terminationCondition === 'repeat_last_step' && {
+          repeatLastStepIntervalMinutes: formData.repeatLastStepIntervalMinutes
+        })
       }
   
       const res = await fetch('/api/escalation-policies', {
@@ -484,6 +491,42 @@ export default function EscalationPolicyCreatePage() {
                 )}
               </div>
 
+              {/* New: Escalation Termination Condition */}
+              <div className="space-y-2">
+                <Label htmlFor="terminationCondition">Escalation Termination Condition</Label>
+                <Select
+                  value={formData.terminationCondition}
+                  onValueChange={(value: any) => setFormData(prev => ({ ...prev, terminationCondition: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select how escalation stops" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stop_after_last_step">
+                      Stop escalating after the last step
+                    </SelectItem>
+                    <SelectItem value="repeat_last_step">
+                      Keep repeating the last step
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {formData.terminationCondition === 'repeat_last_step' && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Label htmlFor="repeatInterval" className="sr-only">Repeat Interval</Label>
+                    <Input
+                      id="repeatInterval"
+                      type="number"
+                      min="1"
+                      value={formData.repeatLastStepIntervalMinutes}
+                      onChange={(e) => setFormData(prev => ({ ...prev, repeatLastStepIntervalMinutes: parseInt(e.target.value) || 1 }))}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">minutes</span>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">Define what happens when all escalation steps have been exhausted if no one acknowledges the escalation.</p>
+              </div>
+
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="active"
@@ -531,7 +574,7 @@ export default function EscalationPolicyCreatePage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="response-time"
-                      checked={false}
+                      checked={formData.triggerConditions.responseTimeThreshold}
                       disabled
                     />
                     <Label htmlFor="response-time" className="font-medium text-gray-500">
@@ -545,7 +588,7 @@ export default function EscalationPolicyCreatePage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="ssl-expiry"
-                      checked={false}
+                      checked={formData.triggerConditions.sslExpiry}
                       disabled
                     />
                     <Label htmlFor="ssl-expiry" className="font-medium text-gray-500">
@@ -559,7 +602,7 @@ export default function EscalationPolicyCreatePage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="domain-expiry"
-                      checked={false}
+                      checked={formData.triggerConditions.domainExpiry}
                       disabled
                     />
                     <Label htmlFor="domain-expiry" className="font-medium text-gray-500">
@@ -573,7 +616,7 @@ export default function EscalationPolicyCreatePage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="status-codes"
-                      checked={false}
+                      checked={formData.triggerConditions.statusCodeErrors}
                       disabled
                     />
                     <Label htmlFor="status-codes" className="font-medium text-gray-500">
@@ -587,7 +630,7 @@ export default function EscalationPolicyCreatePage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="heartbeat"
-                      checked={false}
+                      checked={formData.triggerConditions.heartbeatMissed}
                       disabled
                     />
                     <Label htmlFor="heartbeat" className="font-medium text-gray-500">
@@ -809,6 +852,21 @@ export default function EscalationPolicyCreatePage() {
                           className="w-24"
                         />
                         <span className="text-sm text-gray-600">minutes without acknowledgment</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Repeat This Step</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={step.repeatCount}
+                          onChange={(e) => updateStep(step.id, 'repeatCount', parseInt(e.target.value) || 1)}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-gray-600">times</span>
                       </div>
                     </div>
                   </div>

@@ -10,7 +10,7 @@ interface UserPayload {
 }
 
 interface CustomRequest extends Request {
-  user?: UserPayload;
+  user: UserPayload;
 }
 
 const createInvitationLink = (token: string) => {

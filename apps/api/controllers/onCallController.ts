@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import {prismaClient} from '@uptimematrix/store';
 
 interface AuthenticatedRequest extends Request {
-  user?: { id: string; organizationId?: string };
+  user: { id: string; organizationId?: string };
 }
 
 // Create a new on-call schedule

@@ -6,7 +6,7 @@ import { prismaClient } from "@uptimematrix/store";
 declare global {
   namespace Express {
     interface Request {
-      user?: {
+      user: {
         id: string;
         organizationId?: string;
         email?: string; // Add email to the user object
@@ -30,7 +30,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string };
-
         // Verify user exists and get their current organization context
         const user = await prismaClient.user.findUnique({
           where: { id: decoded.sub },
@@ -50,7 +49,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         
         // Determine organization ID to use (selected or first available)
         let organizationId = user.selectedOrganizationId;
-        
         // The following block can be removed if organizationId is not strictly required for every authenticated route
         // if (!organizationId) {
         //   return res.status(401).json({ message: 'Unauthorized: No organization access' });

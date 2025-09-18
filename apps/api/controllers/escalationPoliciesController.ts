@@ -7,8 +7,37 @@ import type { Request, Response } from "express";
 export const getEscalationPolicies = async (req: Request, res: Response) => {
   try {
     const policies = await prismaClient.escalationPolicy.findMany({
-      where: { createdById: req.userId! },
-      include: { steps: true },
+      where: {
+        createdById: req.user.id!,
+        organizationId: req.user.organizationId!,
+      },
+      // Include new fields for EscalationPolicy
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        priorityLevel: true,
+        tags: true,
+        isActive: true,
+        monitorsDown: true,
+        terminationCondition: true,
+        repeatLastStepIntervalMinutes: true,
+        steps: {
+          select: {
+            id: true,
+            stepOrder: true,
+            primaryMethods: true,
+            additionalMethods: true,
+            recipients: true,
+            delayMinutes: true,
+            repeatCount: true,
+            escalateAfter: true,
+            customMessage: true,
+          },
+        },
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -24,7 +53,7 @@ export const getEscalationPolicies = async (req: Request, res: Response) => {
  */
 export const createEscalationPolicy = async (req: Request, res: Response) => {
     try {
-      const { name, description, severity, isActive, tags, steps, ...triggers } = req.body;
+      const { name, description, severity, isActive, tags, steps, monitorsDown, terminationCondition, repeatLastStepIntervalMinutes } = req.body;
   
       const policy = await prismaClient.escalationPolicy.create({
         data: {
@@ -33,8 +62,11 @@ export const createEscalationPolicy = async (req: Request, res: Response) => {
           priorityLevel: (severity as string).toLowerCase() as Priority,  // must be a valid enum
           isActive,
           tags: Array.isArray(tags) ? tags : [], // ensure string[]
-          createdById: req.userId!,
-          ...triggers,
+          createdBy: { connect: { id: req.user.id! } }, // Connect to existing User
+          organization: { connect: { id: req.user.organizationId! } }, // Connect to existing Organization
+          monitorsDown,
+          terminationCondition,
+          repeatLastStepIntervalMinutes: terminationCondition === 'repeat_last_step' ? repeatLastStepIntervalMinutes : null,
           steps: {
             create: steps.map((step: any, idx: number) => ({
               stepOrder: idx + 1,
@@ -42,6 +74,7 @@ export const createEscalationPolicy = async (req: Request, res: Response) => {
               additionalMethods: step.alertMethod?.additional ?? [],
               recipients: step.recipients ?? [],
               delayMinutes: step.delayMinutes ?? 0,
+              repeatCount: step.repeatCount ?? 1,
               escalateAfter: step.escalateAfter ?? 5,
               customMessage: step.customMessage ?? null,
             })),
@@ -63,17 +96,22 @@ export const createEscalationPolicy = async (req: Request, res: Response) => {
  */
 export const updateEscalationPolicy = async (req: Request, res: Response) => {
     try {
-      const { id, name, description, severity, isActive, tags, steps, ...triggers } = req.body;
+      const { id, name, description, severity, isActive, tags, steps, monitorsDown, terminationCondition, repeatLastStepIntervalMinutes } = req.body;
   
       const policy = await prismaClient.escalationPolicy.update({
-        where: { id },
+        where: { 
+          id, 
+          organizationId: req.user.organizationId!,
+        },
         data: {
           name,
           description,
           priorityLevel: severity as Priority,
           isActive,
           tags: Array.isArray(tags) ? tags : [],
-          ...triggers,
+          monitorsDown,
+          terminationCondition,
+          repeatLastStepIntervalMinutes: terminationCondition === 'repeat_last_step' ? repeatLastStepIntervalMinutes : null,
           steps: {
             deleteMany: {}, // clear old steps
             create: steps.map((step: any, idx: number) => ({
@@ -82,6 +120,7 @@ export const updateEscalationPolicy = async (req: Request, res: Response) => {
               additionalMethods: step.alertMethod?.additional ?? [],
               recipients: step.recipients ?? [],
               delayMinutes: step.delayMinutes ?? 0,
+              repeatCount: step.repeatCount ?? 1,
               escalateAfter: step.escalateAfter ?? 5,
               customMessage: step.customMessage ?? null,
             })),
@@ -109,7 +148,8 @@ export const deleteEscalationPolicy = async (req: Request, res: Response) => {
       const policy = await prismaClient.escalationPolicy.findFirst({
         where: {
           id,
-          createdById: req.userId!,
+          createdById: req.user.id!,
+          organizationId: req.user.organizationId!,
         },
       });
   
@@ -119,7 +159,10 @@ export const deleteEscalationPolicy = async (req: Request, res: Response) => {
   
       // Delete (steps will cascade if relation is set in schema)
       await prismaClient.escalationPolicy.delete({
-        where: { id },
+        where: { 
+          id, 
+          organizationId: req.user.organizationId!,
+        },
       });
   
       res.json({ message: "Policy deleted successfully", id });

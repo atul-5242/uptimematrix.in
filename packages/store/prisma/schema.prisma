@@ -100,6 +100,9 @@ model EscalationPolicy {
   // heartbeatMissed      Boolean @default(false)
   // heartbeatMissedCount Int?    @default(3)
 
+  terminationCondition String? @default("stop_after_last_step")
+  repeatLastStepIntervalMinutes Int? @default(30)
+
   steps          EscalationStep[]
   websites       website[]
   organization   Organization     @relation(fields: [organizationId], references: [id])
@@ -125,6 +128,7 @@ model EscalationStep {
 
   recipients    String[] // list of user IDs, team names, or external contacts - Not directly used in frontend pages analyzed (though mentioned in concepts)
   delayMinutes  Int      @default(0) // wait before this step triggers - Not directly used in frontend pages analyzed (though mentioned in concepts)
+  repeatCount   Int      @default(1)
   escalateAfter Int      @default(5) // wait before escalating to next step (in minutes) - Not directly used in frontend pages analyzed (though mentioned in concepts)
   customMessage String? // Not directly used in frontend pages analyzed (though mentioned in concepts)
 
