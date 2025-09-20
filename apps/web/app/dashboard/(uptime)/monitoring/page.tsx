@@ -142,7 +142,10 @@ export default function MonitorsDashboard() {
     try {
       const response = await fetch(`/api/monitors/${monitorId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
         body: JSON.stringify({ isActive: !currentStatus })
       })
 

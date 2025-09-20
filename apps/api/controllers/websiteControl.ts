@@ -35,8 +35,8 @@ export const addWebsite = async (req: Request, res: Response) => {
                 tags: tags || [],
                 timeAdded: new Date(),
                 nextCheckTime: new Date(Date.now() + 5000), // Set to 5 seconds from now for first monitoring cycle
-                createdById: req.userId!,
-                organizationId: req.organizationId!,
+                createdById: req.user.id!,
+                organizationId: req.user.organizationId!,
             },
         });
 
@@ -55,20 +55,22 @@ export const addWebsite = async (req: Request, res: Response) => {
         }
 
         // 3️⃣ Upsert region(s) and create first tick(s)
-        const regionsToUse = website.regions || ["India"];
+        const regionsToUse = regions || ["India"];
         for (const r of regionsToUse) {
-            const region = await prismaClient.region.upsert({
+            const region = await prismaClient.region.findUnique({
                 where: { name: r },
-                update: {},
-                create: { name: r },
             });
+
+            if (!region) {
+                return res.status(400).json({ message: `Region '${r}' not found. Please select an existing region.` });
+            }
 
             await prismaClient.websiteTick.create({
                 data: {
                     response_time_ms: responseTime,
                     status,
-                    website_id: website.id,  // ✅ Fixed: use correct field name
-                    region_id: region.id,    // ✅ Fixed: use correct field name
+                    website_id: website.id,
+                    region_id: region.id,
                 },
             });
         }
@@ -101,7 +103,7 @@ export const addWebsite = async (req: Request, res: Response) => {
 
 export const getWebsiteStatus = async (req: Request, res: Response) => {
     const website = await prismaClient.website.findFirst({
-      where: { createdById: req.userId!, id: req.params.websiteId },
+      where: { organizationId: req.user.organizationId!, id: req.params.websiteId },
       include: { ticks: { orderBy: [{ createdAt: "desc" }], take: 20 } }, // fetch more ticks
       orderBy: { timeAdded: "desc" },
     });
@@ -159,7 +161,7 @@ function calculateAvgResponseTime(ticks: any[], hours = 24) {
 export const getAllMonitors = async (req: Request, res: Response) => {
   try {
     const websites = await prismaClient.website.findMany({
-      where: { createdById: req.userId! },
+      where: { organizationId: req.user.organizationId! },
       include: {
         ticks: {
           orderBy: { createdAt: "desc" },
@@ -215,7 +217,7 @@ export const deleteWebsite = async (req: Request, res: Response) => {
     const website = await prismaClient.website.findFirst({
       where: {
         id,
-        createdById: req.userId!,
+        organizationId: req.user.organizationId!,
       },
     });
 

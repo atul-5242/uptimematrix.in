@@ -17,6 +17,15 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get("authorization")?.split(" ")[1];
   if (!token) return NextResponse.json({ message: "Missing auth token" }, { status: 401 });
   const body = await req.json();
+
+  // Server-side validation: Ensure at least one escalation step is provided
+  if (!body.steps || body.steps.length === 0) {
+    return NextResponse.json(
+      { message: "At least one escalation step is required." },
+      { status: 400 }
+    );
+  }
+
   const res = await fetch(`${BASE_URL}/escalation-policies/create-escalation-policy`, {
     method: "POST",
     headers: {
@@ -33,6 +42,15 @@ export async function PATCH(req: NextRequest) {
   const token = req.headers.get("authorization")?.split(" ")[1];
   if (!token) return NextResponse.json({ message: "Missing auth token" }, { status: 401 });
   const body = await req.json();
+
+  // Server-side validation: Ensure at least one escalation step is provided for updates
+  if (body.steps && body.steps.length === 0) {
+    return NextResponse.json(
+      { message: "At least one escalation step is required for updates." },
+      { status: 400 }
+    );
+  }
+
   const res = await fetch(`${BASE_URL}/escalation-policies`, {
     method: "PATCH",
     headers: {

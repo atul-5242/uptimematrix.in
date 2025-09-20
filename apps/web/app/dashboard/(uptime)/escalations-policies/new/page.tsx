@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect, FormEvent } from 'react'
+import React, { useState, useEffect, FormEvent, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Plus, Trash2, Clock, Users, AlertTriangle, ArrowLeft, Globe, Zap, Webhook, Bell, Phone, Mail, MessageSquare, X, Info, Settings } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { toast } from 'sonner'
 
 type EscalationStep = {
   id: number;
@@ -100,7 +101,11 @@ export default function EscalationPolicyCreatePage() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<ErrorState>({})
   const [availableIntegrations, setAvailableIntegrations] = useState<any[]>([])
-  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([]);
+  const [organizationMembers, setOrganizationMembers] = useState<any[]>([]);
+  const [onCallSchedules, setOnCallSchedules] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState<boolean>(true);
+  const [membersLoading, setMembersLoading] = useState<boolean>(true);
 
   const primaryAlertMethods = [
     { value: 'email', label: 'Email Notification', icon: Mail },
@@ -108,7 +113,99 @@ export default function EscalationPolicyCreatePage() {
     { value: 'phone', label: 'Phone Call', icon: Phone }
   ]
 
-  // Fetch available integrations and team members
+  // Fetch all necessary data: teams, organization members, on-call schedules
+  useEffect(() => {
+    const fetchData = async () => {
+      setDataLoading(true);
+      const token = localStorage.getItem('auth_token') || '';
+      if (!token) {
+        console.error("Authentication token not found.");
+        setDataLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch Teams
+        const teamsRes = await fetch('/api/teams', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (teamsRes.ok) {
+          const data = await teamsRes.json();
+          setTeams(data.data || []);
+        } else {
+          console.error("Failed to fetch teams:", await teamsRes.text());
+        }
+
+        const fetchOrganizationMembers = async () => {
+          const token = localStorage.getItem('auth_token');
+          if (!token) {
+            console.error('No auth token found');
+            setMembersLoading(false);
+            return;
+          }
+
+          try {
+            const response = await fetch('/api/teams/all-organization-members', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Failed to fetch organization members:', errorText);
+              // Handle different error responses from the backend
+              if (response.status === 401) {
+                toast.error('Unauthorized', {
+                  description: 'Your session has expired. Please log in again.',
+                });
+                router.push('/signin');
+              } else if (response.status === 403) {
+                toast.error('Forbidden', {
+                  description: 'You do not have permission to view organization members.',
+                });
+              } else {
+                toast.error('Error', {
+                  description: `Failed to fetch organization members: ${response.statusText}`,
+                });
+              }
+              return;
+            }
+
+            const data = await response.json();
+            setOrganizationMembers(data.data || []);
+          } catch (error) {
+            console.error('Error fetching organization members:', error);
+            toast.error('Network Error', {
+              description: 'Unable to connect to the server. Please check your internet connection.',
+            });
+          } finally {
+            setMembersLoading(false);
+          }
+        };
+        fetchOrganizationMembers();
+
+        // Fetch On-Call Schedules with assignments
+        const onCallRes = await fetch('/api/oncall/schedules', { // Assuming this is the correct route
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (onCallRes.ok) {
+          const data = await onCallRes.json();
+          setOnCallSchedules(data || []);
+        } else {
+          console.error("Failed to fetch on-call schedules:", await onCallRes.text());
+        }
+      } catch (error) {
+        console.error("Error fetching escalation recipients data:", error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Fetch available integrations (original logic)
   useEffect(() => {
     // Demo data for integrations - replace with actual API call
     setAvailableIntegrations([
@@ -119,17 +216,6 @@ export default function EscalationPolicyCreatePage() {
       { value: 'push', label: 'Push Notification', icon: Bell, integrated: false },
       { value: 'pagerduty', label: 'PagerDuty', icon: Bell, integrated: true },
       { value: 'opsgenie', label: 'Opsgenie', icon: Bell, integrated: false }
-    ])
-
-    // Demo data for team members - replace with actual API call
-    setTeamMembers([
-      { value: 'john-doe', label: 'John Doe - Lead Developer', role: 'Lead Developer', email: 'john@company.com' },
-      { value: 'jane-smith', label: 'Jane Smith - DevOps Engineer', role: 'DevOps Engineer', email: 'jane@company.com' },
-      { value: 'mike-wilson', label: 'Mike Wilson - System Admin', role: 'System Admin', email: 'mike@company.com' },
-      { value: 'oncall', label: 'Current On-Call Engineer', role: 'On-Call', email: 'oncall@company.com' },
-      { value: 'team-lead', label: 'Team Lead', role: 'Team Lead', email: 'teamlead@company.com' },
-      { value: 'dev-team', label: 'Development Team', role: 'Team', email: 'dev-team@company.com' },
-      { value: 'ops-team', label: 'Operations Team', role: 'Team', email: 'ops-team@company.com' }
     ])
   }, [])
 
@@ -153,6 +239,75 @@ export default function EscalationPolicyCreatePage() {
       ]
     }))
   }
+
+  // Consolidated list of recipients for the "Notify Who" dropdown
+  const allRecipients = useMemo(() => {
+    const recipients: { value: string; label: string; type: string; email?: string }[] = [];
+    const addedRecipientIds = new Set<string>(); // To track unique recipients
+
+    organizationMembers.forEach(member => {
+      if (!addedRecipientIds.has(member.id)) {
+        recipients.push({
+          value: member.id,
+          label: `${member.name} (${member.organizationRole})`,
+          type: 'member',
+          email: member.email,
+        });
+        addedRecipientIds.add(member.id);
+      }
+    });
+
+    teams.forEach(team => {
+      if (!addedRecipientIds.has(team.id)) {
+        recipients.push({
+          value: team.id,
+          label: `${team.name} (Team)`,
+          type: 'team',
+        });
+        addedRecipientIds.add(team.id);
+      }
+    });
+
+    onCallSchedules.forEach(schedule => {
+      // Add the schedule itself as an option
+      if (!addedRecipientIds.has(schedule.id)) {
+        recipients.push({
+          value: schedule.id,
+          label: `${schedule.name} (On-Call Schedule)`,
+          type: 'oncall-schedule',
+        });
+        addedRecipientIds.add(schedule.id);
+      }
+
+      // Add individual users assigned to this on-call schedule
+      schedule.userAssignments.forEach((assignment: any) => {
+        if (assignment.user && !addedRecipientIds.has(assignment.user.id)) {
+          recipients.push({
+            value: assignment.user.id,
+            label: `${assignment.user.fullName || assignment.user.email}`, 
+            type: 'oncall-member',
+            email: assignment.user.email,
+          });
+          addedRecipientIds.add(assignment.user.id);
+        }
+      });
+
+      // Add individual teams assigned to this on-call schedule
+      schedule.teamAssignments.forEach((assignment: any) => {
+        if (assignment.team && !addedRecipientIds.has(assignment.team.id)) {
+          recipients.push({
+            value: assignment.team.id,
+            label: `${assignment.team.name}`, 
+            type: 'oncall-team',
+          });
+          addedRecipientIds.add(assignment.team.id);
+        }
+      });
+    });
+
+    return recipients;
+  }, [organizationMembers, teams, onCallSchedules]);
+
 
   const removeStep = (stepId: number) => {
     setFormData(prev => ({
@@ -807,13 +962,21 @@ export default function EscalationPolicyCreatePage() {
                           <SelectValue placeholder="Select recipients" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teamMembers.map((member) => (
-                            <SelectItem key={member.value} value={member.value}>
+                          {allRecipients.map((recipient) => (
+                            <SelectItem key={recipient.value} value={recipient.value}>
                               <div className="flex items-center gap-2">
-                                <Users className="h-4 w-4" />
+                                {recipient.type === 'member' && <Users className="h-4 w-4" />}
+                                {recipient.type === 'team' && <Users className="h-4 w-4" />}
+                                {recipient.type === 'oncall-schedule' && <Clock className="h-4 w-4" />}
+                                {recipient.type === 'oncall-member' && <Users className="h-4 w-4" />}
+                                {recipient.type === 'oncall-team' && <Users className="h-4 w-4" />}
                                 <div className="flex flex-col">
-                                  <span className="font-medium">{member.label}</span>
-                                  <span className="text-xs text-gray-500">{member.email}</span>
+                                  <span className="font-medium">
+                                    {recipient.label}
+                                    {recipient.type === 'oncall-member' && ' (on call engineer)'}
+                                    {recipient.type === 'oncall-team' && ' (on call team)'}
+                                  </span>
+                                  {recipient.email && <span className="text-xs text-gray-500">{recipient.email}</span>}
                                 </div>
                               </div>
                             </SelectItem>

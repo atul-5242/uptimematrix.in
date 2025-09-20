@@ -9,6 +9,7 @@ import organizationRouter from "./routes/organizationRoutes/organizationRoutes.j
 import teamRouter from "./routes/team-sectionRoutes/team/teamRoutes.js";
 import roleRouter from "./routes/team-sectionRoutes/roles/roleRoutes.js";
 import onCallRoutes from './routes/oncallRoute/oncallRoutes.js';
+import regionsRouter from "./routes/regions.js"; // Import the new regions router
 import dotenv from "dotenv";
 
 
@@ -27,6 +28,7 @@ app.use("/website", websiteRouter);
 app.use("/escalation-policies", escalationRouter);
 app.use("/userprofile", userDetailsRouter);
 app.use("/organization", organizationRouter);
+app.use("/regions", regionsRouter); // Register the new regions router
 
 // Team management routes
 app.use("/api/teams", teamRouter);

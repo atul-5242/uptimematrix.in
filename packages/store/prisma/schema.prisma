@@ -15,37 +15,37 @@ datasource db {
 }
 
 model User {
-  id                          String               @id @default(uuid())
-  fullName                    String?
-  email                       String               @unique
-  phone                       String? // Added from frontend
-  company                     String[]             @default([]) // Added from frontend - represents multiple organizations
-  jobTitle                    String? // Added from frontend (referred to as 'Expertise')
-  location                    String? // Added from frontend
-  bio                         String? // Added from frontend
-  avatar                      String? // Added from frontend
-  joinDate                    DateTime             @default(now()) // Added from frontend
-  lastLogin                   DateTime? // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
-  isEmailVerified             Boolean              @default(false) // Added from frontend
-  isPhoneVerified             Boolean              @default(false) // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
-  password                    String
-  selectedOrganizationId      String?
-  selectedOrganizationRole    String? // Store role like "Admin", "Member", etc.
-  selectedOrganizationPermissions String[]             @default([]) // Store a list of permissions for the selected organization
-  emailVerificationToken      String?
-  emailVerificationExpires    DateTime?
-  organizationMembers         OrganizationMember[] // Inverse relation for OrganizationMember's 'user' field AND ALSO  A list of OrganizationMember entries where this user is the member
-  createdWebsites             website[]            @relation("CreatedBy") // Tracks who created a website
-  createdEscalationPolicies   EscalationPolicy[]   @relation("CreatedBy") // Tracks who created an escalation policy
-  createdStatusPages          StatusPage[]         @relation("CreatedBy") // Tracks who created a status page
-  createdReports              ReportService[]      @relation("CreatedBy") // Tracks who created a report service
-  createdIntegrationsRelation Integration[]        @relation("CreatedByIntegration") // Tracks Integrations created by this user
-  acknowledgedIncidents       Incident[]           @relation("AcknowledgedByIncident") // Incidents acknowledged by this user
-  resolvedIncidents           Incident[]           @relation("ResolvedByIncident") // Incidents resolved by this user
-  memberOfTeamEntries         TeamMember[] // TeamMember entries where this user is the member
-  createdTeams                Team[]               @relation("CreatedTeam") // Teams created by this user
-  sentInvitations             OrganizationMember[] @relation("InvitedBy") // Invitations sent by this user
-  onCallUserAssignments       OnCallUserAssignment[]
+  id                              String                 @id @default(uuid())
+  fullName                        String?
+  email                           String                 @unique
+  phone                           String? // Added from frontend
+  company                         String[]               @default([]) // Added from frontend - represents multiple organizations
+  jobTitle                        String? // Added from frontend (referred to as 'Expertise')
+  location                        String? // Added from frontend
+  bio                             String? // Added from frontend
+  avatar                          String? // Added from frontend
+  joinDate                        DateTime               @default(now()) // Added from frontend
+  lastLogin                       DateTime? // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
+  isEmailVerified                 Boolean                @default(false) // Added from frontend
+  isPhoneVerified                 Boolean                @default(false) // Added from frontend (though commented out in frontend) - Not currently used in frontend pages analyzed
+  password                        String
+  selectedOrganizationId          String?
+  selectedOrganizationRole        String? // Store role like "Admin", "Member", etc.
+  selectedOrganizationPermissions String[]               @default([]) // Store a list of permissions for the selected organization
+  emailVerificationToken          String?
+  emailVerificationExpires        DateTime?
+  organizationMembers             OrganizationMember[] // Inverse relation for OrganizationMember's 'user' field AND ALSO  A list of OrganizationMember entries where this user is the member
+  createdWebsites                 website[]              @relation("CreatedBy") // Tracks who created a website
+  createdEscalationPolicies       EscalationPolicy[]     @relation("CreatedBy") // Tracks who created an escalation policy
+  createdStatusPages              StatusPage[]           @relation("CreatedBy") // Tracks who created a status page
+  createdReports                  ReportService[]        @relation("CreatedBy") // Tracks who created a report service
+  createdIntegrationsRelation     Integration[]          @relation("CreatedByIntegration") // Tracks Integrations created by this user
+  acknowledgedIncidents           Incident[]             @relation("AcknowledgedByIncident") // Incidents acknowledged by this user
+  resolvedIncidents               Incident[]             @relation("ResolvedByIncident") // Incidents resolved by this user
+  memberOfTeamEntries             TeamMember[] // TeamMember entries where this user is the member
+  createdTeams                    Team[]                 @relation("CreatedTeam") // Teams created by this user
+  sentInvitations                 OrganizationMember[]   @relation("InvitedBy") // Invitations sent by this user
+  onCallUserAssignments           OnCallUserAssignment[]
 }
 
 model website {
@@ -77,6 +77,7 @@ model website {
   downtimeToday         Int               @default(0) // Added from frontend - Not currently used in frontend pages analyzed
   avgResponseTime24h    Int               @default(0) // Added from frontend
   uptimeTrend           UptimeTrend       @default(ONLINE) // Added from frontend
+  Incidents             Incident[] // Add this inverse relation
 }
 
 model EscalationPolicy {
@@ -100,8 +101,8 @@ model EscalationPolicy {
   // heartbeatMissed      Boolean @default(false)
   // heartbeatMissedCount Int?    @default(3)
 
-  terminationCondition String? @default("stop_after_last_step")
-  repeatLastStepIntervalMinutes Int? @default(30)
+  terminationCondition          String? @default("stop_after_last_step")
+  repeatLastStepIntervalMinutes Int?    @default(30)
 
   steps          EscalationStep[]
   websites       website[]
@@ -132,8 +133,8 @@ model EscalationStep {
   escalateAfter Int      @default(5) // wait before escalating to next step (in minutes) - Not directly used in frontend pages analyzed (though mentioned in concepts)
   customMessage String? // Not directly used in frontend pages analyzed (though mentioned in concepts)
 
-  createdAt                 DateTime                 @default(now())
-  updatedAt                 DateTime                 @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([policyId, stepOrder]) // ensure unique step order per policy
 }
@@ -159,16 +160,16 @@ model Integration {
 }
 
 model Team {
-  id             String                 @id @default(uuid())
-  name           String
-  description    String?
-  organizationId String
-  organization   Organization           @relation(fields: [organizationId], references: [id])
-  members        TeamMember[] // Team members linked via TeamMember model
-  createdBy      User                   @relation("CreatedTeam", fields: [createdById], references: [id]) // Tracks who created this team
-  createdById    String
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id                    String                 @id @default(uuid())
+  name                  String
+  description           String?
+  organizationId        String
+  organization          Organization           @relation(fields: [organizationId], references: [id])
+  members               TeamMember[] // Team members linked via TeamMember model
+  createdBy             User                   @relation("CreatedTeam", fields: [createdById], references: [id]) // Tracks who created this team
+  createdById           String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   onCallTeamAssignments OnCallTeamAssignment[]
 }
 
@@ -383,8 +384,8 @@ model OrganizationMember {
   invitedBy      User?        @relation("InvitedBy", fields: [invitedById], references: [id]) // User who invited this member
   invitedById    String?
   invitationLink String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
 
   @@unique([email, organizationId])
 }
@@ -406,26 +407,31 @@ model ReportService {
 }
 
 model Incident {
-  id               String           @id @default(cuid())
-  title            String
-  serviceName      String // Added from frontend
-  status           IncidentStatus
-  severity         IncidentSeverity
-  startTime        DateTime // Added from frontend
-  endTime          DateTime? // Added from frontend
-  duration         String // Added from frontend
-  impact           String // Added from frontend
-  serviceId        String? // AI-generated relation field
-  service          ReportService?   @relation(fields: [serviceId], references: [id]) // AI-generated relation
-  organization     Organization     @relation(fields: [organizationId], references: [id])
-  organizationId   String
-  createdAt        DateTime         @default(now())
-  Acknowledged     Boolean          @default(false)
-  AcknowledgedBy   User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id]) // User who acknowledged the incident
-  acknowledgedById String?
-  Resolved         Boolean          @default(false)
-  ResolvedBy       User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id]) // User who resolved the incident
-  resolvedById     String?
+  id                      String           @id @default(cuid())
+  title                   String
+  serviceName             String // Added from frontend
+  status                  IncidentStatus
+  severity                IncidentSeverity
+  startTime               DateTime // Added from frontend
+  endTime                 DateTime? // Added from frontend
+  duration                String // Added from frontend
+  impact                  String // Added from frontend
+  serviceId               String? // AI-generated relation field
+  service                 ReportService?   @relation(fields: [serviceId], references: [id]) // AI-generated relation
+  organization            Organization     @relation(fields: [organizationId], references: [id])
+  organizationId          String
+  createdAt               DateTime         @default(now())
+  Acknowledged            Boolean          @default(false)
+  AcknowledgedBy          User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id]) // User who acknowledged the incident
+  acknowledgedById        String?
+  Resolved                Boolean          @default(false)
+  ResolvedBy              User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id]) // User who resolved the incident
+  resolvedById            String?
+  currentEscalationStepId String?
+  nextEscalationTime      DateTime? // When the next escalation step should be triggered
+  createdById             String? // Manually added - Tracks who created the incident
+  websiteId               String? // Relation to the website that caused the incident
+  website                 website?         @relation(fields: [websiteId], references: [id])
 }
 
 enum UptimeTrend {
@@ -434,15 +440,15 @@ enum UptimeTrend {
 }
 
 model OnCallSchedule {
-  id             String               @id @default(uuid())
-  name           String
-  description    String?
-  organization   Organization         @relation(fields: [organizationId], references: [id])
-  organizationId String
+  id              String                 @id @default(uuid())
+  name            String
+  description     String?
+  organization    Organization           @relation(fields: [organizationId], references: [id])
+  organizationId  String
   userAssignments OnCallUserAssignment[]
   teamAssignments OnCallTeamAssignment[]
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
 
   @@unique([name, organizationId])
 }

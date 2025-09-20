@@ -8,7 +8,8 @@ import {
   removeMemberFromTeam,
   updateTeamMember,
   getTeamMembers,
-  getAvailableUsers
+  getAvailableUsers,
+  getAllOrganizationMembers
 } from '../../../controllers/teamsSectionController.js';
 import { authMiddleware } from '../../../middlewares/middleware.js';
 
@@ -25,6 +26,9 @@ router.post('/:teamId/members',authMiddleware, addMemberToTeam);
 router.get('/:teamId/members',authMiddleware, getTeamMembers);
 router.put('/:teamId/members/:memberId', authMiddleware,updateTeamMember);
 router.delete('/:teamId/members/:memberId',authMiddleware, removeMemberFromTeam);
+
+// New route to get all organization members
+router.get('/all-organization-members', authMiddleware, getAllOrganizationMembers);
 
 // Utility routes
 router.get('/:teamId/available-users',authMiddleware, getAvailableUsers);

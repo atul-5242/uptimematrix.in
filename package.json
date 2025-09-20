@@ -4,7 +4,7 @@
   "scripts": {
     "db:dev": "docker-compose up -d",
     "db:prod": "docker-compose up -d",
-    "migrate": "node -e \"require('os').platform().startsWith('win') ? require('child_process').execSync('powershell ./scripts/migrate.ps1', {stdio:'inherit'}) : require('child_process').execSync('./scripts/migrate.sh', {stdio:'inherit'})\"",
+    "migrate": "node -e \"require('os').platform().startsWith('win') ? require('child_process').execSync('powershell ./scripts/migrate.ps1', {stdio:'inherit'}) : require('child_process').execSync('./scripts/migrate.sh', {stdio:'inherit'})\" && pnpm --filter @uptimematrix/store build && cd packages/store && npx prisma db seed --schema prisma/schema.prisma",
     "dev": "pnpm run db:dev && pnpm run migrate && turbo run dev --parallel",
     "start": "pnpm run db:prod && pnpm run migrate && turbo run dev --parallel",
     "build": "turbo run build",

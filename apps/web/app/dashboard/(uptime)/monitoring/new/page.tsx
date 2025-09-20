@@ -44,7 +44,7 @@ export default function MonitorCreatePage() {
     checkInterval: 60,
     timeout: 30,
     method: 'GET',
-    regions: ['ap-south-1'], // India selected by default
+    regions: ['India'], // India selected by default
     escalationPolicyId: 'default',
     tags: []
   })
@@ -52,6 +52,41 @@ export default function MonitorCreatePage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [errors, setErrors] = useState<FormErrors>({})
   const [escalationPolicies, setEscalationPolicies] = useState<{id: string, name: string}[]>([])
+  const [availableRegions, setAvailableRegions] = useState<{ name: string; id: string }[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState<boolean>(true);
+
+  // Fetch available regions
+  useEffect(() => {
+    const fetchRegions = async () => {
+      setRegionsLoading(true);
+      try {
+        const token = localStorage.getItem('auth_token') || '';
+        const res = await fetch('/api/regions', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableRegions(data.data || []);
+          // Set India as default selected region if available and no other regions selected
+          if (data.data.length > 0 && formData.regions.length === 0) {
+            const indiaRegion = data.data.find((r: any) => r.name === 'India');
+            if (indiaRegion) {
+              setFormData(prev => ({ ...prev, regions: [indiaRegion.name] }));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching regions:", e);
+      } finally {
+        setRegionsLoading(false);
+      }
+    };
+    fetchRegions();
+  }, []); // Run only once on mount
 
   // Dummy fetch for Escalation Policies
   useEffect(() => {
@@ -80,15 +115,12 @@ export default function MonitorCreatePage() {
     loadPolicies()
   }, [])
 
-  const monitoringRegions = [
-    { value: 'ap-south-1', label: 'Mumbai (India)', flag: '🇮🇳', available: true }, // ✅ only available
-    { value: 'us-east-1', label: 'N. Virginia (US East)', flag: '🇺🇸', available: false },
-    { value: 'us-west-2', label: 'Oregon (US West)', flag: '🇺🇸', available: false },
-    { value: 'eu-west-1', label: 'Ireland (EU)', flag: '🇮🇪', available: false },
-    { value: 'eu-central-1', label: 'Frankfurt (EU)', flag: '🇩🇪', available: false },
-    { value: 'ap-southeast-1', label: 'Singapore (Asia)', flag: '🇸🇬', available: false },
-    { value: 'ap-northeast-1', label: 'Tokyo (Asia)', flag: '🇯🇵', available: false }
-  ]
+  const monitoringRegions = availableRegions.map(region => ({
+    value: region.name,
+    label: region.name === 'India' ? 'India (Mumbai)' : region.name,
+    flag: region.name === 'India' ? '🇮🇳' : '', // You might want to add more flags here
+    available: true,
+  }));
 
   const checkIntervals = [
     { value: 30, label: '30 seconds' },
@@ -323,31 +355,38 @@ export default function MonitorCreatePage() {
                 <MapPin className="h-6 w-6 text-green-600" />
                 Monitoring Regions
               </CardTitle>
-              <p className="text-sm text-gray-600 flex items-center gap-2">
+              {/* <p className="text-sm text-gray-600 flex items-center gap-2">
                 <Info className="h-4 w-4 text-blue-500" />
                 For now, only <strong>India (Mumbai)</strong> region is available
-              </p>
+              </p> */}
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {monitoringRegions.map((region) => (
-                  <div 
-                    key={region.value} 
-                    className={`flex items-center space-x-3 p-2 rounded-md ${!region.available ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <Checkbox
-                      id={region.value}
-                      checked={formData.regions.includes(region.value)}
-                      onCheckedChange={() => toggleRegion(region.value, region.available)}
-                      disabled={!region.available}
-                    />
-                    <Label htmlFor={region.value} className="flex items-center gap-2 cursor-pointer">
-                      <span className="text-lg">{region.flag}</span>
-                      <span>{region.label}</span>
-                    </Label>
-                  </div>
-                ))}
-              </div>
+              {regionsLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+                  <p className="ml-2 text-gray-600">Loading regions...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {monitoringRegions.map((region) => (
+                    <div 
+                      key={region.value} 
+                      className={`flex items-center space-x-3 p-2 rounded-md ${!region.available ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Checkbox
+                        id={region.value}
+                        checked={formData.regions.includes(region.value)}
+                        onCheckedChange={() => toggleRegion(region.value, region.available)}
+                        disabled={!region.available}
+                      />
+                      <Label htmlFor={region.value} className="flex items-center gap-2 cursor-pointer">
+                        <span className="text-lg">{region.flag}</span>
+                        <span>{region.label}</span>
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              )}
               {errors.regions && <p className="text-sm text-red-600 mt-2">{errors.regions}</p>}
             </CardContent>
           </Card>

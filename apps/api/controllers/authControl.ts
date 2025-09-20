@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { AuthInput } from "../types.js";
 import jwt from "jsonwebtoken";
-import { prismaClient } from "@uptimematrix/store";
+import { prismaClient, EscalationPolicy, IncidentSeverity, Priority } from "@uptimematrix/store";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import { sendEmail, createInvitationLink } from "../utils/email.js"; // Import new email utility
 
@@ -17,6 +17,53 @@ function verifyPassword(password: string, stored: string): boolean {
   const salt = Buffer.from(saltHex!, "hex");
   const hash = scryptSync(password, salt, 64);
   return timingSafeEqual(hash, Buffer.from(hashHex!, "hex"));
+}
+
+// Helper function to map Priority to IncidentSeverity
+function mapPriorityToIncidentSeverity(priority: Priority): IncidentSeverity {
+    switch (priority) {
+        case Priority.critical: return IncidentSeverity.CRITICAL;
+        case Priority.high: return IncidentSeverity.MAJOR;
+        case Priority.medium: return IncidentSeverity.MINOR;
+        case Priority.low: return IncidentSeverity.NONE;
+        default: return IncidentSeverity.NONE;
+    }
+}
+
+// Helper function to create a default escalation policy
+async function createDefaultEscalationPolicy(organizationId: string, createdById: string, adminEmail: string): Promise<EscalationPolicy> {
+    const defaultPolicyName = "Default Admin Notification Policy";
+    const defaultPolicyDescription = "Automatically generated policy to notify the organization admin via email.";
+
+    const defaultPolicy = await prismaClient.escalationPolicy.create({
+        data: {
+            name: defaultPolicyName,
+            description: defaultPolicyDescription,
+            priorityLevel: Priority.medium, // Default priority
+            isActive: true,
+            organization: { connect: { id: organizationId } },
+            createdBy: { connect: { id: createdById } },
+            terminationCondition: "stop_after_last_step",
+            repeatLastStepIntervalMinutes: 30,
+            steps: {
+                create: [
+                    {
+                        stepOrder: 1,
+                        primaryMethods: ["email"],
+                        additionalMethods: [],
+                        recipients: [adminEmail],
+                        delayMinutes: 0,
+                        repeatCount: 1,
+                        escalateAfter: 5, // Escalate after 5 minutes without acknowledgment
+                        customMessage: "Website is down. Please investigate.",
+                    },
+                ],
+            },
+        },
+        include: { steps: true },
+    });
+    console.log(`[API] Default escalation policy created for organization ${organizationId}: ${defaultPolicy.id}`);
+    return defaultPolicy;
 }
 
 // ---------------------- CONFIG ----------------------
@@ -140,6 +187,9 @@ export const signUp = async (req: Request, res: Response) => {
       },
     });
     
+    // Create the default escalation policy for the new organization
+    await createDefaultEscalationPolicy(organization.id, user.id, user.email);
+
     // Create OrganizationMember for the user who signed up
     await prismaClient.organizationMember.create({
       data: {

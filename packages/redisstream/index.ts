@@ -3,16 +3,21 @@ import { createClient } from "redis";
 type WebsiteEvent = { 
     url: string; 
     id: string; 
-    checkInterval?: number;
+    checkInterval?: number | null;
     method?: string;
     monitorType?: string;
-    escalationPolicyId?: string;
-    regions?: string[];
-    user_id?: string;
+    escalationPolicyId?: string | null;
+    regions?: string[] | null;
+    user_id?: string | null;
     region?: string;
+    createdById?: string | null; // Add createdById here
+    currentIncidentId?: string; // Add currentIncidentId
+    escalationStepIndex?: number; // Add escalationStepIndex
+    organizationId?: string; // Add organizationId
 };
 
 export const STREAM_NAME = "betteruptime::website";
+export type { WebsiteEvent };
 
 let client: ReturnType<typeof createClient>;
 
@@ -54,13 +59,17 @@ export async function xAdd(website: WebsiteEvent){
     };
     
     // Add optional fields if they exist
-    if (website.checkInterval !== undefined) data.checkInterval = website.checkInterval.toString();
+    if (website.checkInterval !== undefined && website.checkInterval !== null) data.checkInterval = String(website.checkInterval);
     if (website.method) data.method = website.method;
     if (website.monitorType) data.monitorType = website.monitorType;
-    if (website.escalationPolicyId) data.escalationPolicyId = website.escalationPolicyId;
+    if (website.escalationPolicyId !== undefined && website.escalationPolicyId !== null) data.escalationPolicyId = String(website.escalationPolicyId);
     if (website.regions) data.regions = JSON.stringify(website.regions);
     if (website.user_id) data.user_id = website.user_id;
     if (website.region) data.region = website.region;
+    if (website.createdById !== undefined && website.createdById !== null) data.createdById = String(website.createdById); 
+    if (website.currentIncidentId !== undefined && website.currentIncidentId !== null) data.currentIncidentId = String(website.currentIncidentId); 
+    if (website.escalationStepIndex !== undefined && website.escalationStepIndex !== null) data.escalationStepIndex = String(website.escalationStepIndex); 
+    if (website.organizationId !== undefined && website.organizationId !== null) data.organizationId = String(website.organizationId);
     
     await client.xAdd(STREAM_NAME, "*", data);
 }

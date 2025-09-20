@@ -279,23 +279,30 @@ export default function MonitorPage() {
             </TabsList>
           </Tabs>
           <div className="flex items-center gap-2 mb-2">
-            <img src="/flags/eu.svg" alt="Europe" className="w-5 h-5" />
+            <img src="https://img.freepik.com/free-vector/illustration-india-flag_53876-27130.jpg?semt=ais_incoming&w=740&q=80" alt="India" className="w-5 h-5" />
             <span className="text-sm font-medium">
-              {website.regions && website.regions.length > 0 
-                ? website.regions.join(", ") 
-                : "India"
-              }
+              {"India Mumbai"}
             </span>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={website.responseData}>
+              <LineChart data={[...website.responseData].reverse()}>
                 <XAxis 
                   dataKey="time"
-                  tickFormatter={(isoString) => new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                  tickFormatter={(isoString) => new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
                 />
-                <YAxis />
-                <Tooltip />
+                <YAxis domain={[0, 'auto']} />
+                <Tooltip 
+                  labelFormatter={(label) => new Date(label).toLocaleString('en-US', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit', 
+                    hour12: false 
+                  })}
+                />
                 <Line
                   type="monotone"
                   dataKey="ms"

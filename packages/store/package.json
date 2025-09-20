@@ -9,7 +9,7 @@
     "seed": "pnpm run build && node dist/prisma/seeds/seed.js"
   },
   "prisma": {
-    "seed": "tsc prisma/seeds/seed.ts && node prisma/seeds/seed.js",
+    "seed": "node dist/prisma/seeds/seed.js",
     "schema": "prisma/schema.prisma"
   },
   "exports": {
