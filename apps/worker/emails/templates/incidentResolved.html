@@ -1,0 +1,11 @@
+<p>Hello {{recipientName}},</p>
+<p>This is an update from UptimeMatrix.</p>
+<p>The incident for your website <span class="highlight">{{websiteUrl}}</span> has been <span class="highlight">RESOLVED</span>.</p>
+<p><strong>Incident ID:</strong> {{incidentId}}</p>
+<p><strong>Service:</strong> {{serviceName}}</p>
+<p>The service is now back to normal operation.</p>
+{{#if ctaLink}}
+    <p><a href="{{ctaLink}}" class="button">View Incident Details</a></p>
+{{/if}}
+<p>Thank you,</p>
+<p>UptimeMatrix Team</p>

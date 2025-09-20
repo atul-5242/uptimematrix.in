@@ -5,7 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**","out/**", "!.next/cache/**"]
+      "outputs": [".next/**","out/**", "!.next/cache/**", "apps/worker/dist/emails/templates/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -15,7 +15,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
     }
   }
 }

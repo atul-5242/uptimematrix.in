@@ -1,0 +1,13 @@
+<p>Hello {{recipientName}},</p>
+<p>This is an automated notification from UptimeMatrix.</p>
+<p>Your website <span class="highlight">{{websiteUrl}}</span> is currently <span class="highlight">{{status}}</span>.</p>
+<p><strong>Incident ID:</strong> {{incidentId}}</p>
+<p><strong>Service:</strong> {{serviceName}}</p>
+<p><strong>Impact:</strong> {{impact}}</p>
+<p>Please investigate this issue immediately.</p>
+<p>Additional Details: {{details}}</p>
+{{#if ctaLink}}
+    <p><a href="{{ctaLink}}" class="button">View Incident Details</a></p>
+{{/if}}
+<p>Thank you,</p>
+<p>UptimeMatrix Team</p>

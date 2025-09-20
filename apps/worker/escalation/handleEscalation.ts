@@ -69,12 +69,33 @@ async function getOncallUserEmails(scheduleId: string): Promise<string[]> {
     return emails;
 }
 
-async function getRecipientsEmails(recipientIds: string[], organizationId: string): Promise<string[]> {
+export async function getRecipientsEmails(recipientIds: string[], organizationId: string): Promise<string[]> {
     const allEmails: string[] = [];
     const addedEmails = new Set<string>();
 
     for (const recipientId of recipientIds) {
-        // Try to find if it's a direct user within the organization
+        // Regex to check if the recipientId looks like an email address
+        const isEmail = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(recipientId);
+
+        if (isEmail) {
+            // If it's an email, try to find an organization member by user email and organizationId
+            const organizationMemberByEmail = await prismaClient.organizationMember.findFirst({
+                where: {
+                    organizationId: organizationId,
+                    user: {
+                        email: recipientId, // Filter by user's email
+                    },
+                },
+                include: { user: { select: { email: true } } },
+            });
+            if (organizationMemberByEmail?.user?.email && !addedEmails.has(organizationMemberByEmail.user.email)) {
+                allEmails.push(organizationMemberByEmail.user.email);
+                addedEmails.add(organizationMemberByEmail.user.email);
+            }
+            continue; // Move to next recipientId
+        }
+
+        // Try to find if it's a direct user within the organization (by ID)
         const organizationMember = await prismaClient.organizationMember.findFirst({
             where: { userId: recipientId, organizationId: organizationId },
             include: { user: { select: { email: true } } },
@@ -185,7 +206,12 @@ export async function handleEscalation(
             await sendEmail(
                 email,
                 `[${status}] ${site.url} is ${status} - No Active Policy`,
-                `Website ${site.url} is currently ${status}. No active or valid escalation policy was found or attached. Please investigate.`
+                'generic', // Template name
+                { 
+                    websiteUrl: site.url,
+                    status: status,
+                    // Additional context can be added here
+                }
             );
         }
         // Create a basic incident for tracking if one doesn't already exist
@@ -218,10 +244,15 @@ export async function handleEscalation(
         console.log(`Escalation policy for website ${site.url} is inactive. Sending generic notification.`);
         const adminEmails = await getRecipientsEmails([site.createdById || ""], organizationId);
         for (const email of adminEmails) {
-            await sendEmail(
+        await sendEmail(
                 email,
                 `[${status}] ${site.url} is ${status} - Inactive Policy`,
-                `Website ${site.url} is currently ${status}. The attached escalation policy is inactive. Please investigate.`
+                'generic', // Template name
+                { 
+                    websiteUrl: site.url,
+                    status: status,
+                    // Additional context can be added here
+                }
             );
         }
         if (!incident) {
@@ -282,6 +313,27 @@ export async function handleEscalation(
             include: { website: true }
         });
         console.log(`Incident created for ${site.url}: ${incident.id}`);
+
+        // Send incident created notification
+        const incidentCreatedEmails = await getRecipientsEmails(escalationPolicy.steps[0].recipients, organizationId);
+        for (const email of incidentCreatedEmails) {
+            await sendEmail(
+                email,
+                `[${status}] Incident Created for ${site.url}`,
+                'incidentCreated', // Template name
+                {
+                    recipientName: email, // Placeholder, will be replaced with actual recipient name if available
+                    websiteUrl: site.url,
+                    status: status,
+                    incidentId: incident.id,
+                    serviceName: site.url,
+                    impact: "Service Outage",
+                    details: `${site.url} is currently ${status}.`,
+                    ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+                }
+            );
+        }
+
     } else {
         console.log(`Incident ${incident.id} already exists for ${site.url}.`);
     }
@@ -325,13 +377,24 @@ export async function handleEscalation(
 
     console.log(`Escalating incident ${incident.id} for ${site.url} to step ${nextStep.stepOrder + 1}.`);
 
-    // Send notification for the current step
+    // Send notification for the current step (using incidentEscalated template)
     const recipientEmails = await getRecipientsEmails(nextStep.recipients, organizationId);
     for (const email of recipientEmails) {
         await sendEmail(
             email,
             `[${status}] ${site.url} is ${status} - Escalation Step ${nextStep.stepOrder + 1}`,
-            `Website ${site.url} is currently ${status}. Escalation Policy: ${escalationPolicy.name}, Step: ${nextStep.stepOrder + 1}. Details: ${nextStep.customMessage}`
+            'incidentEscalated', // Template name
+            {
+                recipientName: email, // Placeholder
+                websiteUrl: site.url,
+                status: status,
+                incidentId: incident.id,
+                serviceName: site.url,
+                escalationPolicyName: escalationPolicy.name,
+                escalationStep: nextStep.stepOrder + 1,
+                customMessage: nextStep.customMessage || 'N/A',
+                ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+            }
         );
     }
 

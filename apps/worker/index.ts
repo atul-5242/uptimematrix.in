@@ -1,7 +1,8 @@
 import axios from "axios";
 import { xReadBulk, xAckBulk, xAdd, WebsiteEvent } from "@uptimematrix/redisstream";
 import { prismaClient, WebsiteStatus, IncidentStatus, Website, Incident, EscalationPolicy, EscalationStep } from "@uptimematrix/store";
-import { handleEscalation } from "./escalation/handleEscalation.js";
+import { handleEscalation, getRecipientsEmails } from "./escalation/handleEscalation.js";
+import { sendEmail } from "./notifications/email.js";
 
 // Define a type for the selected escalation steps to avoid type mismatches
 type SelectedEscalationStep = {
@@ -118,7 +119,7 @@ async function processWebsite(site: WebsiteEvent) {
         } else {
             console.log(`✅ ${site.url} (${region.name}) is online, ${responseTime}ms`);
             // If website is now online, resolve any active incidents
-            await resolveActiveIncidents(site.id);
+            await resolveActiveIncidents(site.id, organizationId);
         }
     } catch (error) {
         const responseTime = Date.now() - startTime; // Calculate response time even on error
@@ -183,25 +184,53 @@ async function processWebsite(site: WebsiteEvent) {
     console.log(`⏰ Next check for ${site.url} scheduled for: ${new Date(Date.now() + checkInterval).toISOString()} (interval: ${checkInterval}ms)`);
 }
 
-async function resolveActiveIncidents(websiteId: string) {
+async function resolveActiveIncidents(websiteId: string, organizationId: string) {
     const website = await prismaClient.website.findUnique({ where: { id: websiteId } });
     if (!website) {
         console.error(`Website with ID ${websiteId} not found for resolving incidents.`);
         return;
     }
 
-    await prismaClient.incident.updateMany({
+    const incidentsToResolve = await prismaClient.incident.findMany({
         where: {
-            websiteId: websiteId, // Use websiteId directly
-            status: IncidentStatus.INVESTIGATING, // Only resolve incidents that are currently investigating
+            websiteId: websiteId,
+            status: IncidentStatus.INVESTIGATING,
         },
-        data: {
-            status: IncidentStatus.RESOLVED,
-            endTime: new Date(),
-            nextEscalationTime: null, // Stop any further escalations
+        include: {
+            website: { select: { url: true, createdById: true } },
         },
     });
-    console.log(`✅ Active incidents for website ${websiteId} resolved.`);
+
+    for (const incident of incidentsToResolve) {
+        await prismaClient.incident.update({
+            where: { id: incident.id },
+            data: {
+                status: IncidentStatus.RESOLVED,
+                endTime: new Date(),
+                nextEscalationTime: null,
+            },
+        });
+        console.log(`✅ Incident ${incident.id} for website ${websiteId} resolved.`);
+
+        // Send incident resolved notification
+        if (incident.website && incident.website.createdById) {
+            const recipientEmails = await getRecipientsEmails([incident.website.createdById], organizationId);
+            for (const email of recipientEmails) {
+                await sendEmail(
+                    email,
+                    `[Resolved] Incident for ${incident.website.url}`,
+                    'incidentResolved', // Template name
+                    {
+                        recipientName: email, // Placeholder
+                        websiteUrl: incident.website.url,
+                        incidentId: incident.id,
+                        serviceName: incident.website.url,
+                        ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+                    }
+                );
+            }
+        }
+    }
 }
 
 async function checkScheduledEscalations() {

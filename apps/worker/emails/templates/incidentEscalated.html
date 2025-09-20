@@ -1,0 +1,13 @@
+<p>Hello {{recipientName}},</p>
+<p>This is an escalation alert for your website <span class="highlight">{{websiteUrl}}</span>.</p>
+<p>The incident is still <span class="highlight">{{status}}</span> and has escalated to step <span class="highlight">{{escalationStep}}</span>.</p>
+<p><strong>Incident ID:</strong> {{incidentId}}</p>
+<p><strong>Service:</strong> {{serviceName}}</p>
+<p><strong>Policy:</strong> {{escalationPolicyName}}</p>
+<p><strong>Step Message:</strong> {{customMessage}}</p>
+{{#if ctaLink}}
+    <p><a href="{{ctaLink}}" class="button">View Incident Details</a></p>
+{{/if}}
+<p>Please acknowledge or take action.</p>
+<p>Thank you,</p>
+<p>UptimeMatrix Team</p>
