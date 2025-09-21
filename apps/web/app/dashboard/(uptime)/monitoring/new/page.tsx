@@ -71,12 +71,10 @@ export default function MonitorCreatePage() {
         if (res.ok) {
           const data = await res.json();
           setAvailableRegions(data.data || []);
-          // Set India as default selected region if available and no other regions selected
-          if (data.data.length > 0 && formData.regions.length === 0) {
-            const indiaRegion = data.data.find((r: any) => r.name === 'India');
-            if (indiaRegion) {
-              setFormData(prev => ({ ...prev, regions: [indiaRegion.name] }));
-            }
+                  // Always set India as the only selected region
+          const indiaRegion = data.data.find((r: any) => r.name === 'India');
+          if (indiaRegion) {
+            setFormData(prev => ({ ...prev, regions: [indiaRegion.name] }));
           }
         }
       } catch (e) {
@@ -118,8 +116,8 @@ export default function MonitorCreatePage() {
   const monitoringRegions = availableRegions.map(region => ({
     value: region.name,
     label: region.name === 'India' ? 'India (Mumbai)' : region.name,
-    flag: region.name === 'India' ? '🇮🇳' : '', // You might want to add more flags here
-    available: true,
+    flag: region.name === 'India' ? '🇮🇳' : '',
+    available: region.name === 'India' // Only India is selectable
   }));
 
   const checkIntervals = [
@@ -203,7 +201,9 @@ export default function MonitorCreatePage() {
   }
 
   const toggleRegion = (region: string, available: boolean): void => {
-    if (!available) return // prevent selecting disabled regions
+    // Only allow toggling India, other regions are disabled
+    if (region !== 'India') return;
+    
     setFormData(prev => ({
       ...prev,
       regions: prev.regions.includes(region)

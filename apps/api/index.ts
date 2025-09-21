@@ -28,7 +28,7 @@ app.use("/website", websiteRouter);
 app.use("/escalation-policies", escalationRouter);
 app.use("/userprofile", userDetailsRouter);
 app.use("/organization", organizationRouter);
-app.use("/regions", regionsRouter); // Register the new regions router
+app.use("/api/regions", regionsRouter); // Register the new regions router under /api
 
 // Team management routes
 app.use("/api/teams", teamRouter);
