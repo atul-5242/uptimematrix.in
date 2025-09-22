@@ -409,28 +409,34 @@ model ReportService {
 model Incident {
   id                      String           @id @default(cuid())
   title                   String
-  serviceName             String // Added from frontend
+  serviceName             String
   status                  IncidentStatus
   severity                IncidentSeverity
-  startTime               DateTime // Added from frontend
-  endTime                 DateTime? // Added from frontend
-  duration                String // Added from frontend
-  impact                  String // Added from frontend
-  serviceId               String? // AI-generated relation field
-  service                 ReportService?   @relation(fields: [serviceId], references: [id]) // AI-generated relation
+  startTime               DateTime
+  endTime                 DateTime?
+  duration                String
+  impact                  String
+  serviceId               String?
+  service                 ReportService?   @relation(fields: [serviceId], references: [id])
   organization            Organization     @relation(fields: [organizationId], references: [id])
   organizationId          String
   createdAt               DateTime         @default(now())
   Acknowledged            Boolean          @default(false)
-  AcknowledgedBy          User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id]) // User who acknowledged the incident
+  AcknowledgedBy          User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id])
   acknowledgedById        String?
   Resolved                Boolean          @default(false)
-  ResolvedBy              User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id]) // User who resolved the incident
+  ResolvedBy              User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id])
   resolvedById            String?
+  
+  // Enhanced escalation tracking fields
   currentEscalationStepId String?
-  nextEscalationTime      DateTime? // When the next escalation step should be triggered
-  createdById             String? // Manually added - Tracks who created the incident
-  websiteId               String? // Relation to the website that caused the incident
+  nextEscalationTime      DateTime?        // When the next escalation action should happen
+  escalationStepStartTime DateTime?        // When the current step actually started (after delayMinutes)
+  currentRepeatCount      Int              @default(0) // How many times current step has been repeated
+  stepDelayCompleted      Boolean          @default(false) // Whether delayMinutes has passed for current step
+  
+  createdById             String?
+  websiteId               String?
   website                 website?         @relation(fields: [websiteId], references: [id])
 }
 

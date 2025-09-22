@@ -20,7 +20,7 @@ async function getUserEmail(userId: string): Promise<string> {
         where: { id: userId },
         select: { email: true },
     });
-    return user?.email || "user@example.com"; // Fallback email
+    return user?.email || "user@example.com";
 }
 
 async function getTeamMemberEmails(teamId: string): Promise<string[]> {
@@ -45,7 +45,6 @@ async function getOncallUserEmails(scheduleId: string): Promise<string[]> {
     const emails: string[] = [];
     const addedEmails = new Set<string>();
 
-    // Add emails from direct user assignments
     schedule.userAssignments.forEach(assignment => {
         if (assignment.user?.email && !addedEmails.has(assignment.user.email)) {
             emails.push(assignment.user.email);
@@ -53,7 +52,6 @@ async function getOncallUserEmails(scheduleId: string): Promise<string[]> {
         }
     });
 
-    // Add emails from team assignments within the schedule
     for (const teamAssignment of schedule.teamAssignments) {
         if (teamAssignment.team) {
             const teamEmails = await getTeamMemberEmails(teamAssignment.team.id);
@@ -74,17 +72,13 @@ export async function getRecipientsEmails(recipientIds: string[], organizationId
     const addedEmails = new Set<string>();
 
     for (const recipientId of recipientIds) {
-        // Regex to check if the recipientId looks like an email address
         const isEmail = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(recipientId);
 
         if (isEmail) {
-            // If it's an email, try to find an organization member by user email and organizationId
             const organizationMemberByEmail = await prismaClient.organizationMember.findFirst({
                 where: {
                     organizationId: organizationId,
-                    user: {
-                        email: recipientId, // Filter by user's email
-                    },
+                    user: { email: recipientId },
                 },
                 include: { user: { select: { email: true } } },
             });
@@ -92,10 +86,9 @@ export async function getRecipientsEmails(recipientIds: string[], organizationId
                 allEmails.push(organizationMemberByEmail.user.email);
                 addedEmails.add(organizationMemberByEmail.user.email);
             }
-            continue; // Move to next recipientId
+            continue;
         }
 
-        // Try to find if it's a direct user within the organization (by ID)
         const organizationMember = await prismaClient.organizationMember.findFirst({
             where: { userId: recipientId, organizationId: organizationId },
             include: { user: { select: { email: true } } },
@@ -106,7 +99,6 @@ export async function getRecipientsEmails(recipientIds: string[], organizationId
             continue;
         }
 
-        // Try to find if it's a team
         const team = await prismaClient.team.findUnique({
             where: { id: recipientId, organizationId: organizationId },
             select: { id: true },
@@ -122,7 +114,6 @@ export async function getRecipientsEmails(recipientIds: string[], organizationId
             continue;
         }
 
-        // Try to find if it's an on-call schedule
         const onCallSchedule = await prismaClient.onCallSchedule.findUnique({
             where: { id: recipientId, organizationId: organizationId },
             select: { id: true },
@@ -155,14 +146,14 @@ export async function handleEscalation(
     currentIncidentId?: string,
     escalationStepIndex: number = 0
 ) {
-
     let incident = null;
+    const now = new Date();
 
     // Fetch the escalation policy with steps first
     let escalationPolicy = null;
     if (site.escalationPolicyId) {
         escalationPolicy = await prismaClient.escalationPolicy.findUnique({
-        where: { id: site.escalationPolicyId },
+            where: { id: site.escalationPolicyId },
             select: {
                 name: true,
                 isActive: true,
@@ -184,103 +175,34 @@ export async function handleEscalation(
                         updatedAt: true,
                     }
                 },
-                priorityLevel: true // Select priorityLevel
+                priorityLevel: true
             }
         });
     }
 
-    // Scenario 1: escalationPolicyId was provided but the policy was not found
     if (site.escalationPolicyId && !escalationPolicy) {
-        console.error(`Escalation policy with ID ${site.escalationPolicyId} not found for website ${site.url}. Cannot process escalation.`);
-        // Log and exit, as we cannot proceed with a non-existent policy.
-        // A generic incident might still be created by processWebsite, but no escalation will occur.
+        console.error(`Escalation policy with ID ${site.escalationPolicyId} not found for website ${site.url}.`);
         return;
     }
 
-    // Scenario 2: No escalationPolicyId was provided, or policy was found but is inactive.
-    // This block now specifically handles cases where there's no policy to act on.
     if (!escalationPolicy || !escalationPolicy.isActive) {
-        console.log(`No active or valid escalation policy found for website ${site.url}. Sending generic notification.`);
+        console.log(`No active escalation policy found for website ${site.url}. Sending generic notification.`);
         const adminEmails = await getRecipientsEmails([site.createdById || ""], organizationId);
         for (const email of adminEmails) {
             await sendEmail(
                 email,
-                `[${status}] ${site.url} is ${status} - No Active Policy`,
-                'generic', // Template name
+                `[${status}] ${site.url} is ${status} - ${!escalationPolicy ? 'No Active Policy' : 'Inactive Policy'}`,
+                'generic',
                 { 
                     websiteUrl: site.url,
                     status: status,
-                    // Additional context can be added here
                 }
             );
         }
-        // Create a basic incident for tracking if one doesn't already exist
-        if (!incident) {
-            const websiteDetails = await prismaClient.website.findUnique({ where: { id: site.id } });
-            if (websiteDetails) {
-                incident = await prismaClient.incident.create({
-                    data: {
-                        website: { connect: { id: site.id } },
-                        organization: { connect: { id: websiteDetails.organizationId } },
-                        status: IncidentStatus.RESOLVED, // Resolved if no policy to act on
-                        severity: IncidentSeverity.NONE, // No specific severity
-                        Acknowledged: false,
-                        startTime: new Date(),
-                        title: `${site.url} is ${status} (No Policy)`,
-                        serviceName: site.url,
-                        impact: "No Policy/Generic Notification",
-                        duration: "0",
-                        createdById: site.createdById || undefined,
-                    }
-                });
-            }
-        }
-        return; // Exit if no policy to follow
+        return;
     }
 
-    // Scenario 3: Policy exists but is inactive
-    // At this point, if escalationPolicy is non-null, it is guaranteed to have steps due to API validation.
-    if (escalationPolicy && !escalationPolicy.isActive) {
-        console.log(`Escalation policy for website ${site.url} is inactive. Sending generic notification.`);
-        const adminEmails = await getRecipientsEmails([site.createdById || ""], organizationId);
-        for (const email of adminEmails) {
-        await sendEmail(
-                email,
-                `[${status}] ${site.url} is ${status} - Inactive Policy`,
-                'generic', // Template name
-                { 
-                    websiteUrl: site.url,
-                    status: status,
-                    // Additional context can be added here
-                }
-            );
-        }
-        if (!incident) {
-            const websiteDetails = await prismaClient.website.findUnique({ where: { id: site.id } });
-            if (websiteDetails) {
-                incident = await prismaClient.incident.create({
-                    data: {
-                        website: { connect: { id: site.id } },
-                        organization: { connect: { id: websiteDetails.organizationId } },
-                        status: IncidentStatus.RESOLVED, // Resolved if no policy to act on
-                        severity: IncidentSeverity.NONE, // No specific severity
-                        Acknowledged: false,
-                        startTime: new Date(),
-                        title: `${site.url} is ${status} (Inactive Policy)`,
-                        serviceName: site.url,
-                        impact: "Inactive Policy",
-                        duration: "0",
-                        createdById: site.createdById || undefined,
-                    }
-                });
-            }
-        }
-        return; // Exit if policy cannot be followed
-    }
-
-    // At this point, if escalationPolicy is non-null, it is guaranteed to be active and have steps.
-    // If escalationPolicy is null, it means no policy was specified, and we've already handled the generic notification above.
-
+    // Get or create incident
     if (currentIncidentId) {
         incident = await prismaClient.incident.findUnique({
             where: { id: currentIncidentId },
@@ -289,126 +211,307 @@ export async function handleEscalation(
     }
 
     if (!incident) {
-        // Create a new incident if none exists or provided incident ID is invalid
-        const websiteDetails = await prismaClient.website.findUnique({ where: { id: site.id } });
-        if (!websiteDetails) {
-            console.error(`Website ${site.id} not found when trying to create an incident.`);
-            return;
-        }
-
-        incident = await prismaClient.incident.create({
-            data: {
-                website: { connect: { id: site.id } },
-                organization: { connect: { id: websiteDetails.organizationId } },
-                status: IncidentStatus.INVESTIGATING, // Using IncidentStatus directly
-                severity: escalationPolicy?.priorityLevel ? mapPriorityToIncidentSeverity(escalationPolicy.priorityLevel) : IncidentSeverity.MAJOR, // Use policy priority or default
-                Acknowledged: false,
-                startTime: new Date(),
-                title: `${site.url} is ${status}`,
-                serviceName: site.url,
-                impact: "Service Outage",
-                duration: "0",
-                createdById: site.createdById || undefined,
+        const existingIncident = await prismaClient.incident.findFirst({
+            where: {
+                websiteId: site.id,
+                status: IncidentStatus.INVESTIGATING,
             },
             include: { website: true }
         });
-        console.log(`Incident created for ${site.url}: ${incident.id}`);
 
-        // Send incident created notification
-        const incidentCreatedEmails = await getRecipientsEmails(escalationPolicy.steps[0].recipients, organizationId);
-        for (const email of incidentCreatedEmails) {
-            await sendEmail(
-                email,
-                `[${status}] Incident Created for ${site.url}`,
-                'incidentCreated', // Template name
-                {
-                    recipientName: email, // Placeholder, will be replaced with actual recipient name if available
-                    websiteUrl: site.url,
-                    status: status,
-                    incidentId: incident.id,
+        if (existingIncident) {
+            incident = existingIncident;
+            console.log(`Using existing incident ${incident.id} for ${site.url}`);
+        } else {
+            const websiteDetails = await prismaClient.website.findUnique({ where: { id: site.id } });
+            if (!websiteDetails) {
+                console.error(`Website ${site.id} not found when trying to create an incident.`);
+                return;
+            }
+
+            const sortedSteps = escalationPolicy.steps.sort((a: EscalationStep, b: EscalationStep) => a.stepOrder - b.stepOrder);
+            const firstStep = sortedSteps[0];
+            
+            // Calculate when the first step should start (after delayMinutes)
+            const firstStepStartTime = new Date(now.getTime() + (firstStep.delayMinutes * 60 * 1000));
+            const nextEscalationTime = firstStep.delayMinutes > 0 ? firstStepStartTime : new Date(now.getTime() + (firstStep.escalateAfter * 60 * 1000));
+
+            incident = await prismaClient.incident.create({
+                data: {
+                    website: { connect: { id: site.id } },
+                    organization: { connect: { id: websiteDetails.organizationId } },
+                    status: IncidentStatus.INVESTIGATING,
+                    severity: escalationPolicy?.priorityLevel ? mapPriorityToIncidentSeverity(escalationPolicy.priorityLevel) : IncidentSeverity.MAJOR,
+                    Acknowledged: false,
+                    startTime: now,
+                    title: `${site.url} is ${status}`,
                     serviceName: site.url,
                     impact: "Service Outage",
-                    details: `${site.url} is currently ${status}.`,
-                    ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
-                }
-            );
+                    duration: "0",
+                    createdById: site.createdById || undefined,
+                    currentEscalationStepId: firstStep.id,
+                    nextEscalationTime: nextEscalationTime,
+                    escalationStepStartTime: firstStep.delayMinutes > 0 ? null : now,
+                    currentRepeatCount: 0,
+                    stepDelayCompleted: firstStep.delayMinutes === 0,
+                },
+                include: { website: true }
+            });
+            
+            console.log(`Incident created for ${site.url}: ${incident.id}`);
+            console.log(`First step delay: ${firstStep.delayMinutes} minutes, next escalation time: ${nextEscalationTime.toISOString()}`);
+
+            // If no delay for first step, send notification immediately
+            if (firstStep.delayMinutes === 0) {
+                await sendStepNotification(incident, firstStep, site.url, status, organizationId, escalationPolicy.name);
+                
+                // Update the incident with the first notification sent
+                await prismaClient.incident.update({
+                    where: { id: incident.id },
+                    data: {
+                        currentRepeatCount: 1,
+                        escalationStepStartTime: now,
+                    },
+                });
+            }
+
+            return;
         }
-
-    } else {
-        console.log(`Incident ${incident.id} already exists for ${site.url}.`);
     }
 
-    // If we reach here and escalationPolicy is null, it means no policy was ever specified.
-    // This case should ideally be handled by the generic notification above.
-    // For safety, ensure escalationPolicy is present before proceeding with steps logic.
-    if (!escalationPolicy) {
-        console.error(`Attempted to process escalation steps for ${site.url} but no valid escalation policy is available. This should have been caught earlier.`);
-        return; // Should not happen if previous checks are robust
+    // CRITICAL: Check if it's time to process this incident
+    if (incident.nextEscalationTime && now < incident.nextEscalationTime) {
+        console.log(`Incident ${incident.id} not ready for escalation. Next escalation time: ${incident.nextEscalationTime.toISOString()}, Current time: ${now.toISOString()}`);
+        return;
     }
 
+    console.log(`Processing escalation for incident ${incident.id} for ${site.url}.`);
+    
     const sortedSteps = escalationPolicy.steps.sort((a: EscalationStep, b: EscalationStep) => a.stepOrder - b.stepOrder);
-    let nextStep = sortedSteps[escalationStepIndex];
+    const currentStep = sortedSteps.find(step => step.id === incident.currentEscalationStepId);
     
-    /*
-        However, in distributed systems with potential race conditions, 
-        unexpected message re-deliveries, or unforeseen edge cases, it's possible 
-        (though unlikely) for handleEscalation to receive an escalationStepIndex that 
-        no longer corresponds to a valid step. This defensive if (!nextStep) block would 
-        then catch that and ensure the incident is marked as RESOLVED, preventing an infinite 
-        loop or unhandled error.However, in distributed systems with potential race conditions, 
-        unexpected message re-deliveries, or unforeseen edge cases, it's possible (though unlikely) 
-        for handleEscalation to receive an escalationStepIndex that no longer corresponds to a 
-        valid step. This defensive if (!nextStep) block would then catch that and ensure 
-        the incident is marked as RESOLVED, preventing an infinite loop or unhandled error.
-    */
-    
-    if (!nextStep) {
-        console.log(`No more escalation steps for ${site.url}. Incident ${incident?.id} fully escalated.`);
+    if (!currentStep) {
+        console.log(`No current step found for incident ${incident.id}. Resolving.`);
         await prismaClient.incident.update({
             where: { id: incident.id },
             data: {
                 status: IncidentStatus.RESOLVED,
-                endTime: new Date(),
+                endTime: now,
                 nextEscalationTime: null,
             },
         });
         return;
     }
 
-    console.log(`Escalating incident ${incident.id} for ${site.url} to step ${nextStep.stepOrder + 1}.`);
+    // Check if we need to handle delay period
+    if (!incident.stepDelayCompleted) {
+        console.log(`Starting step ${currentStep.stepOrder} for incident ${incident.id} (delay period completed)`);
+        
+        await sendStepNotification(incident, currentStep, site.url, status, organizationId, escalationPolicy.name);
+        
+        // Calculate next action time based on escalateAfter
+        const nextActionTime = new Date(now.getTime() + (currentStep.escalateAfter * 60 * 1000));
+        await prismaClient.incident.update({
+            where: { id: incident.id },
+            data: {
+                stepDelayCompleted: true,
+                escalationStepStartTime: now,
+                currentRepeatCount: 1,
+                nextEscalationTime: nextActionTime,
+            },
+        });
+        console.log(`Step ${currentStep.stepOrder} notification sent. Next action in ${currentStep.escalateAfter} minutes at ${nextActionTime.toISOString()}`);
+        return;
+    }
+    
+    // Handle repeats or escalation properly
+    if (incident.currentRepeatCount < currentStep.repeatCount) {
+        // Send repeat notification
+        console.log(`Sending repeat ${incident.currentRepeatCount + 1} of step ${currentStep.stepOrder} for incident ${incident.id}`);
+        
+        await sendStepNotification(incident, currentStep, site.url, status, organizationId, escalationPolicy.name);
+        
+        const nextRepeatCount = incident.currentRepeatCount + 1;
+        
+        if (nextRepeatCount < currentStep.repeatCount) {
+            // Schedule next repeat after escalateAfter minutes
+            const nextRepeatTime = new Date(now.getTime() + (currentStep.escalateAfter * 60 * 1000));
+            await prismaClient.incident.update({
+                where: { id: incident.id },
+                data: {
+                    currentRepeatCount: nextRepeatCount,
+                    nextEscalationTime: nextRepeatTime,
+                },
+            });
+            console.log(`Scheduled repeat ${nextRepeatCount + 1} for step ${currentStep.stepOrder} in ${currentStep.escalateAfter} minutes at ${nextRepeatTime.toISOString()}`);
+            return;
+        } else {
+            // All repeats done, prepare for next step
+            const currentStepIndex = sortedSteps.indexOf(currentStep);
+            const nextStepIndex = currentStepIndex + 1;
+            
+            if (nextStepIndex < sortedSteps.length) {
+                // Move to next step
+                const nextStep = sortedSteps[nextStepIndex];
+                const nextStepStartTime = new Date(now.getTime() + (nextStep.delayMinutes * 60 * 1000));
+                
+                await prismaClient.incident.update({
+                    where: { id: incident.id },
+                    data: {
+                        currentEscalationStepId: nextStep.id,
+                        currentRepeatCount: 0,
+                        stepDelayCompleted: nextStep.delayMinutes === 0,
+                        escalationStepStartTime: nextStep.delayMinutes === 0 ? now : null,
+                        nextEscalationTime: nextStepStartTime,
+                    },
+                });
+                console.log(`Moving to step ${nextStep.stepOrder} after ${nextStep.delayMinutes} minute delay. Next escalation at ${nextStepStartTime.toISOString()}`);
+                
+                // If no delay for next step, send notification immediately and set proper next escalation time
+                if (nextStep.delayMinutes === 0) {
+                    await sendStepNotification(incident, nextStep, site.url, status, organizationId, escalationPolicy.name);
+                    
+                    const nextActionTime = new Date(now.getTime() + (nextStep.escalateAfter * 60 * 1000));
+                    await prismaClient.incident.update({
+                        where: { id: incident.id },
+                        data: {
+                            stepDelayCompleted: true,
+                            escalationStepStartTime: now,
+                            currentRepeatCount: 1,
+                            nextEscalationTime: nextActionTime,
+                        },
+                    });
+                    console.log(`Step ${nextStep.stepOrder} notification sent immediately. Next action at ${nextActionTime.toISOString()}`);
+                }
+                return;
+            } else {
+                // No more steps - handle termination condition
+                if (escalationPolicy.terminationCondition === "repeat_last_step" && 
+                    escalationPolicy.repeatLastStepIntervalMinutes) {
+                    
+                    const nextRepeatTime = new Date(now.getTime() + (escalationPolicy.repeatLastStepIntervalMinutes * 60 * 1000));
+                    await prismaClient.incident.update({
+                        where: { id: incident.id },
+                        data: {
+                            currentRepeatCount: 0,
+                            stepDelayCompleted: true,
+                            nextEscalationTime: nextRepeatTime,
+                        },
+                    });
+                    console.log(`Will repeat last step in ${escalationPolicy.repeatLastStepIntervalMinutes} minutes at ${nextRepeatTime.toISOString()}`);
+                    return;
+                } else {
+                    // Stop after last step - resolve the incident
+                    await prismaClient.incident.update({
+                        where: { id: incident.id },
+                        data: {
+                            status: IncidentStatus.RESOLVED,
+                            endTime: now,
+                            nextEscalationTime: null,
+                        },
+                    });
+                    console.log(`Incident ${incident.id} resolved after completing all escalation steps`);
+                    return;
+                }
+            }
+        }
+    }
+    
+    // If we reach here, all repeats for current step are completed, move to next step
+    const finalStepIndex = sortedSteps.indexOf(currentStep);
+    const finalNextStepIndex = finalStepIndex + 1;
+    
+    if (finalNextStepIndex < sortedSteps.length) {
+        // Move to next step
+        const nextStep = sortedSteps[finalNextStepIndex];
+        const nextStepStartTime = new Date(now.getTime() + (nextStep.delayMinutes * 60 * 1000));
+        
+        await prismaClient.incident.update({
+            where: { id: incident.id },
+            data: {
+                currentEscalationStepId: nextStep.id,
+                currentRepeatCount: 0,
+                stepDelayCompleted: nextStep.delayMinutes === 0,
+                escalationStepStartTime: nextStep.delayMinutes === 0 ? now : null,
+                nextEscalationTime: nextStepStartTime,
+            },
+        });
+        console.log(`Moving to step ${nextStep.stepOrder} after ${nextStep.delayMinutes} minute delay. Next escalation at ${nextStepStartTime.toISOString()}`);
+        
+        // If no delay for next step, send notification immediately and set proper next escalation time
+        if (nextStep.delayMinutes === 0) {
+            await sendStepNotification(incident, nextStep, site.url, status, organizationId, escalationPolicy.name);
+            
+            const nextActionTime = new Date(now.getTime() + (nextStep.escalateAfter * 60 * 1000));
+            await prismaClient.incident.update({
+                where: { id: incident.id },
+                data: {
+                    stepDelayCompleted: true,
+                    escalationStepStartTime: now,
+                    currentRepeatCount: 1,
+                    nextEscalationTime: nextActionTime,
+                },
+            });
+            console.log(`Step ${nextStep.stepOrder} notification sent immediately. Next action at ${nextActionTime.toISOString()}`);
+        }
+        return;
+    }
 
-    // Send notification for the current step (using incidentEscalated template)
-    const recipientEmails = await getRecipientsEmails(nextStep.recipients, organizationId);
+    // This section should only be reached if we're at the last step and have completed all repeats
+    const isLastStep = finalStepIndex === sortedSteps.length - 1;
+    
+    if (isLastStep && escalationPolicy.terminationCondition === "repeat_last_step" && 
+        escalationPolicy.repeatLastStepIntervalMinutes) {
+        
+        console.log(`Repeating last step ${currentStep.stepOrder} for incident ${incident.id}`);
+        await sendStepNotification(incident, currentStep, site.url, status, organizationId, escalationPolicy.name);
+
+        const nextRepeatTime = new Date(now.getTime() + (escalationPolicy.repeatLastStepIntervalMinutes * 60 * 1000));
+        await prismaClient.incident.update({
+            where: { id: incident.id },
+            data: {
+                currentRepeatCount: 0,
+                nextEscalationTime: nextRepeatTime,
+            },
+        });
+        console.log(`Scheduled repeat of last step in ${escalationPolicy.repeatLastStepIntervalMinutes} minutes at ${nextRepeatTime.toISOString()}`);
+    } else if (isLastStep) {
+        // Only resolve if we're at the last step and not repeating
+        await prismaClient.incident.update({
+            where: { id: incident.id },
+            data: {
+                status: IncidentStatus.RESOLVED,
+                endTime: now,
+                nextEscalationTime: null,
+            },
+        });
+        console.log(`Incident ${incident.id} resolved - completed all escalation steps`);
+    } else {
+        // This should not happen - log for debugging
+        console.error(`Unexpected state: incident ${incident.id} reached end of logic but not at last step. Current step: ${currentStep.stepOrder}, Total steps: ${sortedSteps.length}`);
+    }
+}
+
+// Helper function to send step notifications
+async function sendStepNotification(incident: any, step: EscalationStep, websiteUrl: string, status: WebsiteStatus, organizationId: string, policyName: string) {
+    const recipientEmails = await getRecipientsEmails(step.recipients, organizationId);
+    
     for (const email of recipientEmails) {
         await sendEmail(
             email,
-            `[${status}] ${site.url} is ${status} - Escalation Step ${nextStep.stepOrder + 1}`,
-            'incidentEscalated', // Template name
+            `[${status}] ${websiteUrl} is ${status} - Escalation Step ${step.stepOrder}`,
+            'incidentEscalated',
             {
-                recipientName: email, // Placeholder
-                websiteUrl: site.url,
+                recipientName: email,
+                websiteUrl: websiteUrl,
                 status: status,
                 incidentId: incident.id,
-                serviceName: site.url,
-                escalationPolicyName: escalationPolicy.name,
-                escalationStep: nextStep.stepOrder + 1,
-                customMessage: nextStep.customMessage || 'N/A',
+                serviceName: websiteUrl,
+                escalationPolicyName: policyName,
+                escalationStep: step.stepOrder,
+                customMessage: step.customMessage || 'N/A',
                 ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
             }
         );
     }
-
-    // Schedule the next escalation step
-    const nextEscalationTime = nextStep.escalateAfter
-        ? new Date(Date.now() + nextStep.escalateAfter * 60 * 1000)
-        : null;
-
-    await prismaClient.incident.update({
-        where: { id: incident.id },
-        data: {
-            currentEscalationStepId: nextStep.id,
-            nextEscalationTime: nextEscalationTime,
-            status: IncidentStatus.INVESTIGATING,
-        },
-    });
 }
