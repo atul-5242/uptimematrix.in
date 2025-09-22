@@ -6,38 +6,12 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Plus, Eye, TrendingUp, Globe, Users } from 'lucide-react'
-
-type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
-type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low' | 'maintenance' // Re-added 'maintenance'
-
-interface Incident { // AI-generated type from frontend usage
-  id: string
-  title: string
-  description: string
-  status: IncidentStatus
-  severity: IncidentSeverity
-  affectedServices: string[]
-  createdAt: string
-  resolvedAt?: string
-  assignee?: string
-  responseTime: number // minutes
-  escalationPolicy: {
-    name: string
-  }
-  tags: string[]
-}
-
-type IncidentStats = {
-  total: number
-  open: number
-  acknowledged: number
-  investigating: number
-  resolved: number
-  avgResponseTime: number
-  avgResolutionTime: number
-  uptime: number
-}
+import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Plus, TrendingUp, Globe, Users } from 'lucide-react'
+import { getIncidents, getIncidentStats } from '@/app/all-actions/incidents/actions'
+import { Incident, IncidentStatus, IncidentSeverity, IncidentStats } from '@/types/incident'
+import { formatTimeAgo, formatDuration } from '@/lib/time'
+import { useAppSelector } from '@/store'
+import { toast } from '@/hooks/use-toast'
 
 export default function IncidentsPage() {
   const router = useRouter()
@@ -48,6 +22,7 @@ export default function IncidentsPage() {
     acknowledged: 0,
     investigating: 0,
     resolved: 0,
+    resolvedToday: 0,
     avgResponseTime: 0,
     avgResolutionTime: 0,
     uptime: 99.9
@@ -56,145 +31,85 @@ export default function IncidentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('active')
 
-  // Helper to format minutes to "Xm" or "Yh Zm"
-  const formatDuration = (minutes: number) => {
-    if (!minutes || minutes <= 0) return '0m'
-    if (minutes < 60) return `${minutes}m`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return `${hours}h ${mins}m`
-  }
+  const selectedOrganizationId = useAppSelector((state) => state.user.selectedOrganizationId);
 
-  // Demo data - replace with API calls
   useEffect(() => {
-    const fetchIncidents = async () => {
-      setLoading(true)
-      await new Promise(resolve => setTimeout(resolve, 800))
+    const fetchData = async () => {
+      console.log('Selected Organization ID:', selectedOrganizationId);
+      if (!selectedOrganizationId) {
+        console.log('No organization selected, skipping fetch');
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        console.log('Fetching incidents and stats for organization:', selectedOrganizationId);
+        const [incidentsData, statsData] = await Promise.all([
+          getIncidents(selectedOrganizationId),
+          getIncidentStats(selectedOrganizationId)
+        ]);
+        
+        console.log('Fetched incidents:', incidentsData);
+        console.log('Fetched stats:', statsData);
+        
+        setIncidents(incidentsData);
+        setStats(statsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch incidents. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const demoIncidents: Incident[] = [
-        {
-          id: '1',
-          title: 'YouTube.com API Gateway Timeout',
-          description: 'API gateway experiencing high latency and timeout errors',
-          status: 'investigating',
-          severity: 'critical',
-          affectedServices: ['youtube.com', 'API Gateway', 'Video Streaming'],
-          createdAt: '2024-01-15T10:30:00Z',
-          assignee: 'John Doe',
-          responseTime: 2,
-          escalationPolicy: { name: "Critical API Escalation Policy" },
-          tags: ['api', 'timeout', 'performance']
-        },
-        {
-          id: '2',
-          title: 'Database Connection Pool Exhaustion',
-          description: 'Production database connection pool reached maximum capacity',
-          status: 'acknowledged',
-          severity: 'high',
-          affectedServices: ['Main Database', 'User Authentication'],
-          createdAt: '2024-01-15T09:15:00Z',
-          assignee: 'Jane Smith',
-          responseTime: 5,
-          escalationPolicy: { name: "Database Reliability Policy" },
-          tags: ['database', 'connection', 'performance']
-        },
-        {
-          id: '3',
-          title: 'SSL Certificate Expiry Warning',
-          description: 'SSL certificate for subdomain.example.com expires in 7 days',
-          status: 'open',
-          severity: 'medium',
-          affectedServices: ['subdomain.example.com'],
-          createdAt: '2024-01-15T08:00:00Z',
-          assignee: 'Ops Team',
-          responseTime: 0,
-          escalationPolicy: { name: "Security Alerts Policy" },
-          tags: ['ssl', 'certificate', 'security']
-        },
-        {
-          id: '4',
-          title: 'CDN Edge Server Performance Degradation',
-          description: 'Edge servers in Asia-Pacific region showing increased response times',
-          status: 'resolved',
-          severity: 'medium',
-          affectedServices: ['CDN', 'Static Assets', 'Image Delivery'],
-          createdAt: '2024-01-14T16:45:00Z',
-          resolvedAt: '2024-01-14T18:30:00Z',
-          assignee: 'Mike Wilson',
-          responseTime: 10,
-          escalationPolicy: { name: "CDN Escalation Policy" },
-          tags: ['cdn', 'performance', 'asia-pacific']
-        }
-      ]
-
-      setIncidents(demoIncidents)
-
-      const avgResponse = Math.round(demoIncidents.reduce((acc, i) => acc + (i.responseTime || 0), 0) / demoIncidents.length)
-
-      setStats({
-        total: demoIncidents.length,
-        open: demoIncidents.filter(i => i.status === 'open').length,
-        acknowledged: demoIncidents.filter(i => i.status === 'acknowledged').length,
-        investigating: demoIncidents.filter(i => i.status === 'investigating').length,
-        resolved: demoIncidents.filter(i => ['resolved', 'closed'].includes(i.status)).length,
-        avgResponseTime: avgResponse,
-        avgResolutionTime: 0,
-        uptime: 99.94
-      })
-      setLoading(false)
-    }
-
-    fetchIncidents()
-  }, [])
+    fetchData();
+  }, [selectedOrganizationId])
 
   const getStatusColor = (status: IncidentStatus) => {
     switch (status) {
-      case 'open': return 'bg-red-100 text-red-800 border-red-200'
-      case 'acknowledged': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'investigating': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'resolved': return 'bg-green-100 text-green-800 border-green-200'
-      case 'closed': return 'bg-gray-100 text-gray-800 border-gray-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'DOWN':
+        return 'bg-red-100 text-red-800 hover:bg-red-200'
+      case 'MONITORING':
+        return 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+      case 'INVESTIGATING':
+        return 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+      case 'RESOLVED':
+        return 'bg-green-100 text-green-800 hover:bg-green-200'
+      case 'MAINTENANCE':
+        return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+      default:
+        return 'bg-gray-100 text-gray-800 hover:bg-gray-200'
     }
   }
 
   const getStatusIcon = (status: IncidentStatus) => {
     switch (status) {
-      case 'open': return <XCircle className="h-4 w-4" />
-      case 'acknowledged': return <Clock className="h-4 w-4" />
-      case 'investigating': return <Search className="h-4 w-4" />
-      case 'resolved': return <CheckCircle className="h-4 w-4" />
-      case 'closed': return <CheckCircle className="h-4 w-4" />
+      case 'DOWN': return <AlertTriangle className="h-4 w-4" />
+      case 'MONITORING': return <CheckCircle className="h-4 w-4" />
+      case 'INVESTIGATING': return <Search className="h-4 w-4" />
+      case 'RESOLVED': return <CheckCircle className="h-4 w-4" />
+      case 'MAINTENANCE': return <Clock className="h-4 w-4" />
       default: return <AlertTriangle className="h-4 w-4" />
     }
   }
 
   const filteredIncidents = incidents.filter(incident => {
-    const q = searchQuery.toLowerCase()
-    const matchesSearch =
-      incident.title.toLowerCase().includes(q) ||
-      incident.description.toLowerCase().includes(q) ||
-      incident.affectedServices.some(s => s.toLowerCase().includes(q))
-
-    const matchesTab = activeTab === 'all' ||
-      (activeTab === 'active' && ['open', 'acknowledged', 'investigating'].includes(incident.status)) ||
-      (activeTab === 'resolved' && ['resolved', 'closed'].includes(incident.status))
-
-    return matchesSearch && matchesTab
+    const matchesSearch = searchQuery === '' || 
+      incident.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (incident.impact?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    
+    if (activeTab === 'active') {
+      return matchesSearch && incident.status !== 'RESOLVED'
+    } else if (activeTab === 'resolved') {
+      return matchesSearch && incident.status === 'RESOLVED'
+    }
+    return matchesSearch
   })
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
-  }
 
   if (loading) {
     return (
@@ -223,13 +138,6 @@ export default function IncidentsPage() {
               <p className="text-gray-600 mt-1">Monitor, track, and resolve incidents across your infrastructure</p>
             </div>
             <div className="flex items-center gap-3">
-              <Button 
-                variant="outline"
-                onClick={() => router.push('/dashboard/incidents/analytics')}
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Analytics
-              </Button>
               <Button onClick={() => router.push('/dashboard/incidents/create')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Incident
@@ -259,10 +167,11 @@ export default function IncidentsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-green-600 text-sm font-medium">Resolved Today</p>
-                  <p className="text-2xl font-bold text-green-700">{stats.resolved}</p>
+                  <p className="text-2xl font-bold text-green-700">{stats.resolvedToday}</p>
                 </div>
                 <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="h-6 w-6 text-green-600" />
+                  <span className="text-xs absolute -mt-8">Today</span>
                 </div>
               </div>
             </CardContent>
@@ -327,7 +236,7 @@ export default function IncidentsPage() {
                 filteredIncidents.map((incident) => (
                   <div 
                     key={incident.id} 
-                    className="p-6 hover:bg-gray-50/50 cursor-pointer transition-colors"
+                    className="p-6 hover:bg-gray-50/50 cursor-pointer"
                     onClick={() => router.push(`/dashboard/incidents/${incident.id}`)}
                   >
                     <div className="flex items-start gap-4">
@@ -340,58 +249,63 @@ export default function IncidentsPage() {
                             </h3>
                             <Badge className={getStatusColor(incident.status)}>
                               {getStatusIcon(incident.status)}
-                              <span className="ml-1 capitalize">{incident.status}</span>
+                              <span className="ml-1 capitalize">
+                                {incident.status.toLowerCase()}
+                              </span>
                             </Badge>
+                            {incident.severity && incident.status !== 'RESOLVED' && (
+                              <Badge variant="outline" className="border-red-200 text-red-700">
+                                {incident.severity.toLowerCase()}
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {formatTimeAgo(incident.createdAt)}
+                            {formatTimeAgo(incident.startTime)}
                           </div>
                         </div>
 
                         <p className="text-gray-600 mb-3 line-clamp-2">
-                          {incident.description}
+                          {incident.impact || 'No impact description available'}
                         </p>
 
-                        {/* Affected Services */}
-                        {incident.affectedServices?.length > 0 && (
+                        {/* Affected Service */}
+                        {incident.website && (
                           <div className="flex flex-wrap gap-1 mb-2">
-                            {incident.affectedServices.map((service, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs flex items-center gap-1">
-                                <Globe className="h-3 w-3" />
-                                {service}
-                              </Badge>
-                            ))}
+                            <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                              <Globe className="h-3 w-3" />
+                              {incident.website.name || 'Unknown Service'}
+                            </Badge>
                           </div>
                         )}
 
-                        {/* Metadata: assignee + responseTime + escalationPolicy */}
+                        {/* Metadata */}
                         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-2">
-                          {incident.assignee && (
+                          {incident.AcknowledgedBy && (
                             <div className="flex items-center gap-1">
                               <Users className="h-4 w-4" />
-                              <span>{incident.assignee}</span>
+                              <span>Acknowledged by: {incident.AcknowledgedBy.fullName || incident.AcknowledgedBy.email}</span>
                             </div>
                           )}
 
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            <span>Response: {formatDuration(incident.responseTime)}</span>
+                            <span>Duration: {formatDuration(parseInt(incident.duration) || 0)}</span>
                           </div>
 
-                          {incident.escalationPolicy?.name && (
+                          {incident.ResolvedBy && (
                             <div className="flex items-center gap-1">
-                              <span className="font-medium text-gray-700">Escalation:</span>
-                              <span>{incident.escalationPolicy.name}</span>
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span>Resolved by: {incident.ResolvedBy.fullName || incident.ResolvedBy.email}</span>
                             </div>
                           )}
                         </div>
 
-                        {/* Tags */}
-                        {incident.tags?.length > 0 && (
+                        {/* Tags - Using service name as a tag */}
+                        {incident.serviceName && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {incident.tags.map((tag, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">#{tag}</Badge>
-                            ))}
+                            <Badge variant="outline" className="text-xs">
+                              {incident.serviceName}
+                            </Badge>
                           </div>
                         )}
                       </div>
@@ -399,14 +313,16 @@ export default function IncidentsPage() {
                       {/* View Button */}
                       <div className="flex items-center gap-2">
                         <Button 
-                          variant="ghost" 
+                          variant="outline" 
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/dashboard/incidents/${incident.id}`)
+                            router.push(`/dashboard/incidents/analytics?incidentId=${incident.id}`)
                           }}
+                          className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
                         >
-                          <Eye className="h-4 w-4" />
+                          <TrendingUp className="h-3.5 w-3.5" />
+                          <span>Analytics</span>
                         </Button>
                       </div>
                     </div>
