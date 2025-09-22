@@ -88,4 +88,125 @@ export async function getIncidentStats(organizationId: string): Promise<Incident
   }
 }
 
-// Add more incident-related actions here as needed
+// Incident Analytics Functions
+export async function getIncidentAnalytics(incidentId: string) {
+  try {
+    const response = await fetch(`/api/incidents/analytics/${incidentId}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch incident analytics');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching incident analytics:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to fetch incident analytics',
+      variant: 'destructive',
+    });
+    throw error;
+  }
+}
+
+export async function updateIncidentStatus(incidentId: string, status: string) {
+  try {
+    const response = await fetch(`/api/incidents/analytics/${incidentId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update incident status');
+    }
+
+    const data = await response.json();
+    toast({
+      title: 'Success',
+      description: 'Incident status updated successfully',
+    });
+    return data;
+  } catch (error) {
+    console.error('Error updating incident status:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to update incident status',
+      variant: 'destructive',
+    });
+    throw error;
+  }
+}
+
+export async function createIncidentUpdate(incidentId: string, message: string, type: 'comment' | 'incident_report') {
+  try {
+    const response = await fetch(`/api/incidents/analytics/${incidentId}/updates`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message, type }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create incident update');
+    }
+
+    const data = await response.json();
+    toast({
+      title: 'Success',
+      description: 'Update posted successfully',
+    });
+    return data;
+  } catch (error) {
+    console.error('Error creating incident update:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to post update',
+      variant: 'destructive',
+    });
+    throw error;
+  }
+}
+
+export async function getIncidentUpdates(incidentId: string) {
+  try {
+    const response = await fetch(`/api/incidents/analytics/${incidentId}/updates`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch incident updates');
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching incident updates:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to fetch incident updates',
+      variant: 'destructive',
+    });
+    throw error;
+  }
+}

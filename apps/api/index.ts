@@ -11,6 +11,7 @@ import roleRouter from "./routes/team-sectionRoutes/roles/roleRoutes.js";
 import onCallRoutes from './routes/oncallRoute/oncallRoutes.js';
 import regionsRouter from "./routes/regions.js"; // Import the new regions router
 import incidentRouter from "./routes/incidentRoutes.js";
+import incidentAnalyticsRouter from "./routes/incidentAnalyticsRoutes.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -35,6 +36,7 @@ app.use("/api/teams", teamRouter);
 app.use("/api/roles", roleRouter);
 app.use('/api/oncall', onCallRoutes);
 app.use("/api/incidents", incidentRouter);
+app.use("/api/incidents/analytics", incidentAnalyticsRouter);
 // Session validation endpoint
 app.use("/api", sessionRouter);
 

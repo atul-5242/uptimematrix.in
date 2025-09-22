@@ -46,6 +46,7 @@ model User {
   createdTeams                    Team[]                 @relation("CreatedTeam") // Teams created by this user
   sentInvitations                 OrganizationMember[]   @relation("InvitedBy") // Invitations sent by this user
   onCallUserAssignments           OnCallUserAssignment[]
+  incidentUpdates                 IncidentUpdate[]       @relation("IncidentUpdateUser") // Incident updates created by this user
 }
 
 model website {
@@ -270,7 +271,8 @@ enum IncidentStatus {
   MONITORING 
   OPERATIONAL 
   DOWN 
-  MAINTENANCE 
+  MAINTENANCE
+  CLOSED
 }
 
 enum IncidentSeverity {
@@ -437,6 +439,19 @@ model Incident {
   createdById             String?
   websiteId               String?
   website                 website?         @relation(fields: [websiteId], references: [id])
+  updates                 IncidentUpdate[] // Relation to incident updates
+}
+
+model IncidentUpdate {
+  id        String   @id @default(cuid())
+  message   String
+  type      String   // 'comment' | 'incident_report' | 'status_change'
+  incident  Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  incidentId String
+  user      User     @relation("IncidentUpdateUser", fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum UptimeTrend {

@@ -1,6 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { formatDistanceToNow } from 'date-fns';
+import { getIncidentAnalytics, updateIncidentStatus, createIncidentUpdate, getIncidentUpdates } from "@/app/all-actions/incidents/actions";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,8 +52,8 @@ type Incident = {
 
 export default function IncidentDetailPage() {
   const router = useRouter()
-  const params = useParams()
-  const incidentId = params?.id as string
+  const searchParams = useSearchParams()
+  const incidentId = searchParams.get('incidentId')
   
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,80 +69,49 @@ export default function IncidentDetailPage() {
 
   useEffect(() => {
     const fetchIncident = async () => {
+      if (!incidentId) return;
+      
       setLoading(true)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Demo incident data
-      const demoIncident: Incident = {
-        id: incidentId,
-        title: 'YouTube.com API Gateway Timeout',
-        description: 'API gateway experiencing high latency and timeout errors affecting video streaming and user authentication services. Multiple regions reporting increased response times.',
-        status: 'investigating',
-        severity: 'low',
-        affectedServices: ['youtube.com', 'API Gateway', 'Video Streaming', 'User Authentication'],
-        createdAt: '2024-01-15T10:30:00Z',
-        acknowledgedAt: '2024-01-15T10:32:00Z',
-        assignee: 'John Doe',
-        responseTime: 2,
-        downtime: 45,
-        impactedUsers: 15420,
-        escalationLevel: 2,
-        tags: ['api', 'timeout', 'performance', 'critical'],
-        updates: [
-          {
-            id: '1',
-            message: 'Incident automatically created due to API gateway timeout alerts',
-            type: 'status_change',
-            author: 'System',
-            timestamp: '2024-01-15T10:30:00Z'
-          },
-          {
-            id: '2',
-            message: 'Incident acknowledged by John Doe. Investigating root cause.',
-            status: 'acknowledged',
-            type: 'status_change',
-            author: 'John Doe',
-            timestamp: '2024-01-15T10:32:00Z'
-          },
-          {
-            id: '3',
-            message: 'Identified high CPU usage on gateway servers. Scaling up infrastructure.',
-            type: 'comment',
-            author: 'John Doe',
-            timestamp: '2024-01-15T10:45:00Z'
-          },
-          {
-            id: '4',
-            message: 'Status changed to investigating. Working with infrastructure team to resolve.',
-            status: 'investigating',
-            type: 'status_change',
-            author: 'Jane Smith',
-            timestamp: '2024-01-15T11:00:00Z'
-          },
-          {
-            id: '5',
-            message: 'Added additional monitoring for API response times. Seeing some improvement.',
-            type: 'comment',
-            author: 'Mike Wilson',
-            timestamp: '2024-01-15T11:15:00Z'
+      try {
+        const [data, updatesData] = await Promise.all([
+          getIncidentAnalytics(incidentId),
+          getIncidentUpdates(incidentId)
+        ]);
+        
+        // Transform backend data to match frontend interface
+        const transformedIncident: Incident = {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          status: data.status.toLowerCase() as IncidentStatus,
+          severity: data.severity.toLowerCase() as IncidentSeverity,
+          affectedServices: [data.service?.name || 'Unknown Service'],
+          createdAt: data.createdAt,
+          acknowledgedAt: data.acknowledgedAt,
+          resolvedAt: data.resolvedAt,
+          assignee: data.acknowledgedBy?.name || data.resolvedBy?.name,
+          responseTime: data.metrics.responseTimeMs ? Math.floor(data.metrics.responseTimeMs / 60000) : 0,
+          downtime: data.metrics.resolutionTimeMs ? Math.floor(data.metrics.resolutionTimeMs / 60000) : 0,
+          impactedUsers: 0, // Not available in current backend
+          escalationLevel: 1,
+          tags: ['incident'],
+          updates: updatesData || [],
+          metrics: {
+            responseTimeMs: [],
+            errorRate: [],
+            timestamps: []
           }
-        ],
-        metrics: {
-          responseTimeMs: [450, 520, 680, 890, 1200, 980, 750, 620, 540, 480],
-          errorRate: [0.1, 0.3, 0.8, 1.5, 2.3, 1.8, 1.2, 0.7, 0.4, 0.2],
-          timestamps: [
-            '10:30', '10:35', '10:40', '10:45', '10:50', 
-            '10:55', '11:00', '11:05', '11:10', '11:15'
-          ]
-        }
+        };
+        
+        setIncident(transformedIncident);
+        setEditedTitle(transformedIncident.title);
+        setEditedDescription(transformedIncident.description);
+      } catch (error) {
+        console.error('Error fetching incident:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      setIncident(demoIncident)
-      setEditedTitle(demoIncident.title)
-      setEditedDescription(demoIncident.description)
-      setLoading(false)
     }
     
     fetchIncident()
@@ -180,29 +151,30 @@ export default function IncidentDetailPage() {
   }
 
   const handleUpdateSubmit = async () => {
-    if (!newUpdate.trim()) return
+    if (!newUpdate.trim() || !incidentId) return
     
     setUpdating(true)
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const response = await createIncidentUpdate(incidentId, newUpdate, updateType);
       
-      const update: IncidentUpdate = {
-        id: Date.now().toString(),
-        message: newUpdate,
-        type: updateType === 'incident_report' ? 'incident_report' : 'comment',
-        author: 'Current User',
-        timestamp: new Date().toISOString()
+      if (response.success) {
+        const update: IncidentUpdate = {
+          id: response.data.id,
+          message: response.data.message,
+          type: response.data.type,
+          author: response.data.author,
+          timestamp: response.data.timestamp
+        }
+        
+        setIncident(prev => prev ? ({
+          ...prev,
+          updates: [update, ...prev.updates]
+        } as Incident) : null)
+        
+        setNewUpdate('')
+        setUpdateType('comment')
       }
-      
-      setIncident(prev => prev ? ({
-        ...prev,
-        updates: [...prev.updates, update]
-      } as Incident) : null)
-      
-      setNewUpdate('')
-      setUpdateType('comment')
     } catch (error) {
       console.error('Error updating incident:', error)
     } finally {
@@ -211,33 +183,50 @@ export default function IncidentDetailPage() {
   }
 
   const handleActionClick = async () => {
-    if (!incident) return
+    if (!incident || !incidentId) return
     setActionLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      let newStatus = '';
+      
+      // Determine the next status based on current status
+      if (incident.status === 'open') {
+        newStatus = 'INVESTIGATING'; // Move from open to investigating
+      } else if (incident.status === 'acknowledged' || incident.status === 'investigating') {
+        newStatus = 'RESOLVED'; // Move from acknowledged/investigating to resolved
+      } else if (incident.status === 'resolved') {
+        newStatus = 'CLOSED'; // Move from resolved to closed
+      }
 
-      // If not acknowledged yet, acknowledge. If acknowledged, resolve.
-      if (incident.status !== 'acknowledged' && incident.status !== 'resolved' && incident.status !== 'closed') {
-        const update: IncidentUpdate = {
-          id: Date.now().toString(),
-          message: `Incident acknowledged by Current User.`,
-          status: 'acknowledged',
-          type: 'status_change',
-          author: 'Current User',
-          timestamp: new Date().toISOString()
-        }
-        setIncident(prev => prev ? ({ ...prev, status: 'acknowledged', acknowledgedAt: new Date().toISOString(), updates: [...prev.updates, update] }) : null)
-      } else if (incident.status === 'acknowledged') {
-        const update: IncidentUpdate = {
-          id: Date.now().toString(),
-          message: `Incident resolved by Current User.`,
-          status: 'resolved',
-          type: 'status_change',
-          author: 'Current User',
-          timestamp: new Date().toISOString()
-        }
-        setIncident(prev => prev ? ({ ...prev, status: 'resolved', resolvedAt: new Date().toISOString(), updates: [...prev.updates, update] }) : null)
+      if (newStatus) {
+        await updateIncidentStatus(incidentId, newStatus);
+        
+        // Refresh the incident data after status update
+        const updatedData = await getIncidentAnalytics(incidentId);
+        const transformedIncident: Incident = {
+          id: updatedData.id,
+          title: updatedData.title,
+          description: updatedData.description,
+          status: updatedData.status.toLowerCase() as IncidentStatus,
+          severity: updatedData.severity.toLowerCase() as IncidentSeverity,
+          affectedServices: [updatedData.service?.name || 'Unknown Service'],
+          createdAt: updatedData.createdAt,
+          acknowledgedAt: updatedData.acknowledgedAt,
+          resolvedAt: updatedData.resolvedAt,
+          assignee: updatedData.acknowledgedBy?.name || updatedData.resolvedBy?.name,
+          responseTime: updatedData.metrics.responseTimeMs ? Math.floor(updatedData.metrics.responseTimeMs / 60000) : 0,
+          downtime: updatedData.metrics.resolutionTimeMs ? Math.floor(updatedData.metrics.resolutionTimeMs / 60000) : 0,
+          impactedUsers: 0,
+          escalationLevel: 1,
+          tags: ['incident'],
+          updates: [],
+          metrics: {
+            responseTimeMs: [],
+            errorRate: [],
+            timestamps: []
+          }
+        };
+        
+        setIncident(transformedIncident);
       }
     } catch (error) {
       console.error('Error performing action:', error)
@@ -373,15 +362,22 @@ export default function IncidentDetailPage() {
             {/* Action Button and acknowledgements/resolution info */}
             <div className="flex flex-col items-end gap-2">
               {incident.status !== 'resolved' && incident.status !== 'closed' && (
-                incident.status === 'acknowledged' ? (
+                incident.status === 'acknowledged' || incident.status === 'investigating' ? (
                   <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
-                    <CheckCircle className="h-4 w-4 mr-1" /> Resolve
+                    <CheckCircle className="h-4 w-4 mr-1" /> 
+                    {actionLoading ? 'Resolving...' : 'Resolve'}
                   </Button>
                 ) : (
                   <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
-                    Acknowledge
+                    {actionLoading ? 'Acknowledging...' : 'Acknowledge'}
                   </Button>
                 )
+              )}
+
+              {incident.status === 'resolved' && (
+                <Button size="sm" onClick={handleActionClick} disabled={actionLoading} variant="outline">
+                  {actionLoading ? 'Closing...' : 'Close Incident'}
+                </Button>
               )}
 
               {/* Permanent label after resolve / acknowledged */}
