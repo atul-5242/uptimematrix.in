@@ -120,8 +120,8 @@ export const getIncidentAnalytics = async (req: Request, res: Response) => {
       ? endTime.getTime() - startTime.getTime()
       : null;
 
-    const resolutionTime = incident.Resolved && incident.ResolvedBy
-      ? endTime.getTime() - startTime.getTime()
+    const resolutionTime = incident.Resolved && incident.ResolvedBy && incident.endTime
+      ? new Date(incident.endTime).getTime() - startTime.getTime()
       : null;
 
     // Get related incidents for analysis
@@ -145,8 +145,8 @@ export const getIncidentAnalytics = async (req: Request, res: Response) => {
       status: incident.status,
       severity: incident.severity,
       createdAt: incident.createdAt,
-acknowledgedAt: incident.Acknowledged ? endTime.toISOString() : null,
-      resolvedAt: incident.Resolved ? endTime.toISOString() : null,
+      acknowledgedAt: incident.Acknowledged ? startTime.toISOString() : null,
+      resolvedAt: incident.Resolved && incident.endTime ? incident.endTime.toISOString() : null,
       service: { 
         id: incident.serviceId || '', 
         name: incident.serviceName, 
@@ -154,7 +154,7 @@ acknowledgedAt: incident.Acknowledged ? endTime.toISOString() : null,
       },
       organization: { 
         id: incident.organizationId, 
-        name: 'Organization' 
+        name: incident.organization.name 
       },
       metrics: {
         responseTimeMs: responseTime,

@@ -357,7 +357,7 @@ export default function MonitorsDashboard() {
                     <SelectItem value="offline">Offline</SelectItem>
                     <SelectItem value="unknown">Unknown</SelectItem>
                     <SelectItem value="paused">Paused</SelectItem>
-                    <SelectItem value="maintenance">Maintenance</SelectItem> // Added maintenance filter
+                    <SelectItem value="maintenance">Maintenance</SelectItem> 
                   </SelectContent>
                 </Select>
 
@@ -442,7 +442,11 @@ export default function MonitorsDashboard() {
                             <span className="font-semibold">{monitor.uptime.toFixed(1)}%</span>
                             {getTrendIcon(monitor.uptimeTrend)}
                           </div>
-                          <Progress value={monitor.uptime} className="h-1 mt-1" />
+                          <Progress
+                            value={Number(monitor?.uptime ?? 0)}
+                            max={100}
+                            className="h-1 mt-1"
+                          />
                         </div>
 
                         <div>

@@ -139,7 +139,10 @@ export function IntegrationsSection() {
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
-                      e.currentTarget.nextElementSibling.style.display = 'flex'
+                      const nextSibling = e.currentTarget.nextElementSibling as HTMLElement
+                      if (nextSibling) {
+                        nextSibling.style.display = 'flex'
+                      }
                     }}
                   />
                   <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg items-center justify-center text-white font-bold text-lg hidden">

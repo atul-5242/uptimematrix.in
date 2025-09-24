@@ -1,19 +1,27 @@
-import { Router } from 'express';
+import express from 'express';
+import { 
+  getIncidentAnalytics, 
+  updateIncidentStatus,
+  createIncidentUpdate,
+  getIncidentUpdates
+} from '../controllers/incidentAnalyticsController.js';
 import { authMiddleware } from '../middlewares/middleware.js';
-import { getIncidentAnalytics, updateIncidentStatus, createIncidentUpdate, getIncidentUpdates } from '../controllers/incidentAnalyticsController.js';
 
-const router = Router();
+const router = express.Router();
 
-// Get incident analytics
-router.get('/:incidentId', authMiddleware, getIncidentAnalytics);
+// All routes require authentication
+router.use(authMiddleware);
 
-// Update incident status
-router.patch('/:incidentId/status', authMiddleware, updateIncidentStatus);
+// GET /api/incidents/analytics/:incidentId - Get detailed analytics for a specific incident
+router.get('/:incidentId', getIncidentAnalytics);
 
-// Get incident updates
-router.get('/:incidentId/updates', authMiddleware, getIncidentUpdates);
+// PATCH /api/incidents/analytics/:incidentId/status - Update incident status
+router.patch('/:incidentId/status', updateIncidentStatus);
 
-// Create incident update
-router.post('/:incidentId/updates', authMiddleware, createIncidentUpdate);
+// POST /api/incidents/analytics/:incidentId/updates - Create incident update
+router.post('/:incidentId/updates', createIncidentUpdate);
+
+// GET /api/incidents/analytics/:incidentId/updates - Get incident updates
+router.get('/:incidentId/updates', getIncidentUpdates);
 
 export default router;

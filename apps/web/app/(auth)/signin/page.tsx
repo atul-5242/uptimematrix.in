@@ -11,14 +11,7 @@ interface SignInFormData {
   password: string;
 }
 
-interface SignInProps {
-  onSubmit?: (data: SignInFormData) => Promise<void> | void;
-  onSignUpClick?: () => void;
-  isLoading?: boolean;
-  error?: string;
-}
-
-const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = false, error }) => {
+const SignIn: React.FC = () => {
   const [formData, setFormData] = useState<{email: string; password: string}>({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Partial<{email: string; password: string}>>({});
@@ -75,12 +68,6 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
         </div>
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                <AlertCircle size={20} />
-                <span className="text-sm">{error}</span>
-              </div>
-            )}
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email</label>
               <div className="relative">
@@ -96,7 +83,7 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
                     validationErrors.email ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'
                   } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="Enter your email"
-                  disabled={isLoading || submitting}
+                  disabled={submitting}
                 />
               </div>
               {validationErrors.email && <p className="text-sm text-red-600">{validationErrors.email}</p>}
@@ -114,15 +101,15 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
                   onChange={handleChange('password')}
                   className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.password ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="Enter your password"
-                  disabled={isLoading || submitting}
+                  disabled={submitting}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={isLoading || submitting}>
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={submitting}>
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
               {validationErrors.password && <p className="text-sm text-red-600">{validationErrors.password}</p>}
             </div>
-            <button type="submit" disabled={isLoading || submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {submitting ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Signing in...</>) : 'Sign in'}
             </button>
           </form>
@@ -133,7 +120,7 @@ const SignIn: React.FC<SignInProps> = ({ onSubmit, onSignUpClick, isLoading = fa
                 type="button"
                 onClick={() => router.push('/signup')}
                 className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
-                disabled={isLoading || submitting}
+                disabled={submitting}
               >
                 Sign up
               </button>

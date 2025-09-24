@@ -106,7 +106,7 @@ export function TestimonialsSection() {
           <div className="grid grid-cols-4 lg:grid-cols-8 gap-8 items-center">
             {companies.map((company, index) => (
               <div key={index} className="flex items-center justify-center">
-                <div className={`w-12 h-12 bg-gradient-to-br ${colorClasses[company.color]} rounded-lg flex items-center justify-center text-sm font-bold text-white shadow-lg`}>
+                <div className={`w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center text-sm font-bold text-white shadow-lg`}>
                   {company.logo}
                 </div>
               </div>

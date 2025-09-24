@@ -1,212 +1,140 @@
-"use client";
+"use server"
 
-import { toast } from "@/hooks/use-toast";
-import { Incident, IncidentStats } from "@/types/incident";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  try {
-    // Get the token from localStorage
-    let token = '';
-    if (typeof window !== 'undefined') {
-      // Check for both 'auth_token' and 'token' for backward compatibility
-      token = localStorage.getItem('auth_token') || localStorage.getItem('token') || '';
-      console.log('Using token from localStorage:', token ? '*****' + token.slice(-5) : 'No token found');
-      
-      if (!token) {
-        throw new Error('No authentication token found. Please log in again.');
-      }
-    }
-
-    console.log(`Making request to: ${url}`);
-    const headers = new Headers(options.headers);
-    headers.set('Content-Type', 'application/json');
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers,
-    });
-
-    console.log(`Response status: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-        console.error('Error response:', errorData);
-      } catch (e) {
-        errorData = { message: 'Failed to parse error response' };
-      }
-      throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('Response data:', data);
-    return data;
-  } catch (error) {
-    console.error('Error in fetchWithAuth:', error);
-    throw error;
-  }
-}
-
-export async function getIncidents(organizationId: string): Promise<Incident[]> {
-  try {
-    const data = await fetchWithAuth(
-      `${API_BASE_URL}/api/incidents/${organizationId}`
-    );
-    return data;
-  } catch (error) {
-    console.error('Error fetching incidents:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to fetch incidents',
-      variant: 'destructive',
-    });
-    throw error;
-  }
-}
-
-export async function getIncidentStats(organizationId: string): Promise<IncidentStats> {
-  try {
-    const data = await fetchWithAuth(
-      `${API_BASE_URL}/api/incidents/stats/${organizationId}`
-    );
-    return data;
-  } catch (error) {
-    console.error('Error fetching incident stats:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to fetch incident statistics',
-      variant: 'destructive',
-    });
-    throw error;
-  }
-}
-
-// Incident Analytics Functions
 export async function getIncidentAnalytics(incidentId: string) {
   try {
-    const response = await fetch(`/api/incidents/analytics/${incidentId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${incidentId}`, {
       method: 'GET',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-    });
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch incident analytics');
+      throw new Error(`Failed to fetch incident analytics: ${response.statusText}`)
     }
 
-    const data = await response.json();
-    return data;
+    const data = await response.json()
+    return data
   } catch (error) {
-    console.error('Error fetching incident analytics:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to fetch incident analytics',
-      variant: 'destructive',
-    });
-    throw error;
+    console.error('Error fetching incident analytics:', error)
+    throw error
   }
 }
 
 export async function updateIncidentStatus(incidentId: string, status: string) {
   try {
-    const response = await fetch(`/api/incidents/analytics/${incidentId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${incidentId}/status`, {
       method: 'PATCH',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status }),
-    });
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update incident status');
+      throw new Error(`Failed to update incident status: ${response.statusText}`)
     }
 
-    const data = await response.json();
-    toast({
-      title: 'Success',
-      description: 'Incident status updated successfully',
-    });
-    return data;
+    const data = await response.json()
+    return data
   } catch (error) {
-    console.error('Error updating incident status:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to update incident status',
-      variant: 'destructive',
-    });
-    throw error;
+    console.error('Error updating incident status:', error)
+    throw error
   }
 }
 
-export async function createIncidentUpdate(incidentId: string, message: string, type: 'comment' | 'incident_report') {
+export async function createIncidentUpdate(incidentId: string, message: string, type: string) {
   try {
-    const response = await fetch(`/api/incidents/analytics/${incidentId}/updates`, {
+    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`, {
       method: 'POST',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ message, type }),
-    });
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create incident update');
+      throw new Error(`Failed to create incident update: ${response.statusText}`)
     }
 
-    const data = await response.json();
-    toast({
-      title: 'Success',
-      description: 'Update posted successfully',
-    });
-    return data;
+    const data = await response.json()
+    return { success: true, data }
   } catch (error) {
-    console.error('Error creating incident update:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to post update',
-      variant: 'destructive',
-    });
-    throw error;
+    console.error('Error creating incident update:', error)
+    return { success: false, error }
   }
 }
 
 export async function getIncidentUpdates(incidentId: string) {
   try {
-    const response = await fetch(`/api/incidents/analytics/${incidentId}/updates`, {
+    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`, {
       method: 'GET',
-      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-    });
+    })
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch incident updates');
+      throw new Error(`Failed to fetch incident updates: ${response.statusText}`)
     }
 
-    const data = await response.json();
-    return data.data || [];
+    const data = await response.json()
+    return data
   } catch (error) {
-    console.error('Error fetching incident updates:', error);
-    toast({
-      title: 'Error',
-      description: 'Failed to fetch incident updates',
-      variant: 'destructive',
-    });
-    throw error;
+    console.error('Error fetching incident updates:', error)
+    return []
+  }
+}
+
+export async function getIncidents(organizationId: string) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/incidents?organizationId=${organizationId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch incidents: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error fetching incidents:', error)
+    return []
+  }
+}
+
+export async function getIncidentStats(organizationId: string) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/incidents/stats?organizationId=${organizationId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch incident stats: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Error fetching incident stats:', error)
+    return {
+      total: 0,
+      open: 0,
+      acknowledged: 0,
+      investigating: 0,
+      resolved: 0,
+      closed: 0,
+      avgResolutionTime: 0,
+      criticalIncidents: 0
+    }
   }
 }

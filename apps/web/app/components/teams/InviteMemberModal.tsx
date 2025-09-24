@@ -106,7 +106,7 @@ export default function InviteMemberModal({
         name: formData.name.trim(),
         email: formData.email.trim(),
         roleId: formData.roleId,
-        teamId: formData.addToTeam ? teamId : undefined
+        teamIds: formData.addToTeam && teamId ? [teamId] : undefined
       });
 
       if (result.success) {

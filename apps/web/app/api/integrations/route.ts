@@ -300,10 +300,11 @@ async function testIntegrationConnection(integrationId: string, config: Integrat
           // Don't fail on 4xx/5xx as some webhooks expect specific payloads
           return { success: true, warning: `Webhook returned ${customResponse.status} but connection is working` }
         } catch (error) {
-          if (error.name === 'AbortError') {
+          const err = error as Error
+          if (err.name === 'AbortError') {
             return { success: false, error: 'Webhook test timed out - check URL accessibility' }
           }
-          return { success: false, error: `Webhook test failed: ${error.message}` }
+          return { success: false, error: `Webhook test failed: ${err.message}` }
         }
 
       case 'email':
@@ -365,8 +366,9 @@ async function testIntegrationConnection(integrationId: string, config: Integrat
 
     return { success: true }
   } catch (error) {
+    const err = error as Error
     console.error(`Integration test error for ${integrationId}:`, error)
-    return { success: false, error: error.message || 'Connection test failed' }
+    return { success: false, error: err.message || 'Connection test failed' }
   }
 }
 
@@ -461,22 +463,5 @@ function parseHeaderString(headerString: string): Record<string, string> {
   }
   
   return headers
-}Connected: false,
-    //     status: 'inactive',
-    //     config: null,
-    //     disconnectedAt: new Date().toISOString()
-    //   }
-    // })
-
-    return NextResponse.json({
-      success: true,
-      message: 'Integration disconnected successfully'
-    })
-  } catch (error) {
-    console.error('Error disconnecting integration:', error)
-    return NextResponse.json(
-      { success: false, message: 'Failed to disconnect integration' },
-      { status: 500 }
-    )
-  }
 }
+

@@ -16,16 +16,10 @@ interface SignUpFormData {
   agreeToTerms: boolean;
 }
 
-interface SignUpProps {
-  onSubmit?: (data: Omit<SignUpFormData, 'confirmPassword'>) => Promise<void> | void;
-  onSignInClick?: () => void;
-  isLoading?: boolean;
-  error?: string;
-}
 
 type SignUpErrors = Partial<Record<keyof SignUpFormData, string>>;
 
-const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = false, error }) => {
+const SignUp: React.FC = () => {
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: '',
     lastName: '',
@@ -96,7 +90,6 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
         organizationName: formData.organizationName,
         invitationEmails: formData.invitationEmails,
       });
-      if (onSubmit) await onSubmit({ ...formData });
       router.push('/signin');
     } catch (e: any) {
       setApiError(e?.message || 'Sign up failed. Try a different email.');
@@ -154,10 +147,10 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Global Error */}
-            {(error || apiError) && (
+            {apiError && (
               <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
                 <AlertCircle size={20} />
-                <span className="text-sm">{apiError || error}</span>
+                <span className="text-sm">{apiError}</span>
               </div>
             )}
 
@@ -169,7 +162,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-slate-400" />
                   </div>
-                  <input id="firstName" type="text" value={formData.firstName} onChange={handleChange('firstName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.firstName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="John" disabled={isLoading || submitting} />
+                  <input id="firstName" type="text" value={formData.firstName} onChange={handleChange('firstName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.firstName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="John" disabled={submitting} />
                 </div>
                 {validationErrors.firstName && (<p className="text-sm text-red-600">{validationErrors.firstName}</p>)}
               </div>
@@ -179,7 +172,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-slate-400" />
                   </div>
-                  <input id="lastName" type="text" value={formData.lastName} onChange={handleChange('lastName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.lastName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Doe" disabled={isLoading || submitting} />
+                  <input id="lastName" type="text" value={formData.lastName} onChange={handleChange('lastName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.lastName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Doe" disabled={submitting} />
                 </div>
                 {validationErrors.lastName && (<p className="text-sm text-red-600">{validationErrors.lastName}</p>)}
               </div>
@@ -192,7 +185,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="h-5 w-5 text-slate-400">🏢</span>
                 </div>
-                <input id="organizationName" type="text" value={formData.organizationName} onChange={handleChange('organizationName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.organizationName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Acme Corp" disabled={isLoading || submitting} />
+                <input id="organizationName" type="text" value={formData.organizationName} onChange={handleChange('organizationName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.organizationName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Acme Corp" disabled={submitting} />
               </div>
               {validationErrors.organizationName && (<p className="text-sm text-red-600">{validationErrors.organizationName}</p>)}
             </div>
@@ -204,7 +197,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
                 </div>
-                <input id="email" type="email" value={formData.email} onChange={handleChange('email')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.email ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="john.doe@example.com" disabled={isLoading || submitting} />
+                <input id="email" type="email" value={formData.email} onChange={handleChange('email')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.email ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="john.doe@example.com" disabled={submitting} />
               </div>
               {validationErrors.email && (<p className="text-sm text-red-600">{validationErrors.email}</p>)}
             </div>
@@ -216,8 +209,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
                 </div>
-                <input id="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={handleChange('password')} className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.password ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Create a strong password" disabled={isLoading || submitting} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={isLoading || submitting}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                <input id="password" type={showPassword ? 'text' : 'password'} value={formData.password} onChange={handleChange('password')} className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.password ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Create a strong password" disabled={submitting} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={submitting}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
               </div>
               {validationErrors.password && (<p className="text-sm text-red-600">{validationErrors.password}</p>)}
             </div>
@@ -229,8 +222,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
                 </div>
-                <input id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={handleChange('confirmPassword')} className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Confirm your password" disabled={isLoading || submitting} />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={isLoading || submitting}>{showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                <input id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} value={formData.confirmPassword} onChange={handleChange('confirmPassword')} className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Confirm your password" disabled={submitting} />
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={submitting}>{showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
               </div>
               {validationErrors.confirmPassword && (<p className="text-sm text-red-600">{validationErrors.confirmPassword}</p>)}
             </div>
@@ -246,7 +239,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
                   placeholder="Enter email and press Enter or Tab"
                   onKeyDown={handleInvitationEmailKeyDown}
                   onBlur={handleInvitationEmailBlur}
-                  disabled={isLoading || submitting}
+                  disabled={submitting}
                 />
               </div>
               {formData.invitationEmails.length > 0 && (
@@ -266,7 +259,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
             {/* Terms and Conditions */}
             <div className="space-y-2">
               <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={formData.agreeToTerms} onChange={handleChange('agreeToTerms')} className="mt-0.5 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" disabled={isLoading || submitting} />
+                <input type="checkbox" checked={formData.agreeToTerms} onChange={handleChange('agreeToTerms')} className="mt-0.5 h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500" disabled={submitting} />
                 <span className="text-sm text-slate-600">
                   I agree to the <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">Terms of Service</a> and <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">Privacy Policy</a>
                 </span>
@@ -275,7 +268,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
             </div>
 
             {/* Submit Button */}
-            <button type="submit" disabled={isLoading || submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            <button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {submitting ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Creating account...</>) : 'Create account'}
             </button>
           </form>
@@ -291,7 +284,7 @@ const SignUp: React.FC<SignUpProps> = ({ onSubmit, onSignInClick, isLoading = fa
           <div className="mt-6 text-center">
             <p className="text-slate-600">
               Already have an account?{' '}
-              <button type="button" onClick={() => router.push('/signin')} className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200" disabled={isLoading || submitting}>
+              <button type="button" onClick={() => router.push('/signin')} className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200" disabled={submitting}>
                 Sign in
               </button>
             </p>
