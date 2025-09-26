@@ -81,7 +81,7 @@ jobs:
         cp -r packages/redisstream/dist/* deployment/packages/redisstream/
         
         # Copy only essential deployment files
-        cp scripts/deployment/ecosystem.config.js deployment/
+        cp scripts/deployment/ecosystem.config.cjs deployment/
         cp scripts/deployment/health-check.js deployment/
         cp packages/store/prisma/schema.prisma deployment/schema.prisma
         
@@ -92,7 +92,7 @@ jobs:
           "version": "1.0.0",
           "type": "module",
           "scripts": {
-            "start": "pm2 start ecosystem.config.js",
+            "start": "pm2 start ecosystem.config.cjs",
             "stop": "pm2 stop all",
             "restart": "pm2 restart all",
             "health": "node health-check.js"
@@ -185,5 +185,5 @@ jobs:
           npx prisma db push --schema=schema.prisma
           
           # Start services with PM2
-          pm2 start ecosystem.config.js
+          pm2 start ecosystem.config.cjs
           pm2 save
