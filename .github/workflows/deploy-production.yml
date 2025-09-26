@@ -1,0 +1,183 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ production ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.0.0
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Build packages
+      run: |
+        # Build store package first (dependency for others)
+        cd packages/store
+        pnpm run build
+        cd ../..
+        
+        # Build redisstream package
+        cd packages/redisstream
+        pnpm run build
+        cd ../..
+        
+        # Build API
+        cd apps/api
+        pnpm run build
+        cd ../..
+        
+        # Build Pusher
+        cd apps/pusher
+        pnpm run build
+        cd ../..
+        
+        # Build Worker
+        cd apps/worker
+        pnpm run build
+        cd ../..
+
+    - name: Create minimal deployment package
+      run: |
+        mkdir -p deployment
+        
+        # Copy only built JavaScript files (no source code)
+        mkdir -p deployment/api
+        cp -r apps/api/dist/* deployment/api/
+        
+        mkdir -p deployment/pusher  
+        cp -r apps/pusher/dist/* deployment/pusher/
+        
+        mkdir -p deployment/worker
+        cp -r apps/worker/dist/* deployment/worker/
+        
+        # Copy only built packages (no source)
+        mkdir -p deployment/packages/store
+        cp -r packages/store/dist/* deployment/packages/store/
+        mkdir -p deployment/packages/redisstream  
+        cp -r packages/redisstream/dist/* deployment/packages/redisstream/
+        
+        # Copy only essential deployment files
+        cp scripts/deployment/ecosystem.config.js deployment/
+        cp scripts/deployment/health-check.js deployment/
+        cp packages/store/prisma/schema.prisma deployment/schema.prisma
+        
+        # Create minimal production package.json
+        cat > deployment/package.json << EOF
+        {
+          "name": "uptimematrix-production",
+          "version": "1.0.0",
+          "type": "module",
+          "scripts": {
+            "start": "pm2 start ecosystem.config.js",
+            "stop": "pm2 stop all",
+            "restart": "pm2 restart all",
+            "health": "node health-check.js"
+          },
+          "dependencies": {
+            "@prisma/client": "6.15.0",
+            "axios": "^1.12.2",
+            "cors": "^2.8.5",
+            "dotenv": "^17.2.1",
+            "express": "^5.1.0",
+            "jsonwebtoken": "^9.0.2",
+            "nodemailer": "^6.9.14",
+            "zod": "^4.0.10",
+            "redis": "^5.6.1",
+            "pm2": "^5.3.0",
+            "handlebars": "^4.7.8",
+            "prisma": "^6.15.0"
+          }
+        }
+        EOF
+
+    - name: Create deployment archive
+      run: |
+        cd deployment
+        tar -czf ../deployment.tar.gz .
+        cd ..
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        script: |
+          # Stop existing services
+          pm2 stop all || true
+          
+          # Backup current deployment
+          sudo rm -rf /opt/uptimematrix/backup || true
+          sudo mv /opt/uptimematrix/current /opt/uptimematrix/backup || true
+          
+          # Create directories
+          sudo mkdir -p /opt/uptimematrix/current
+          sudo chown $USER:$USER /opt/uptimematrix/current
+
+    - name: Copy deployment files
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        source: "deployment.tar.gz"
+        target: "/opt/uptimematrix/"
+
+    - name: Extract and setup on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        script: |
+          cd /opt/uptimematrix
+          tar -xzf deployment.tar.gz -C current/
+          rm deployment.tar.gz
+          
+          cd current
+          
+          # Install only production dependencies
+          pnpm install --production --no-dev
+          
+          # Setup environment
+          cat > .env << EOF
+          NODE_ENV=production
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          REDIS_URL=redis://localhost:6379
+          API_PORT=3001
+          PUSHER_PORT=3002
+          EMAIL_HOST=${{ secrets.EMAIL_HOST }}
+          EMAIL_PORT=${{ secrets.EMAinstaIL_PORT }}
+          EMAIL_USER=${{ secrets.EMAIL_USER }}
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          EOF
+          
+          # Generate Prisma client and run migrations
+          npx prisma generate --schema=schema.prisma
+          npx prisma db push --schema=schema.prisma
+          
+          # Start services with PM2
+          pm2 start ecosystem.config.js
+          pm2 save

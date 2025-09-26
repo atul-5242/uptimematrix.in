@@ -1,0 +1,22 @@
+{
+  "name": "uptimematrix-deployment",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "health": "node health-check.js",
+    "monitor": "./monitor.sh",
+    "deploy": "./deploy.sh"
+  },
+  "dependencies": {
+    "@prisma/client": "6.15.0",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.14",
+    "zod": "^4.0.10",
+    "redis": "^5.6.1",
+    "pm2": "^5.3.0"
+  }
+}
