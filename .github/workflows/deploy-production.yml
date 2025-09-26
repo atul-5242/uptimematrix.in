@@ -27,6 +27,12 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
+    - name: Generate Prisma client
+      run: |
+        cd packages/store
+        npx prisma generate
+        cd ../..
+
     - name: Build packages
       run: |
         # Build store package first (dependency for others)
