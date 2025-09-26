@@ -84,9 +84,11 @@ jobs:
         
         # Copy only built packages (no source)
         mkdir -p deployment/packages/store
-        cp -r packages/store/dist/* deployment/packages/store/
+        cp -r packages/store/dist deployment/packages/store/
+        cp packages/store/package.json deployment/packages/store/
         mkdir -p deployment/packages/redisstream  
-        cp -r packages/redisstream/dist/* deployment/packages/redisstream/
+        cp -r packages/redisstream/dist deployment/packages/redisstream/
+        cp packages/redisstream/package.json deployment/packages/redisstream/
         
         # Copy only essential deployment files
         cp scripts/deployment/ecosystem.config.cjs deployment/
@@ -174,6 +176,11 @@ jobs:
           
           # Install only production dependencies
           pnpm install --production --no-dev
+          
+          # Create node_modules symlinks for local packages
+          mkdir -p node_modules/@uptimematrix
+          ln -sf ../../packages/store node_modules/@uptimematrix/store
+          ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
           
           # Setup environment
           cat > .env << EOF
