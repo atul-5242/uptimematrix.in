@@ -54,6 +54,24 @@ module.exports = {
       max_restarts: 10,
       min_uptime: '10s',
       max_memory_restart: '400M'
+    },
+    {
+      name: 'uptimematrix-cron',
+      script: './cron/index.js',
+      cwd: '/opt/uptimematrix/current',
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        NODE_ENV: 'production'
+      },
+      error_file: '/var/log/uptimematrix/cron-error.log',
+      out_file: '/var/log/uptimematrix/cron-out.log',
+      log_file: '/var/log/uptimematrix/cron.log',
+      time: true,
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: '10s',
+      max_memory_restart: '200M'
     }
   ]
 };

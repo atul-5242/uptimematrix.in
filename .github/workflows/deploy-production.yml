@@ -59,6 +59,11 @@ jobs:
         cd apps/worker
         pnpm run build
         cd ../..
+        
+        # Build Cron service
+        cd apps/cron
+        pnpm run build
+        cd ../..
 
     - name: Create minimal deployment package
       run: |
@@ -73,6 +78,9 @@ jobs:
         
         mkdir -p deployment/worker
         cp -r apps/worker/dist/* deployment/worker/
+        
+        mkdir -p deployment/cron
+        cp -r apps/cron/dist/* deployment/cron/
         
         # Copy only built packages (no source)
         mkdir -p deployment/packages/store
@@ -109,7 +117,8 @@ jobs:
             "redis": "^5.6.1",
             "pm2": "^5.3.0",
             "handlebars": "^4.7.8",
-            "prisma": "^6.15.0"
+            "prisma": "^6.15.0",
+            "node-cron": "^3.0.3"
           }
         }
         EOF
