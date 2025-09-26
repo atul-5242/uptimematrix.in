@@ -182,6 +182,12 @@ jobs:
           ln -sf ../../packages/store node_modules/@uptimematrix/store
           ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
           
+          # Verify symlinks were created
+          echo "Verifying symlinks:"
+          ls -la node_modules/@uptimematrix/
+          echo "Checking packages directory:"
+          ls -la packages/
+          
           # Setup environment
           cat > .env << EOF
           NODE_ENV=production
