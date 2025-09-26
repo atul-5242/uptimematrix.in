@@ -48,7 +48,7 @@ sudo apt install -y nginx
 sudo tee /etc/nginx/sites-available/uptimematrix << 'EOF'
 server {
     listen 80;
-    api.uptimematrix.atulmaurya.in;  # Replace with your domain
+    server_name api.uptimematrix.atulmaurya.in;
 
     # API routes
     location /api/ {
