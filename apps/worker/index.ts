@@ -1,4 +1,4 @@
-import axios from "axios";
+// Removed axios import to reduce memory usage
 import { xReadBulk, xAckBulk, xAdd, WebsiteEvent } from "@uptimematrix/redisstream";
 import { prismaClient, WebsiteStatus, IncidentStatus, Website, Incident, EscalationPolicy, EscalationStep } from "@uptimematrix/store";
 import { handleEscalation, getRecipientsEmails } from "./escalation/handleEscalation.js";
@@ -66,14 +66,21 @@ async function processWebsite(site: WebsiteEvent) {
 
     try {
         const method = site.method ? site.method.toLowerCase() as "get" | "post" | "put" | "delete" | "head" : "get";
-        const dataOfWebsite = await axios({ 
-            url: site.url, 
-            method, 
-            timeout: 10000,
-            validateStatus: (status) => status < 500 // Only treat 5xx as errors
+        
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(site.url, {
+            method: method.toUpperCase(),
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'UptimeMatrix-Monitor/1.0'
+            }
         });
         
-        statusCode = dataOfWebsite.status;
+        clearTimeout(timeoutId);
+        statusCode = response.status;
         isOnline = (statusCode >= 200 && statusCode < 400);
         const responseTime = Date.now() - startTime;
 
