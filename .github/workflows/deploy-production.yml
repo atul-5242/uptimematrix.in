@@ -171,14 +171,17 @@ jobs:
           NODE_ENV=production
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
-          REDIS_URL=redis://localhost:6379
+          REDIS_URL=${{ secrets.REDIS_URL }}
           API_PORT=3001
           PUSHER_PORT=3002
           CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
           EMAIL_HOST=${{ secrets.EMAIL_HOST }}
-          EMAIL_PORT=${{ secrets.EMAinstaIL_PORT }}
+          EMAIL_PORT=${{ secrets.EMAIL_PORT }}
           EMAIL_USER=${{ secrets.EMAIL_USER }}
           EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          GROUP_NAME=${{ secrets.GROUP_NAME }}
+          CONSUMER_NAME=${{ secrets.CONSUMER_NAME }}
           EOF
           
           # Generate Prisma client and run migrations
