@@ -6,13 +6,15 @@ import { sendEmail } from "./notifications/email.js";
 
 const GROUP_NAME = process.env.GROUP_NAME!;
 const CONSUMER_NAME = process.env.CONSUMER_NAME!;
+const REGION = process.env.REGION!;
 if (!GROUP_NAME || !CONSUMER_NAME) throw new Error("GROUP_NAME and CONSUMER_NAME required");
+if (!REGION) throw new Error("REGION is required");
 
 // Add a processing lock to prevent duplicate processing
 const processingIncidents = new Set<string>();
 
 async function workerLoop() {
-    console.log("Worker started");
+    console.log(`Worker started for region: ${REGION}`);
 
     while (true) {
         try {
@@ -85,11 +87,11 @@ async function processWebsite(site: WebsiteEvent) {
         const responseTime = Date.now() - startTime;
 
         const region = await prismaClient.region.findUnique({
-            where: { name: site.region || "India" },
+            where: { name: REGION },
         });
 
         if (!region) {
-            console.error(`Region ${site.region || "India"} not found. Please ensure it is seeded.`);
+            console.error(`Region ${REGION} not found. Please ensure it is seeded.`);
             return;
         }
 
@@ -146,11 +148,11 @@ async function processWebsite(site: WebsiteEvent) {
         
         try {
             const region = await prismaClient.region.findUnique({
-                where: { name: site.region || "India" },
+                where: { name: REGION },
             });
 
             if (!region) {
-                console.error(`Region ${site.region || "India"} not found.`);
+                console.error(`Region ${REGION} not found.`);
                 return;
             }
 

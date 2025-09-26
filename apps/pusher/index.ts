@@ -3,7 +3,9 @@ import { Website, MonitorType, Method } from "@uptimematrix/store";
 import { xAddBulk, xGroupCreate, STREAM_NAME } from "@uptimematrix/redisstream/client";
 
 const GROUP_NAME = process.env.GROUP_NAME!;
+const REGION = process.env.REGION!;
 if (!GROUP_NAME) throw new Error("GROUP_NAME is required");
+if (!REGION) throw new Error("REGION is required");
 
 async function pushWebsites() {
     console.log("Pusher started");
@@ -13,13 +15,22 @@ async function pushWebsites() {
     while (true) {
         try {
             const now = new Date();
-            console.log(`\n🕐 Pusher check at: ${now.toISOString()}`);
+            console.log(`🕐 Pusher check at: ${now.toISOString()} for region: ${REGION}`);
             
             const websites = await prismaClient.website.findMany({
                 where: {
-                    OR: [
-                        { nextCheckTime: { lte: now } },
-                        { nextCheckTime: null }
+                    AND: [
+                        {
+                            OR: [
+                                { nextCheckTime: { lte: now } },
+                                { nextCheckTime: null }
+                            ]
+                        },
+                        {
+                            regions: {
+                                has: REGION
+                            }
+                        }
                     ]
                 },
                 select: {
@@ -47,10 +58,10 @@ async function pushWebsites() {
 
                 const messages: any[] = [];
                 websites.forEach((site: WebsiteWithCreatedById) => {
-                    // Send one message per website, not per region - worker will handle all regions
+                    // Only send websites that have the current region
                     const message = {
                         ...site,
-                        region: site.regions?.[0] || "India"
+                        region: REGION
                     };
                     messages.push(message);
                 });

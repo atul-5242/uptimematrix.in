@@ -182,11 +182,11 @@ jobs:
           EMAIL_FROM=${{ secrets.EMAIL_FROM }}
           GROUP_NAME=${{ secrets.GROUP_NAME }}
           CONSUMER_NAME=${{ secrets.CONSUMER_NAME }}
+          REGION=${{ secrets.REGION }}
           EOF
           
-          # Generate Prisma client and run migrations
+          # Generate Prisma client only (migrations done manually)
           npx prisma generate --schema=schema.prisma
-          npx prisma db push --schema=schema.prisma
           
           # Start services with PM2
           pm2 start ecosystem.config.cjs
