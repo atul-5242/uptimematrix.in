@@ -1,6 +1,7 @@
 {
   "name": "webapp-on",
   "private": true,
+  "type": "module",
   "scripts": {
     "db:dev": "docker-compose up -d",
     "db:prod": "docker-compose up -d",
