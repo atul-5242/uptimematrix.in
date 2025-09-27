@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
     }
 
     const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    console.log("baseURL>>>>>>>>>>>>>>>>>>>>>>>>>>--------------from signup action next server page route.ts page.", process.env.NEXT_PUBLIC_API_URL);
     const response = await fetch(`${baseURL}/auth/user/signup`, {
       method: "POST",
       headers: {
