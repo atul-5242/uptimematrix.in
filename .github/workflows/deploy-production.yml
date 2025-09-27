@@ -273,6 +273,17 @@ jobs:
           GROUP_NAME=${{ secrets.GROUP_NAME }}
           CONSUMER_NAME=${{ secrets.CONSUMER_NAME }}
           REGION=${{ secrets.REGION }}
+          PORT=${{ secrets.PORT }}
+          JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          INVITATION_SECRET=${{ secrets.INVITATION_SECRET }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          SMTP_SECURE=${{ secrets.SMTP_SECURE }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASS=${{ secrets.SMTP_PASS }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          BACKEND_URL=${{ secrets.BACKEND_URL }}
           EOF
           
           # Generate Prisma client only (migrations done manually)
