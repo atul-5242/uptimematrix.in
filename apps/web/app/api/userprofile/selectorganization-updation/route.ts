@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backendUrl = process.env.BACKEND_URL;
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!backendUrl) {
-      console.error('[Frontend API] NEXT_PUBLIC_BACKEND_URL is not defined.');
+      console.error('[Frontend API] NEXT_PUBLIC_NEXT_PUBLIC_API_URL is not defined.');
       return NextResponse.json(
         { message: 'Backend URL is not configured.' },
         { status: 500 }

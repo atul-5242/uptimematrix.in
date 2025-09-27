@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     const { invitationLink,name } = await req.json();
 
-    const backendResponse = await fetch(`${process.env.BACKEND_URL}/organization/invitations/accept`, {
+    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/invitations/accept`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

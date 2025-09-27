@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Forward the request to the backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const response = await fetch(`${backendUrl}/userprofile/me`, {
       method: 'GET',
       headers: {

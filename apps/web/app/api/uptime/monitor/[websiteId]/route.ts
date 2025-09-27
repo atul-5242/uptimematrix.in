@@ -16,7 +16,7 @@ export async function GET(
     }
 
     // Call your Express backend to get website status
-    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
     const authHeader =  req.headers.get("authorization") ||
     `Bearer ${req.cookies.get("auth_token")?.value || ""}`;
@@ -27,7 +27,7 @@ export async function GET(
     }
 
     const backendRes = await fetch(
-      `${BACKEND_URL}/website/status/${websiteId}`,{ 
+      `${NEXT_PUBLIC_API_URL}/website/status/${websiteId}`,{ 
         method: "GET" ,
         headers: {
           "Content-Type": "application/json",
