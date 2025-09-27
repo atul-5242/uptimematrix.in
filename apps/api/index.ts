@@ -23,6 +23,15 @@ app.use(cors({
 
 app.use(express.json());
 
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.json({ status: "OK", message: "UptimeMatrix API is running" });
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+});
+
 // Routes
 app.use("/auth", authRouter);
 app.use("/website", websiteRouter);
