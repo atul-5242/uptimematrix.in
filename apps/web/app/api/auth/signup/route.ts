@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
+  // Use a consistent baseURL for both try and catch
+  const baseURL = process.env.NEXT_PUBLIC_API_URL || "https://api.uptimematrix.atulmaurya.in";
+
   try {
     const body = await request.json();
     const { email, password, fullName, organizationName, invitationEmails } = body || {};
 
     if (!email || !password || !fullName || !organizationName) {
       return NextResponse.json(
-        { message: "Email, password, fullName, and organizationName are required" },
+        {
+          success: false,
+          message: "Email, password, fullName, and organizationName are required",
+          baseURLUsed: baseURL,
+        },
         { status: 400 }
       );
     }
 
-   
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || "https://api.uptimematrix.atulmaurya.in/";
-
-    console.log(
-      "baseURL from env >>>",
-      process.env.NEXT_PUBLIC_API_URL
-    );
+    console.log("baseURL being used >>>", baseURL);
 
     const response = await fetch(`${baseURL}/auth/user/signup`, {
       method: "POST",
@@ -27,17 +28,17 @@ export async function POST(request: NextRequest) {
     });
 
     const data = await response.json();
-
     console.log("signup response data >>>", data);
 
     return NextResponse.json(
       {
-        success: true,
+        success: response.ok,
         data,
-        baseURLUsed: baseURL, 
+        baseURLUsed: baseURL, // Always included
       },
       { status: response.status }
     );
+
   } catch (error: any) {
     console.error("Sign up error:", error);
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: "Failed to sign up",
-        baseURLUsed: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001", 
+        baseURLUsed: baseURL, // Use same baseURL as above
         error: error?.message || "Unknown error",
       },
       { status: 500 }
