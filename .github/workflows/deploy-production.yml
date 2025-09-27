@@ -96,10 +96,12 @@ jobs:
           "exports": {
             ".": {
               "import": "./dist/index.js",
+              "require": "./dist/index.js",
               "types": "./dist/index.d.ts"
             },
             "./client": {
               "import": "./dist/index.js",
+              "require": "./dist/index.js",
               "types": "./dist/index.d.ts"
             }
           }
@@ -118,10 +120,12 @@ jobs:
           "main": "dist/index.js",
           "exports": {
             ".": {
-              "import": "./dist/index.js"
+              "import": "./dist/index.js",
+              "require": "./dist/index.js"
             },
             "./client": {
-              "import": "./dist/index.js"
+              "import": "./dist/index.js",
+              "require": "./dist/index.js"
             }
           }
         }
@@ -210,6 +214,11 @@ jobs:
           rm deployment.tar.gz
           
           cd current
+          
+          # Install pnpm if not available
+          if ! command -v pnpm &> /dev/null; then
+            npm install -g pnpm
+          fi
           
           # Install only production dependencies
           pnpm install --production --no-dev
