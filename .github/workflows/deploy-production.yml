@@ -85,12 +85,47 @@ jobs:
         # Copy only built packages (no source) with complete package.json files
         mkdir -p deployment/packages/store
         cp -r packages/store/dist deployment/packages/store/
-        # Ensure complete package.json with exports field is copied
-        cp packages/store/package.json deployment/packages/store/package.json
+        # Create complete package.json with exports field for store
+        cat > deployment/packages/store/package.json << 'STORE_EOF'
+        {
+          "name": "@uptimematrix/store",
+          "version": "1.0.0",
+          "type": "module",
+          "main": "dist/index.js",
+          "types": "dist/index.d.ts",
+          "exports": {
+            ".": {
+              "import": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            },
+            "./client": {
+              "import": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            }
+          }
+        }
+        STORE_EOF
+        
         mkdir -p deployment/packages/redisstream  
         cp -r packages/redisstream/dist deployment/packages/redisstream/
-        # Ensure complete package.json with exports field is copied
-        cp packages/redisstream/package.json deployment/packages/redisstream/package.json
+        # Create complete package.json with exports field for redisstream
+        cat > deployment/packages/redisstream/package.json << 'REDIS_EOF'
+        {
+          "name": "@uptimematrix/redisstream",
+          "version": "0.0.1",
+          "type": "module",
+          "private": true,
+          "main": "dist/index.js",
+          "exports": {
+            ".": {
+              "import": "./dist/index.js"
+            },
+            "./client": {
+              "import": "./dist/index.js"
+            }
+          }
+        }
+        REDIS_EOF
         
         # Copy only essential deployment files
         cp scripts/deployment/ecosystem.config.cjs deployment/
