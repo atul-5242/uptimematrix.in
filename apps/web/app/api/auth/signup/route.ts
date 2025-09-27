@@ -22,6 +22,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data, { status: response.status });
     }catch (error) {
       console.error("Sign up error:", error);
-      return NextResponse.json({ message: "Failed to sign up" }, { status: 500 });  
+      return NextResponse.json({ message: "Failed to sign up",baseurlCheck: process.env.NEXT_PUBLIC_API_URL }, { status: 500 });  
     }
 }
