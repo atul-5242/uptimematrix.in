@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
    
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || "https://api.uptimematrix.atulmaurya.in/";
 
     console.log(
       "baseURL from env >>>",
