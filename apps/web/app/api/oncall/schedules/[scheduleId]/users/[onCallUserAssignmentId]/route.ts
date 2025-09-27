@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
 
 export async function DELETE(req: NextRequest, { params }: { params: { scheduleId: string, onCallUserAssignmentId: string } }) {
   const { scheduleId, onCallUserAssignmentId } = params;
