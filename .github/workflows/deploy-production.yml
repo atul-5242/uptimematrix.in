@@ -177,7 +177,7 @@ jobs:
           # Install only production dependencies
           pnpm install --production --no-dev
           
-          # Create node_modules symlinks for local packages
+          # Create node_modules symlinks for local packages (after pnpm install)
           mkdir -p node_modules/@uptimematrix
           ln -sf ../../packages/store node_modules/@uptimematrix/store
           ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
@@ -187,6 +187,17 @@ jobs:
           ls -la node_modules/@uptimematrix/
           echo "Checking packages directory:"
           ls -la packages/
+          
+          # Ensure symlinks persist after PM2 operations
+          echo "Creating symlink backup script..."
+          cat > restore-symlinks.sh << 'SCRIPT_EOF'
+          #!/bin/bash
+          mkdir -p node_modules/@uptimematrix
+          ln -sf ../../packages/store node_modules/@uptimematrix/store
+          ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
+          echo "Symlinks restored"
+          SCRIPT_EOF
+          chmod +x restore-symlinks.sh
           
           # Setup environment
           cat > .env << EOF
