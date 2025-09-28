@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { incidentId: string } }

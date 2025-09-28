@@ -22,18 +22,25 @@ const app = express();
 // Allowed origins
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
-  : ["https://uptimematrix.atulmaurya.in"];
+  : ["https://uptimematrix.atulmaurya.in", "http://localhost:3000"];
+
+console.log('CORS Configuration:');
+console.log('CORS_ORIGIN env var:', process.env.CORS_ORIGIN);
+console.log('Allowed origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function(origin: string | undefined, callback: any) {
     // Allow requests with no origin (like mobile apps, curl, etc)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    
+    const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+    console.log(`CORS Error: ${msg}`);
+    console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
+    return callback(new Error(msg), false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -46,15 +53,29 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle preflight OPTIONS requests
-app.options('*', cors(corsOptions));
+// app.options('*', cors(corsOptions));
 
 // Handle preflight for all routes
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    const origin = req.headers.origin;
+    
+    // Check if origin is allowed
+    if (origin && allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+      // Allow requests with no origin
+      res.header('Access-Control-Allow-Origin', '*');
+    } else {
+      // Origin not allowed
+      console.log(`Preflight request from disallowed origin: ${origin}`);
+      return res.status(403).json({ error: 'CORS policy violation' });
+    }
+    
     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept');
     res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400');
     return res.status(200).end();
   }
   next();
@@ -63,9 +84,24 @@ app.use((req, res, next) => {
 // Middleware
 app.use(express.json());
 
+// Add request logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - Origin: ${req.headers.origin || 'No origin'}`);
+  next();
+});
+
 // Health check endpoints
 app.get("/", (req, res) => res.json({ status: "OK", message: "UptimeMatrix API is running" }));
 app.get("/health", (req, res) => res.json({ status: "healthy", timestamp: new Date().toISOString() }));
+
+// CORS test endpoint
+app.get("/cors-test", (req, res) => {
+  res.json({ 
+    message: "CORS is working", 
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Routes
 app.use("/auth", authRouter);

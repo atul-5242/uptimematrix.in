@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 
 const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { incidentId: string } }

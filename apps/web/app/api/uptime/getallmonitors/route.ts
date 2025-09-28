@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
