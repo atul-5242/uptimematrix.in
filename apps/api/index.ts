@@ -39,8 +39,21 @@ const corsOptions = {
       return callback(null, true);
     }
     
+    // Check for exact match first
     if (allowedOrigins.indexOf(origin) !== -1) {
-      console.log(`[CORS] Origin ${origin} is allowed`);
+      console.log(`[CORS] Origin ${origin} is allowed (exact match)`);
+      return callback(null, true);
+    }
+    
+    // Check for match with/without trailing slash
+    const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
+      return normalizedOrigin === normalizedAllowed;
+    });
+    
+    if (isAllowed) {
+      console.log(`[CORS] Origin ${origin} is allowed (normalized match)`);
       return callback(null, true);
     }
     
@@ -63,9 +76,23 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   
   // Set CORS headers for all responses
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else if (!origin) {
+  if (origin) {
+    // Check for exact match first
+    if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      // Check for normalized match (with/without trailing slash)
+      const normalizedOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        const normalizedAllowed = allowedOrigin.endsWith('/') ? allowedOrigin.slice(0, -1) : allowedOrigin;
+        return normalizedOrigin === normalizedAllowed;
+      });
+      
+      if (isAllowed) {
+        res.header('Access-Control-Allow-Origin', origin);
+      }
+    }
+  } else {
     res.header('Access-Control-Allow-Origin', '*');
   }
   
