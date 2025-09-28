@@ -140,11 +140,13 @@ export default function MonitorsDashboard() {
 
   const handleToggleMonitor = async (monitorId: string, currentStatus: boolean): Promise<void> => {
     try {
+      const tokenResponse = await fetch('/api/auth/get-token');
+      const { token } = await tokenResponse.json();
       const response = await fetch(`/api/monitors/${monitorId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${token || ''}`,
         },
         body: JSON.stringify({ isActive: !currentStatus })
       })
@@ -174,11 +176,13 @@ export default function MonitorsDashboard() {
     }
   
     try {
+      const tokenResponse = await fetch('/api/auth/get-token');
+      const { token } = await tokenResponse.json();
       const response = await fetch(`/api/uptime/monitor`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          Authorization: `Bearer ${token || ''}`,
         },
         body: JSON.stringify({ id: monitorId }),
       });

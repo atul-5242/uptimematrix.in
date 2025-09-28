@@ -14,13 +14,15 @@ export interface MonitorFormData {
 }
 
 export async function getAllMonitorsAction() {
-  const nextAppBaseURL = process.env.NEXT_PUBLIC_VERCEL_URL || "http://localhost:3000";
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(`${nextAppBaseURL}/api/uptime/getallmonitors`, {
+  // Always fetch token through our API to avoid stale/localStorage inconsistencies
+  const tokenResponse = await fetch('/api/auth/get-token');
+  const { token } = await tokenResponse.json();
+
+  const res = await fetch(`/api/uptime/getallmonitors`, {
     method: "GET",
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${token || ''}`,
     },
   });
 
@@ -56,12 +58,13 @@ export async function getAllMonitorsAction() {
 
 export async function createMonitorAction(data: MonitorFormData) {
   try {
-    const token = localStorage.getItem("auth_token");
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
     const res = await fetch("/api/uptime/monitor", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${token || ''}`,
       },
       body: JSON.stringify(data),
     });
@@ -78,10 +81,9 @@ export async function createMonitorAction(data: MonitorFormData) {
 }
 
 export async function getWebsiteStatusAction(websiteId: string) {
-  const token = localStorage.getItem("auth_token");
-  if (!token) {
-    throw new Error("Authentication token not found");
-  }
+  const tokenResponse = await fetch('/api/auth/get-token');
+  const { token } = await tokenResponse.json();
+  if (!token) throw new Error("Authentication token not found");
 
   const res = await fetch(`/api/uptime/monitor/${websiteId}`, {
     method: "GET",
