@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   }
   console.log("Fetching pending invitations...>>>>>>>>>>>>>");
   try {
-    const backendResponse = await fetch(`${process.env.BACKEND_URL}/organization/invitations/pending`, {
+    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organization/invitations/pending`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     console.log('[Frontend API] Verifying invitation token with backend...');
 
     // Make API call to backend to verify invitation
-    const backendResponse = await fetch(`${process.env.BACKEND_URL}/auth/verify-invitation`, {
+    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-invitation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Select organization API called');
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
     console.log('Forwarding to backend:', { organizationId });
 
     // Forward the request to the backend API
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = "https://api.uptimematrix.atulmaurya.in/";
     const response = await fetch(`${backendUrl}/auth/select-organization`, {
       method: 'POST',
       headers: {

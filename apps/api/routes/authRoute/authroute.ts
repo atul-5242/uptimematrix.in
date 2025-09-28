@@ -6,6 +6,11 @@ import { authMiddleware } from "../../middlewares/middleware.js";
 
 const router = express.Router()
 
+// Add debugging middleware for auth routes
+router.use((req, res, next) => {
+  console.log(`[AUTH ROUTER] ${req.method} ${req.path} - Origin: ${req.headers.origin || 'No origin'}`);
+  next();
+});
 
 router.post("/user/signup", signUp);
 router.post("/user/signin",signIn);//It is a Login.

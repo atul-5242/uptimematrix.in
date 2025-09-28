@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Make API call to backend to accept invitation
-    const backendResponse = await fetch(`${process.env.BACKEND_URL}/auth/accept-invitation`, {
+    const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/accept-invitation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

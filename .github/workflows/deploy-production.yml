@@ -13,19 +13,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
         version: 9.0.0
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'pnpm'
+
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma client
+      run: |
+        cd packages/store
+        npx prisma generate
+        cd ../..
 
     - name: Build packages
       run: |
@@ -53,6 +59,11 @@ jobs:
         cd apps/worker
         pnpm run build
         cd ../..
+        
+        # Build Cron service
+        cd apps/cron
+        pnpm run build
+        cd ../..
 
     - name: Create minimal deployment package
       run: |
@@ -68,14 +79,60 @@ jobs:
         mkdir -p deployment/worker
         cp -r apps/worker/dist/* deployment/worker/
         
-        # Copy only built packages (no source)
+        mkdir -p deployment/cron
+        cp -r apps/cron/dist/* deployment/cron/
+        
+        # Copy only built packages (no source) with complete package.json files
         mkdir -p deployment/packages/store
-        cp -r packages/store/dist/* deployment/packages/store/
+        cp -r packages/store/dist deployment/packages/store/
+        # Create complete package.json with exports field for store
+        cat > deployment/packages/store/package.json << 'STORE_EOF'
+        {
+          "name": "@uptimematrix/store",
+          "version": "1.0.0",
+          "type": "module",
+          "main": "dist/index.js",
+          "types": "dist/index.d.ts",
+          "exports": {
+            ".": {
+              "import": "./dist/index.js",
+              "require": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            },
+            "./client": {
+              "import": "./dist/index.js",
+              "require": "./dist/index.js",
+              "types": "./dist/index.d.ts"
+            }
+          }
+        }
+        STORE_EOF
+        
         mkdir -p deployment/packages/redisstream  
-        cp -r packages/redisstream/dist/* deployment/packages/redisstream/
+        cp -r packages/redisstream/dist deployment/packages/redisstream/
+        # Create complete package.json with exports field for redisstream
+        cat > deployment/packages/redisstream/package.json << 'REDIS_EOF'
+        {
+          "name": "@uptimematrix/redisstream",
+          "version": "0.0.1",
+          "type": "module",
+          "private": true,
+          "main": "dist/index.js",
+          "exports": {
+            ".": {
+              "import": "./dist/index.js",
+              "require": "./dist/index.js"
+            },
+            "./client": {
+              "import": "./dist/index.js",
+              "require": "./dist/index.js"
+            }
+          }
+        }
+        REDIS_EOF
         
         # Copy only essential deployment files
-        cp scripts/deployment/ecosystem.config.js deployment/
+        cp scripts/deployment/ecosystem.config.cjs deployment/
         cp scripts/deployment/health-check.js deployment/
         cp packages/store/prisma/schema.prisma deployment/schema.prisma
         
@@ -86,7 +143,7 @@ jobs:
           "version": "1.0.0",
           "type": "module",
           "scripts": {
-            "start": "pm2 start ecosystem.config.js",
+            "start": "pm2 start ecosystem.config.cjs",
             "stop": "pm2 stop all",
             "restart": "pm2 restart all",
             "health": "node health-check.js"
@@ -103,7 +160,8 @@ jobs:
             "redis": "^5.6.1",
             "pm2": "^5.3.0",
             "handlebars": "^4.7.8",
-            "prisma": "^6.15.0"
+            "prisma": "^6.15.0",
+            "node-cron": "^3.0.3"
           }
         }
         EOF
@@ -157,27 +215,80 @@ jobs:
           
           cd current
           
+          # Install pnpm if not available
+          if ! command -v pnpm &> /dev/null; then
+            sudo npm install -g pnpm
+          fi
+          
           # Install only production dependencies
           pnpm install --production --no-dev
+          
+          # Create node_modules symlinks for local packages (after pnpm install)
+          mkdir -p node_modules/@uptimematrix
+          ln -sf ../../packages/store node_modules/@uptimematrix/store
+          ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
+          
+          # Verify symlinks were created
+          echo "Verifying symlinks:"
+          ls -la node_modules/@uptimematrix/
+          echo "Checking packages directory:"
+          ls -la packages/
+          
+          # Verify package.json files have exports field and all required export paths
+          echo "Verifying package.json exports fields:"
+          grep -A 10 '"exports"' packages/store/package.json || echo "ERROR: No exports field in store package.json"
+          grep -A 10 '"exports"' packages/redisstream/package.json || echo "ERROR: No exports field in redisstream package.json"
+          
+          # Test module resolution for all import patterns used in the codebase
+          echo "Testing module resolution for all import patterns:"
+          node -e "console.log('Testing @uptimematrix/store:', require.resolve('@uptimematrix/store'))" || echo "ERROR: Cannot resolve @uptimematrix/store"
+          node -e "console.log('Testing @uptimematrix/redisstream:', require.resolve('@uptimematrix/redisstream'))" || echo "ERROR: Cannot resolve @uptimematrix/redisstream" 
+          node -e "console.log('Testing @uptimematrix/redisstream/client:', require.resolve('@uptimematrix/redisstream/client'))" || echo "ERROR: Cannot resolve @uptimematrix/redisstream/client"
+          
+          # Ensure symlinks persist after PM2 operations
+          echo "Creating symlink backup script..."
+          cat > restore-symlinks.sh << 'SCRIPT_EOF'
+          #!/bin/bash
+          mkdir -p node_modules/@uptimematrix
+          ln -sf ../../packages/store node_modules/@uptimematrix/store
+          ln -sf ../../packages/redisstream node_modules/@uptimematrix/redisstream
+          echo "Symlinks restored"
+          SCRIPT_EOF
+          chmod +x restore-symlinks.sh
           
           # Setup environment
           cat > .env << EOF
           NODE_ENV=production
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
-          REDIS_URL=redis://localhost:6379
+          REDIS_URL=${{ secrets.REDIS_URL }}
           API_PORT=3001
           PUSHER_PORT=3002
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
           EMAIL_HOST=${{ secrets.EMAIL_HOST }}
-          EMAIL_PORT=${{ secrets.EMAinstaIL_PORT }}
+          EMAIL_PORT=${{ secrets.EMAIL_PORT }}
           EMAIL_USER=${{ secrets.EMAIL_USER }}
           EMAIL_PASS=${{ secrets.EMAIL_PASS }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          GROUP_NAME=${{ secrets.GROUP_NAME }}
+          CONSUMER_NAME=${{ secrets.CONSUMER_NAME }}
+          REGION=${{ secrets.REGION }}
+          PORT=${{ secrets.PORT }}
+          JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          INVITATION_SECRET=${{ secrets.INVITATION_SECRET }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          SMTP_SECURE=${{ secrets.SMTP_SECURE }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASS=${{ secrets.SMTP_PASS }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+          BACKEND_URL=${{ secrets.BACKEND_URL }}
           EOF
           
-          # Generate Prisma client and run migrations
+          # Generate Prisma client only (migrations done manually)
           npx prisma generate --schema=schema.prisma
-          npx prisma db push --schema=schema.prisma
           
           # Start services with PM2
-          pm2 start ecosystem.config.js
+          pm2 start ecosystem.config.cjs
           pm2 save

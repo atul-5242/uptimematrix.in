@@ -25,14 +25,18 @@ const transporter = nodemailer.createTransport({
     // debug: true, // Uncomment for detailed debugging
 });
 
-// Verify transporter connection
-transporter.verify(function (error: Error | null, success: boolean) {
-    if (error) {
-        console.error("Email transporter verification failed:", error);
-    } else {
-        console.log("Email transporter is ready to take messages.");
-    }
-});
+// Verify transporter connection only if email credentials are provided
+if (SMTP_USER && SMTP_PASS) {
+    transporter.verify(function (error: Error | null, success: boolean) {
+        if (error) {
+            console.error("Email transporter verification failed:", error);
+        } else {
+            console.log("Email transporter is ready to take messages.");
+        }
+    });
+} else {
+    console.log("Email credentials not provided. Email notifications disabled.");
+}
 
 const templatesCache: { [key: string]: HandlebarsTemplateDelegate } = {};
 

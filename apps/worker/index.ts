@@ -1,4 +1,4 @@
-import axios from "axios";
+// Removed axios import to reduce memory usage
 import { xReadBulk, xAckBulk, xAdd, WebsiteEvent } from "@uptimematrix/redisstream";
 import { prismaClient, WebsiteStatus, IncidentStatus, Website, Incident, EscalationPolicy, EscalationStep } from "@uptimematrix/store";
 import { handleEscalation, getRecipientsEmails } from "./escalation/handleEscalation.js";
@@ -6,13 +6,15 @@ import { sendEmail } from "./notifications/email.js";
 
 const GROUP_NAME = process.env.GROUP_NAME!;
 const CONSUMER_NAME = process.env.CONSUMER_NAME!;
+const REGION = process.env.REGION!;
 if (!GROUP_NAME || !CONSUMER_NAME) throw new Error("GROUP_NAME and CONSUMER_NAME required");
+if (!REGION) throw new Error("REGION is required");
 
 // Add a processing lock to prevent duplicate processing
 const processingIncidents = new Set<string>();
 
 async function workerLoop() {
-    console.log("Worker started");
+    console.log(`Worker started for region: ${REGION}`);
 
     while (true) {
         try {
@@ -66,23 +68,30 @@ async function processWebsite(site: WebsiteEvent) {
 
     try {
         const method = site.method ? site.method.toLowerCase() as "get" | "post" | "put" | "delete" | "head" : "get";
-        const dataOfWebsite = await axios({ 
-            url: site.url, 
-            method, 
-            timeout: 10000,
-            validateStatus: (status) => status < 500 // Only treat 5xx as errors
+        
+        // Create AbortController for timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(site.url, {
+            method: method.toUpperCase(),
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'UptimeMatrix-Monitor/1.0'
+            }
         });
         
-        statusCode = dataOfWebsite.status;
+        clearTimeout(timeoutId);
+        statusCode = response.status;
         isOnline = (statusCode >= 200 && statusCode < 400);
         const responseTime = Date.now() - startTime;
 
         const region = await prismaClient.region.findUnique({
-            where: { name: site.region || "India" },
+            where: { name: REGION },
         });
 
         if (!region) {
-            console.error(`Region ${site.region || "India"} not found. Please ensure it is seeded.`);
+            console.error(`Region ${REGION} not found. Please ensure it is seeded.`);
             return;
         }
 
@@ -139,11 +148,11 @@ async function processWebsite(site: WebsiteEvent) {
         
         try {
             const region = await prismaClient.region.findUnique({
-                where: { name: site.region || "India" },
+                where: { name: REGION },
             });
 
             if (!region) {
-                console.error(`Region ${site.region || "India"} not found.`);
+                console.error(`Region ${REGION} not found.`);
                 return;
             }
 

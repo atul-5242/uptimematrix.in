@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export async function GET(req: NextRequest) {
-  const token = req.headers.get("authorization")?.split(" ")[1] || localStorage.getItem("auth_token");
+  const headerToken = req.headers.get("authorization")?.split(" ")[1];
+  // Never access localStorage in a server route; instead, allow client to send Authorization header
+  const token = headerToken;
   if (!token) return NextResponse.json({ message: "Missing auth token" }, { status: 401 });
   const res = await fetch(`${BASE_URL}/escalation-policies/get-escalation-policies`, {
     headers: { "Authorization": `Bearer ${token}` },

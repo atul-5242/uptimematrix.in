@@ -127,6 +127,7 @@ export const setSelectedOrganization = async (req: Request, res: Response) => {
 // ---------------------- SIGN UP ----------------------
 export const signUp = async (req: Request, res: Response) => {
   const data = AuthInput.safeParse(req.body);
+  console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------from signup action next server page route.ts page.", data);
   if (!data.success) {
     const errorMessage =
       Array.isArray(data.error.issues) && data.error.issues[0]?.message

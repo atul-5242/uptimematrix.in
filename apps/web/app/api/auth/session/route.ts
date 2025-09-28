@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const cookieStore = cookies();
@@ -32,7 +34,7 @@ export async function GET() {
     }
 
     // Validate the token and user against the database
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const baseURL = "https://api.uptimematrix.atulmaurya.in/";
     const response = await fetch(`${baseURL}/auth/validate-session`, {
       method: 'POST',
       headers: { 
