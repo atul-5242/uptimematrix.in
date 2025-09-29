@@ -27,6 +27,7 @@ import {
   Monitor
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { getMonitorsForStatusPage } from '@/app/all-actions/status-page/status-page-actions'
 
 interface StatusPageFormData {
   name: string
@@ -131,19 +132,23 @@ export default function CreateStatusPage() {
   useEffect(() => {
     const fetchMonitors = async (): Promise<void> => {
       try {
-        // Replace with actual API call
-        const mockMonitors: Monitor[] = [
-          { id: '1', name: 'Main Website', url: 'https://example.com', status: 'online' },
-          { id: '2', name: 'API Gateway', url: 'https://api.example.com', status: 'online' },
-          { id: '3', name: 'CDN', url: 'https://cdn.example.com', status: 'online' },
-          { id: '4', name: 'Database', url: 'db.example.com:5432', status: 'online' },
-        ]
-        setAvailableMonitors(mockMonitors)
+        const monitors = await getMonitorsForStatusPage();
+        if (monitors && Array.isArray(monitors)) {
+          const formattedMonitors = monitors.map(monitor => ({
+            id: monitor.id,
+            name: monitor.name,
+            url: monitor.url,
+            status: monitor.status || 'unknown'
+          }));
+          setAvailableMonitors(formattedMonitors);
+        }
       } catch (error) {
-        console.error('Error fetching monitors:', error)
+        console.error('Error fetching monitors:', error);
+        // Set empty array on error to show "No monitors available" message
+        setAvailableMonitors([]);
       }
-    }
-    fetchMonitors()
+    };
+    fetchMonitors();
   }, [])
 
   const generateSubdomain = (name: string): string => {
@@ -155,7 +160,7 @@ export default function CreateStatusPage() {
       .substring(0, 50)
   }
 
-  const validateStep = (step: number, updateErrors: boolean = false): boolean => {
+  const validateStep = (step: number, updateErrors: boolean = false): { isValid: boolean; newErrors: FormErrors } => {
     const newErrors: FormErrors = {};
     let isValid = true;
 
@@ -237,18 +242,21 @@ export default function CreateStatusPage() {
         break;
     }
 
-    if (updateErrors || hasSubmitted) {
-      setErrors(newErrors);
-    }
-    return isValid;
+    return { isValid, newErrors };
   };
 
   useEffect(() => {
-    setIsCurrentStepValid(validateStep(currentStep, false));
-  }, [currentStep, formData, errors, hasSubmitted]);
+    const { isValid, newErrors } = validateStep(currentStep, false);
+    setIsCurrentStepValid(isValid);
+    
+    // Only update errors if they've actually changed to prevent infinite loops
+    if (JSON.stringify(newErrors) !== JSON.stringify(errors)) {
+      setErrors(newErrors);
+    }
+  }, [currentStep, formData, hasSubmitted]);
 
   const validateForm = (): boolean => {
-    return validateStep(currentStep, true);
+    return validateStep(currentStep, true).isValid;
   }
 
   const handleSubmit = async (): Promise<void> => {
@@ -256,12 +264,19 @@ export default function CreateStatusPage() {
 
     setLoading(true)
     try {
-      console.log('Submitting status page:', formData)
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      console.log('Submitting status page:', formData);
+      console.log('Using token:', token);
+      
       const response = await fetch('/api/status-pages', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(formData)
       });
@@ -413,7 +428,7 @@ export default function CreateStatusPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, subdomain: e.target.value }))}
                         className={errors.subdomain ? 'border-red-500' : ''}
                       />
-                      <span className="text-sm text-gray-500">.yourdomain.com</span>
+                      <span className="text-sm text-gray-500">.uptimematrix.atulmaurya.in</span>
                     </div>
                     {errors.subdomain && <p className="text-sm text-red-600">{errors.subdomain}</p>}
                   </div>
@@ -515,21 +530,48 @@ export default function CreateStatusPage() {
                             onChange={(e) => updateService(group.id, service.id, 'name', e.target.value)}
                             className="flex-1"
                           />
-                          <Select
-                            value={service.monitorId}
-                            onValueChange={(value) => updateService(group.id, service.id, 'monitorId', value)}
-                          >
-                            <SelectTrigger className="w-64">
-                              <SelectValue placeholder="Select Monitor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableMonitors.map(monitor => (
-                                <SelectItem key={monitor.id} value={monitor.id}>
-                                  {monitor.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="relative w-64">
+                            <Select
+                              value={service.monitorId}
+                              onValueChange={(value) => updateService(group.id, service.id, 'monitorId', value)}
+                              disabled={availableMonitors.length === 0}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder={
+                                  availableMonitors.length === 0 
+                                    ? 'No monitors available' 
+                                    : 'Select Monitor'
+                                } />
+                              </SelectTrigger>
+                              {availableMonitors.length > 0 ? (
+                                <SelectContent>
+                                  {availableMonitors.map(monitor => (
+                                    <SelectItem key={monitor.id} value={monitor.id}>
+                                      <div className="flex items-center gap-2">
+                                        <div className={`h-2 w-2 rounded-full ${
+                                          monitor.status === 'online' ? 'bg-green-500' : 
+                                          monitor.status === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                                        }`} />
+                                        <span>{monitor.name}</span>
+                                        <span className="text-xs text-gray-500 truncate">{monitor.url}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              ) : (
+                                <SelectContent>
+                                  <div className="p-2 text-sm text-gray-500">
+                                    No monitors available. Please add monitors first.
+                                  </div>
+                                </SelectContent>
+                              )}
+                            </Select>
+                            {availableMonitors.length === 0 && (
+                              <p className="absolute -bottom-5 text-xs text-red-500">
+                                No monitors found. Please add monitors first.
+                              </p>
+                            )}
+                          </div>
                           <Button 
                             variant="ghost" 
                             size="sm" 
