@@ -32,6 +32,7 @@ export default function IncidentsPage() {
   const [activeTab, setActiveTab] = useState('active')
 
   const selectedOrganizationId = useAppSelector((state) => state.user.selectedOrganizationId);
+  const authToken = useAppSelector((state) => state.auth.token);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,21 +46,52 @@ export default function IncidentsPage() {
       setLoading(true);
       try {
         console.log('Fetching incidents and stats for organization:', selectedOrganizationId);
+        
+        if (!authToken) {
+          throw new Error('Authentication token not found');
+        }
+
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const [incidentsResponse, statsResponse] = await Promise.all([
+          fetch(`/api/incidents?organizationId=${encodeURIComponent(selectedOrganizationId)}`, {
+            method: 'GET',
+            headers,
+          }),
+          fetch(`/api/incidents/stats?organizationId=${encodeURIComponent(selectedOrganizationId)}`, {
+            method: 'GET',
+            headers,
+          })
+        ]);
+
+        if (!incidentsResponse.ok) {
+          const error = await incidentsResponse.text();
+          throw new Error(`Failed to fetch incidents: ${error}`);
+        }
+
+        if (!statsResponse.ok) {
+          const error = await statsResponse.text();
+          throw new Error(`Failed to fetch stats: ${error}`);
+        }
+
         const [incidentsData, statsData] = await Promise.all([
-          getIncidents(selectedOrganizationId),
-          getIncidentStats(selectedOrganizationId)
+          incidentsResponse.json(),
+          statsResponse.json()
         ]);
         
         console.log('Fetched incidents:', incidentsData);
         console.log('Fetched stats:', statsData);
         
-        setIncidents(incidentsData);
+        setIncidents(Array.isArray(incidentsData) ? incidentsData : []);
         setStats(statsData);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
           title: 'Error',
-          description: 'Failed to fetch incidents. Please try again.',
+          description: error instanceof Error ? error.message : 'Failed to fetch incidents. Please try again.',
           variant: 'destructive',
         });
       } finally {

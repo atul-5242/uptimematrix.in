@@ -10,17 +10,21 @@ export async function GET(
   { params }: { params: { incidentId: string } }
 ) {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get('auth_token')?.value;
+    // Get the token from the auth endpoint
+    const tokenResponse = await fetch(new URL('/api/auth/get-token', request.url));
+    if (!tokenResponse.ok) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const { token } = await tokenResponse.json();
     
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
     const { incidentId } = params;
-    const url = new URL(`/api/incidents/analytics/${incidentId}`, API_BASE_URL);
+    const backendUrl = `${API_BASE_URL}/api/incidents/analytics/${incidentId}`;
     
-    const response = await fetch(url.toString(), {
+    const response = await fetch(backendUrl, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
@@ -52,8 +56,12 @@ export async function PATCH(
   { params }: { params: { incidentId: string } }
 ) {
   try {
-    const cookieStore = cookies();
-    const token = cookieStore.get('auth_token')?.value;
+    // Get the token from the auth endpoint
+    const tokenResponse = await fetch(new URL('/api/auth/get-token', request.url));
+    if (!tokenResponse.ok) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    const { token } = await tokenResponse.json();
     
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
