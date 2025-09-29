@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
-    const backendUrl = "https://api.uptimematrix.atulmaurya.in/";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL;;
     console.log(`[API Proxy] Forwarding GET to: ${backendUrl}/organization/${organizationId}`);
 
     const response = await fetch(`${backendUrl}/organization/${organizationId}`, {
@@ -72,7 +72,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
-    const backendUrl = "https://api.uptimematrix.atulmaurya.in/";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL;;
     console.log(`[API Proxy] Forwarding DELETE to: ${backendUrl}/organization/${organizationId}`);
 
     const response = await fetch(`${backendUrl}/organization/${organizationId}`, {

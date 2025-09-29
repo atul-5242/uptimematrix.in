@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 export const dynamic = 'force-dynamic';
 

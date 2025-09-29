@@ -2,7 +2,7 @@
 
 import { Incident, IncidentStats } from '@/types/incident';
 
-const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const response = await fetch(url, {

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     console.log('Forwarding to backend:', { organizationId });
 
     // Forward the request to the backend API
-    const backendUrl = "https://api.uptimematrix.atulmaurya.in/";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL;;
     const response = await fetch(`${backendUrl}/auth/select-organization`, {
       method: 'POST',
       headers: {

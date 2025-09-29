@@ -1,7 +1,7 @@
 
 "use client";
 
-const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 
 

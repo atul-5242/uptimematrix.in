@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 export async function PUT(request: NextRequest, { params }: { params: { teamId: string } }) {
   try {
