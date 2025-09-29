@@ -15,7 +15,8 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.14",
-    "zod": "^4.0.10"
+    "zod": "^4.0.10",
+    "@prisma/client": "6.15.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
