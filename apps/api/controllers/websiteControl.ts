@@ -227,18 +227,38 @@ export const deleteWebsite = async (req: Request, res: Response) => {
 
     // Delete inside a transaction
     await prismaClient.$transaction(async (tx) => {
-      // 1. Delete related ticks
+      // 1. Find all incidents related to this website
+      const incidents = await tx.incident.findMany({
+        where: { websiteId: id },
+        select: { id: true }
+      });
+      
+      const incidentIds = incidents.map(incident => incident.id);
+
+      // 2. Delete all incident updates for these incidents
+      if (incidentIds.length > 0) {
+        await tx.incidentUpdate.deleteMany({
+          where: { incidentId: { in: incidentIds } },
+        });
+        
+        // 3. Delete all incidents
+        await tx.incident.deleteMany({
+          where: { id: { in: incidentIds } },
+        });
+      }
+
+      // 4. Delete related ticks
       await tx.websiteTick.deleteMany({
         where: { website_id: id },
       });
 
-      // 2. Delete the website (policy is NOT deleted)
+      // 5. Finally, delete the website itself
       await tx.website.delete({
         where: { id },
       });
     });
 
-    res.json({ message: "Website and related data deleted successfully", id });
+    res.json({ message: "Website and all related data (including incidents) deleted successfully", id });
   } catch (error) {
     console.error("Error deleting website:", error);
     res.status(500).json({ message: "Failed to delete website" });
