@@ -35,63 +35,76 @@ import {
   Area
 } from 'recharts'
 
+// Define the status types used throughout the application
+type ServiceStatus = 'operational' | 'degraded' | 'down' | 'maintenance' | 'major_outage' | 'outage';
+
 interface StatusPageData {
-  id: string
-  name: string
-  description: string
-  status: 'operational' | 'down' | 'major_outage' | 'maintenance' // Re-added 'maintenance'
-  lastUpdated: string
-  logo?: string
+  id: string;
+  name: string;
+  description: string;
+  status: ServiceStatus;
+  lastUpdated: string;
+  logo: string;
   branding: {
-    primaryColor: string
-    headerBg: string
-  }
-  serviceGroups: ServiceGroup[]
-  incidents: Incident[]
+    primaryColor: string;
+    headerBg: string;
+  };
+  serviceGroups: ServiceGroup[];
+  incidents: Incident[];
   metrics: {
-    overallUptime: number
-    avgResponseTime: number
-    totalChecks: number
-  }
-  uptimeData: UptimeDataPoint[]
-  responseTimeData: ResponseTimeDataPoint[]
+    overallUptime: number;
+    avgResponseTime: number;
+    totalChecks: number;
+  };
+  uptimeData: UptimeDataPoint[];
+  responseTimeData: ResponseTimeDataPoint[];
 }
 
 interface ServiceGroup {
-  id: string
-  name: string
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
-  services: Service[]
+  id: string;
+  name: string;
+  status: ServiceStatus;
+  services: Service[];
 }
 
 interface Service {
-  id: string
-  name: string
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
-  uptime: number
-  responseTime?: number
-  description?: string
-  lastCheck: string
-  uptimeHistory: UptimeDay[]
+  id: string;
+  name: string;
+  description: string;
+  status: ServiceStatus;
+  uptime: {
+    '24h': number;
+    '7d': number;
+    '30d': number;
+    '90d': number;
+  };
+  responseTime: number;
+  lastCheck: string;
+  uptimeHistory: Array<{
+    timestamp: string;
+    status: ServiceStatus;
+    responseTime: number;
+  }>;
+  history: any[];
 }
 
 interface UptimeDay {
-  date: string
-  uptime: number
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
+  date: string;
+  uptime: number;
+  status: ServiceStatus;
 }
 
 interface Incident {
-  id: string
-  title: string
-  description: string
-  status: 'investigating' | 'identified' | 'monitoring' | 'resolved'
-  severity: 'minor' | 'major' | 'critical'
-  createdAt: string
-  updatedAt: string
-  resolvedAt?: string
-  updates: IncidentUpdate[]
-  affectedServices: string[]
+  id: string;
+  title: string;
+  description: string;
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'postmortem';
+  severity: 'none' | 'minor' | 'major' | 'critical';
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null | undefined;
+  updates: IncidentUpdate[];
+  affectedServices: string[];
 }
 
 interface IncidentUpdate {
@@ -107,208 +120,225 @@ interface UptimeDataPoint {
 }
 
 interface ResponseTimeDataPoint {
-  time: string
-  responseTime: number
+  timestamp: string;
+  value: number;
 }
 
-import { GetServerSidePropsContext } from 'next';
-
-export const getServerSideProps = async ({ req }: GetServerSidePropsContext) => {
-  const host = req.headers.host; // e.g., status.customer.com or uptimematrix.atulmaurya.in
-  
-  // Fetch status page data based on host
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  const res = await fetch(`${apiUrl}/api/status-pages/by-domain?domain=${host}`);
-  const data = await res.json();
-
-  if (!data.success) {
-    return { notFound: true };
-  }
-
-  return {
-    props: { statusPageData: data.data },
+interface ApiResponse {
+  success: boolean;
+  data: {
+    id: string;
+    title: string;
+    description: string | null;
+    customDomain: string | null;
+    subdomain: string;
+    services: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      status: 'operational' | 'degraded' | 'down' | 'maintenance' | 'major_outage';
+      uptime24h: number;
+      uptime7d: number;
+      uptime30d: number;
+      uptime90d: number;
+      responseTime24h: number;
+    }>;
+    incidents: Array<{
+      id: string;
+      title: string;
+      status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
+      impact: 'none' | 'minor' | 'major' | 'critical';
+      startedAt: string;
+      resolvedAt: string | null;
+      updates: Array<{
+        id: string;
+        status: 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'postmortem';
+        message: string;
+        createdAt: string;
+      }>;
+    }>;
+    responseTimeData: Array<{
+      timestamp: string;
+      value: number;
+    }>;
+    uptimeData: Array<{
+      date: string;
+      uptime: number;
+    }>;
   };
+}
+
+export async function getServerSideProps(context: { req: { headers: { host: string } } }) {
+  try {
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    const host = context.req.headers.host;
+    const apiUrl = `${protocol}://${host}/api/status-pages/by-domain?domain=${host}`;
+    
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch status page data: ${response.statusText}`);
+    }
+    
+    const result: ApiResponse = await response.json();
+    
+    if (!result.success || !result.data) {
+      throw new Error('Invalid response from API');
+    }
+
+    // Transform the API response to match the component's expected props
+    const statusPageData: StatusPageData = {
+      id: result.data.id,
+      name: result.data.title,
+      description: result.data.description || 'Our services are running smoothly.',
+      status: 'operational', 
+      lastUpdated: new Date().toISOString(),
+      logo: '', 
+      branding: {
+        primaryColor: '#3498db',
+        headerBg: '#f9f9f9'
+      },
+      serviceGroups: [{
+        id: 'default',
+        name: 'Services',
+        status: 'operational',
+        services: result.data.services.map(service => ({
+          id: service.id,
+          name: service.name,
+          description: service.description || '',
+          status: service.status as 'operational' | 'degraded' | 'down' | 'maintenance' | 'major_outage',
+          uptime: {
+            '24h': service.uptime24h,
+            '7d': service.uptime7d,
+            '30d': service.uptime30d,
+            '90d': service.uptime90d
+          },
+          responseTime: service.responseTime24h,
+          lastCheck: new Date().toISOString(),
+          uptimeHistory: [],
+          history: [],
+        }))
+      }],
+      incidents: result.data.incidents.map((incident: {
+        id: string;
+        title: string;
+        status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
+        impact: 'none' | 'minor' | 'major' | 'critical';
+        startedAt: string;
+        resolvedAt: string | null;
+        updates: Array<{
+          id: string;
+          status: 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'postmortem';
+          message: string;
+          createdAt: string;
+        }>;
+      }) => ({
+        id: incident.id,
+        title: incident.title,
+        description: '',
+        status: incident.status,
+        severity: incident.impact === 'none' ? 'minor' : incident.impact === 'minor' ? 'minor' : incident.impact === 'major' ? 'major' : 'critical',
+        createdAt: incident.startedAt,
+        updatedAt: incident.startedAt,
+        resolvedAt: incident.resolvedAt || undefined,
+        updates: incident.updates.map((update: {
+          id: string;
+          status: 'investigating' | 'identified' | 'monitoring' | 'resolved' | 'postmortem';
+          message: string;
+          createdAt: string;
+        }) => ({
+          id: update.id,
+          status: update.status,
+          message: update.message,
+          timestamp: update.createdAt
+        })),
+        affectedServices: []
+      })),
+      metrics: {
+        overallUptime: 99.99,
+        avgResponseTime: 200,
+        totalChecks: 10000
+      },
+      uptimeData: result.data.uptimeData,
+      responseTimeData: result.data.responseTimeData
+    };
+
+    return {
+      props: {
+        statusPageData,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getServerSideProps:', error);
+    
+    // Return a minimal error state that the component can handle
+    return {
+      props: {
+        statusPageData: {
+          id: '',
+          name: 'Status Page',
+          description: 'Unable to load status information. Please try again later.',
+          status: 'degraded',
+          lastUpdated: new Date().toISOString(),
+          logo: null,
+          branding: {
+            primaryColor: '#3498db',
+            headerBg: '#f9f9f9'
+          },
+          serviceGroups: [],
+          incidents: [],
+          metrics: {
+            overallUptime: 0,
+            avgResponseTime: 0,
+            totalChecks: 0
+          },
+          uptimeData: [],
+          responseTimeData: []
+        },
+      },
+    };
+  }
 };
 
-
-export default function PublicStatusPage() {
-  const [statusData, setStatusData] = useState<StatusPageData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
+export default function PublicStatusPage({ statusPageData }: { statusPageData: StatusPageData }) {
+  const [statusData, setStatusData] = useState<StatusPageData | null>(statusPageData)
+  const [loading, setLoading] = useState<boolean>(false)
   const [subscriberEmail, setSubscriberEmail] = useState<string>('')
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set())
   const [selectedTimeRange, setSelectedTimeRange] = useState<'24h' | '7d' | '30d' | '90d'>('7d')
   const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
 
-  // Mock data - replace with actual API call based on subdomain/custom domain
-  useEffect(() => {
-    const mockStatusData: StatusPageData = {
-      id: '1',
-      name: 'My Company Status',
-      description: 'Track the status of our main services and infrastructure',
-      status: 'operational',
-      lastUpdated: new Date().toISOString(),
-      logo: '',
-      branding: {
-        primaryColor: '#2563eb',
-        headerBg: '#ffffff'
-      },
-      serviceGroups: [
-        {
-          id: '1',
-          name: 'Web Services',
-          status: 'operational',
-          services: [
-            {
-              id: '1',
-              name: 'Main Website',
-              status: 'operational',
-              uptime: 99.95,
-              responseTime: 245,
-              description: 'Primary company website and landing pages',
-              lastCheck: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.05 ? Math.random() * 5 + 95 : Math.random() * 30 + 60,
-                status: Math.random() > 0.05 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            },
-            {
-              id: '2',
-              name: 'API Gateway',
-              status: 'operational',
-              uptime: 99.98,
-              responseTime: 89,
-              description: 'REST API and GraphQL endpoints',
-              lastCheck: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.02 ? Math.random() * 3 + 97 : Math.random() * 40 + 50,
-                status: Math.random() > 0.02 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            },
-            {
-              id: '3',
-              name: 'CDN',
-              status: 'operational',
-              uptime: 100,
-              responseTime: 12,
-              description: 'Global content delivery network',
-              lastCheck: new Date(Date.now() - 30 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() * 2 + 98,
-                status: 'operational' as 'operational' | 'down' | 'major_outage'
-              }))
-            }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Database Services',
-          status: 'operational',
-          services: [
-            {
-              id: '4',
-              name: 'Primary Database',
-              status: 'operational',
-              uptime: 99.99,
-              responseTime: 5,
-              description: 'Main PostgreSQL database cluster',
-              lastCheck: new Date(Date.now() - 45 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() * 1 + 99,
-                status: 'operational' as 'operational' | 'down' | 'major_outage'
-              }))
-            },
-            {
-              id: '5',
-              name: 'Redis Cache',
-              status: 'operational',
-              uptime: 99.97,
-              responseTime: 1,
-              description: 'In-memory data structure store',
-              lastCheck: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.03 ? Math.random() * 3 + 97 : Math.random() * 20 + 70,
-                status: Math.random() > 0.03 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            }
-          ]
-        }
-      ],
-      incidents: [
-        {
-          id: '1',
-          title: 'API Gateway Increased Response Times',
-          description: 'We are experiencing increased response times on our API gateway affecting some user requests.',
-          status: 'resolved',
-          severity: 'minor',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString(),
-          resolvedAt: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString(),
-          affectedServices: ['2'],
-          updates: [
-            {
-              id: '1',
-              status: 'investigating',
-              message: 'We have identified increased response times on our API gateway and are investigating the root cause.',
-              timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '2',
-              status: 'identified',
-              message: 'The issue has been identified as a database connection pool exhaustion. We are implementing a fix.',
-              timestamp: new Date(Date.now() - 1.8 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '3',
-              status: 'resolved',
-              message: 'The connection pool has been optimized and response times have returned to normal levels.',
-              timestamp: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        }
-      ],
-      metrics: {
-        overallUptime: 99.96,
-        avgResponseTime: 89,
-        totalChecks: 45892
-      },
-      uptimeData: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        uptime: Math.random() > 0.1 ? Math.random() * 5 + 95 : Math.random() * 30 + 60
-      })),
-      responseTimeData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        responseTime: Math.floor(Math.random() * 200 + 50)
-      }))
-    }
-
-    setTimeout(() => {
-      setStatusData(mockStatusData)
-      setLoading(false)
-    }, 1000)
-  }, [])
-
-  const getStatusColor = (status: string): string => {
+  const getStatusColor = (status: ServiceStatus): string => {
     switch (status) {
-      case 'operational': return 'text-green-600 bg-green-50 border-green-200'
-      case 'down': return 'text-red-600 bg-red-50 border-red-200'
-      case 'major_outage': return 'text-red-600 bg-red-50 border-red-200'
-      case 'maintenance': return 'text-blue-600 bg-blue-50 border-blue-200'
-      default: return 'text-gray-600 bg-gray-50 border-gray-200'
+      case 'operational': return 'text-green-600 bg-green-50 border-green-200';
+      case 'down':
+      case 'outage':
+      case 'major_outage': 
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'maintenance': 
+        return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'degraded': 
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      default: 
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   }
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: ServiceStatus) => {
     switch (status) {
-      case 'operational': return <CheckCircle className="h-4 w-4" />
-      case 'down': return <XCircle className="h-4 w-4" />
-      case 'major_outage': return <XCircle className="h-4 w-4" />
-      case 'maintenance': return <Clock className="h-4 w-4" />
-      default: return <AlertTriangle className="h-4 w-4" />
+      case 'operational':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'down':
+      case 'outage':
+      case 'major_outage':
+        return <XCircle className="h-4 w-4" />;
+      case 'maintenance':
+        return <Clock className="h-4 w-4" />;
+      case 'degraded':
+        return <AlertTriangle className="h-4 w-4" />;
+      default:
+        // This should never happen if all status values are handled
+        return <AlertTriangle className="h-4 w-4" />;
     }
   }
 
@@ -369,10 +399,17 @@ export default function PublicStatusPage() {
     }
   }
 
-  const renderUptimeHistory = (uptimeHistory: UptimeDay[]): React.ReactElement => {
+  const renderUptimeHistory = (uptimeHistory: Array<{ timestamp: string; status: ServiceStatus; responseTime: number }>): React.ReactElement => {
+    // Convert the uptime history to the format expected by the UptimeDay type
+    const uptimeDays: UptimeDay[] = uptimeHistory.map(entry => ({
+      date: new Date(entry.timestamp).toISOString().split('T')[0],
+      uptime: entry.status === 'operational' ? 100 : 0,
+      status: entry.status
+    }));
+    
     return (
       <div className="flex items-center gap-1 mt-2">
-        {uptimeHistory.slice(-90).map((day, index) => (
+        {uptimeDays.slice(-90).map((day, index) => (
           <div
             key={index}
             className={`w-1 h-6 rounded-sm ${
@@ -436,6 +473,8 @@ export default function PublicStatusPage() {
                 {statusData.status === 'down' && 'Some Systems Down'}
                 {statusData.status === 'major_outage' && 'Major Outage'}
                 {statusData.status === 'maintenance' && 'Under Maintenance'}
+                {statusData.status === 'outage' && 'Major Outage'}
+                {statusData.status === 'degraded' && 'Degraded Performance'}
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Last updated {formatTimeAgo(statusData.lastUpdated)}
@@ -560,8 +599,10 @@ export default function PublicStatusPage() {
 
                         <div className="flex items-center gap-4">
                           <div className="text-right text-sm">
-                            <div className="font-semibold">{service.uptime.toFixed(2)}%</div>
-                            <div className="text-gray-500">uptime</div>
+                            <div className="font-semibold">
+                              {service.uptime[selectedTimeRange].toFixed(2)}%
+                            </div>
+                            <div className="text-gray-500">uptime ({selectedTimeRange})</div>
                           </div>
                           {service.responseTime && (
                             <div className="text-right text-sm">
