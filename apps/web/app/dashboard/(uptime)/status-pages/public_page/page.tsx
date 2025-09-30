@@ -111,7 +111,9 @@ interface ResponseTimeDataPoint {
   responseTime: number
 }
 
-export const getServerSideProps = async ({ req }) => {
+import { GetServerSidePropsContext } from 'next';
+
+export const getServerSideProps = async ({ req }: GetServerSidePropsContext) => {
   const host = req.headers.host; // e.g., status.customer.com or uptimematrix.atulmaurya.in
   
   // Fetch status page data based on host

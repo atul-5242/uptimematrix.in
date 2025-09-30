@@ -332,7 +332,7 @@ export const createStatusPage = async (req: Request, res: Response) => {
     if (customDomain) {
       try {
         const { exec } = require('child_process');
-        exec(`sudo /usr/local/bin/provision_custom_domain.sh ${customDomain}`, (err, stdout, stderr) => {
+        exec(`sudo /usr/local/bin/provision_custom_domain.sh ${customDomain}`, (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
           if (err) {
             console.error('Error provisioning custom domain:', err, stderr);
           } else {
@@ -430,7 +430,7 @@ export const provisionCustomDomain = async (req: Request, res: Response) => {
     
     // Execute provisioning script
     const { exec } = require('child_process');
-    exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, (err, stdout, stderr) => {
+    exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
       if (err) {
         console.error('Domain provisioning failed:', err, stderr);
         return res.status(500).json({ 
