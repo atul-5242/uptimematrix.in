@@ -112,9 +112,6 @@ export const getAllStatusPages = async (req: Request, res: Response) => {
             email: true
           }
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
       }
     });
 
@@ -125,17 +122,25 @@ export const getAllStatusPages = async (req: Request, res: Response) => {
     const serviceGroups = await prismaClient.serviceGroup.findMany({
       where: {
         statusPageId: {
-          in: statusPageIds
+          in: statusPages.map(p => p.id)
         }
       },
       include: {
-        services: true
+        services: true,
+        statusPage: {
+          select: {
+            id: true
+          }
+        }
       }
     });
 
     // Count services and create a map of status page ID to service count
     const serviceCountMap = serviceGroups.reduce<Record<string, number>>((acc, group) => {
-      acc[group.statusPageId] = (acc[group.statusPageId] || 0) + (group.services?.length || 0);
+      const pageId = group.statusPage?.id;
+      if (pageId) {
+        acc[pageId] = (acc[pageId] || 0) + (group.services?.length || 0);
+      }
       return acc;
     }, {});
 
@@ -174,16 +179,14 @@ export const getAllStatusPages = async (req: Request, res: Response) => {
     }, {});
 
     // Format the response
-    const formattedStatusPages = await Promise.all(statusPages.map(async (page: any) => {
+    const formattedStatusPages = statusPages.map((page) => {
       // Calculate total services count and average uptime
-      let totalServices = 0;
       let totalUptime = 0;
       let serviceCount = 0;
       
       // Process each service group and its services
-      const services = page.serviceGroups.flatMap((group: any) => {
-        const groupServices = group.services.map((service: any) => {
-          totalServices++;
+      const serviceGroups = page.services.map((group: any) => {
+        const services = group.services.map((service: any) => {
           totalUptime += service.uptime || 0;
           serviceCount++;
           
@@ -196,28 +199,27 @@ export const getAllStatusPages = async (req: Request, res: Response) => {
           };
         });
 
-        return groupServices.length > 0 ? [{
+        return {
           id: group.id,
           name: group.name,
           status: group.status.toLowerCase(),
-          services: groupServices
-        }] : [];
+          services
+        };
       });
-      
+
       const avgUptime = serviceCount > 0 ? (totalUptime / serviceCount) : 100;
-      const incidentCount = incidentCountMap[page.id] || 0;
-      
+
       return {
         id: page.id,
         name: page.name,
         subdomain: page.subdomain,
-        customDomain: page.customDomain || null,
+        customDomain: page.customDomain,
         description: page.description,
-        status: page.status.toLowerCase(),
-        visibility: page.visibility.toLowerCase(),
-        services,
-        subscribers: 0, // TODO: Implement subscriber count if needed
-        incidents: incidentCount,
+        status: page.status,
+        visibility: page.visibility,
+        services: serviceGroups,
+        subscribers: 0, // TODO: Implement subscriber count
+        incidents: page.incidents || 0,
         uptime: parseFloat(avgUptime.toFixed(2)),
         isPublished: page.isPublished,
         theme: page.theme || 'light',
@@ -226,18 +228,12 @@ export const getAllStatusPages = async (req: Request, res: Response) => {
           headerBg: page.headerBg || '#ffffff',
           logo: page.logo || ''
         },
-        organization: {
-          id: page.organizationId,
-          name: page.organization?.name || ''
-        },
-        createdBy: {
-          id: page.createdById,
-          name: page.createdBy?.fullName || page.createdBy?.email || 'Unknown'
-        },
+        organization: page.organization,
+        createdBy: page.createdBy,
         lastUpdated: page.lastUpdated.toISOString(),
         createdAt: page.createdAt.toISOString()
       };
-    }));
+    });
 
     res.status(200).json({
       success: true,

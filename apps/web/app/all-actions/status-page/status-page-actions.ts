@@ -107,28 +107,42 @@ export async function getMonitorsForStatusPage() {
 }
 
 export async function getStatusPages() {
-  // Fetch token securely from the API route
-  const tokenResponse = await fetch('/api/auth/get-token');
-  const { token } = await tokenResponse.json();
+  try {
+    // Fetch token securely from the API route
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
 
-  if (!token) {
-    throw new Error('Authentication token not found');
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
+
+    const response = await fetch('/api/status-pages', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch status pages');
+    }
+
+    const responseData = await response.json();
+    
+    // Return the response in the expected format
+    return {
+      success: true,
+      data: responseData.data || []
+    };
+  } catch (error) {
+    console.error('Error in getStatusPages:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch status pages',
+      data: []
+    };
   }
-
-  const response = await fetch('/api/status-pages', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Failed to fetch status pages');
-  }
-
-  const data = await response.json();
-  return data.data || [];
 }
