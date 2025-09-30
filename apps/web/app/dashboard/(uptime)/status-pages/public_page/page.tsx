@@ -111,6 +111,24 @@ interface ResponseTimeDataPoint {
   responseTime: number
 }
 
+export const getServerSideProps = async ({ req }) => {
+  const host = req.headers.host; // e.g., status.customer.com or uptimematrix.atulmaurya.in
+  
+  // Fetch status page data based on host
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const res = await fetch(`${apiUrl}/api/status-pages/by-domain?domain=${host}`);
+  const data = await res.json();
+
+  if (!data.success) {
+    return { notFound: true };
+  }
+
+  return {
+    props: { statusPageData: data.data },
+  };
+};
+
+
 export default function PublicStatusPage() {
   const [statusData, setStatusData] = useState<StatusPageData | null>(null)
   const [loading, setLoading] = useState<boolean>(true)

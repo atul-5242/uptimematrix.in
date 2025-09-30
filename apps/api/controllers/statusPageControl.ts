@@ -316,8 +316,9 @@ export const createStatusPage = async (req: Request, res: Response) => {
         },
         isPublished: true,
         customCSS: customizations.customCSS || '',
-        customHTML: customizations.customHTML || ''
-      },
+        customHTML: customizations.customHTML || '',
+        lastUpdated: new Date() // Explicitly set lastUpdated to current date
+      } as Prisma.StatusPageCreateInput,
       include: {
         services: {
           include: {
@@ -326,6 +327,22 @@ export const createStatusPage = async (req: Request, res: Response) => {
         }
       }
     });
+
+    // Trigger Nginx provisioning if custom domain is provided
+    if (customDomain) {
+      try {
+        const { exec } = require('child_process');
+        exec(`sudo /usr/local/bin/provision_custom_domain.sh ${customDomain}`, (err, stdout, stderr) => {
+          if (err) {
+            console.error('Error provisioning custom domain:', err, stderr);
+          } else {
+            console.log('Custom domain provisioned:', stdout);
+          }
+        });
+      } catch (error) {
+        console.error('Failed to execute domain provisioning script:', error);
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -355,3 +372,85 @@ export const createStatusPage = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+export const getStatusPageByDomain = async (req: Request, res: Response) => {
+  try {
+    const { domain } = req.query;
+    
+    if (!domain) {
+      return res.status(400).json({ success: false, message: 'Domain parameter is required' });
+    }
+    
+    // Find status page by custom domain or subdomain
+    const statusPage = await prismaClient.statusPage.findFirst({
+      where: {
+        OR: [
+          { customDomain: domain as string },
+          { subdomain: (domain as string).split('.')[0] } // Extract subdomain part
+        ]
+      },
+      include: {
+        services: {
+          include: {
+            services: true
+          }
+        }
+      }
+    });
+    
+    if (!statusPage) {
+      return res.status(404).json({ success: false, message: 'Status page not found' });
+    }
+    
+    res.json({ success: true, data: statusPage });
+    
+  } catch (error) {
+    console.error('Error fetching status page by domain:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+export const provisionCustomDomain = async (req: Request, res: Response) => {
+  try {
+    const { domain } = req.body;
+    const { id } = req.params;
+    
+    // Verify status page exists and user has access
+    const statusPage = await prismaClient.statusPage.findFirst({
+      where: {
+        id,
+        organizationId: req.user.organizationId
+      }
+    });
+    
+    if (!statusPage) {
+      return res.status(404).json({ success: false, message: 'Status page not found' });
+    }
+    
+    // Execute provisioning script
+    const { exec } = require('child_process');
+    exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, (err, stdout, stderr) => {
+      if (err) {
+        console.error('Domain provisioning failed:', err, stderr);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to provision domain',
+          error: stderr 
+        });
+      }
+      
+      // Update database with custom domain
+      prismaClient.statusPage.update({
+        where: { id },
+        data: { customDomain: domain }
+      }).then(() => {
+        res.json({ success: true, message: 'Domain provisioned successfully' });
+      });
+    });
+    
+  } catch (error) {
+    console.error('Error in domain provisioning:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+}
