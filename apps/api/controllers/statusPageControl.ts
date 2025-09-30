@@ -1,6 +1,6 @@
 import { prismaClient } from "@uptimematrix/store";
 import type { Request, Response } from "express";
-import { StatusPageStatus, StatusPageVisibility } from "@prisma/client";
+import { StatusPageStatus, StatusPageVisibility, Prisma } from "@prisma/client";
 
 export const getMonitorsForStatusPage = async (req: Request, res: Response) => {
   try {
@@ -87,6 +87,172 @@ interface CreateStatusPageRequest {
     customHTML?: string;
   };
 }
+
+export const getAllStatusPages = async (req: Request, res: Response) => {
+  try {
+    // First, get all status pages for the organization with service groups and services
+    const statusPages = await prismaClient.statusPage.findMany({
+      where: {
+        organizationId: req.user.organizationId,
+      },
+      include: {
+        services: {
+          include: {
+            services: true
+          }
+        },
+        organization: {
+          select: {
+            name: true
+          }
+        },
+        createdBy: {
+          select: {
+            fullName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Get incident counts for each status page
+    const statusPageIds = statusPages.map(page => page.id);
+    
+    // Get all service groups for the status pages with their services
+    const serviceGroups = await prismaClient.serviceGroup.findMany({
+      where: {
+        statusPageId: {
+          in: statusPageIds
+        }
+      },
+      include: {
+        services: true
+      }
+    });
+
+    // Count services and create a map of status page ID to service count
+    const serviceCountMap = serviceGroups.reduce<Record<string, number>>((acc, group) => {
+      acc[group.statusPageId] = (acc[group.statusPageId] || 0) + (group.services?.length || 0);
+      return acc;
+    }, {});
+
+    // Get all incidents for the organization
+    const incidents = await prismaClient.incident.findMany({
+      where: {
+        organizationId: req.user.organizationId,
+        serviceId: {
+          in: serviceGroups.flatMap(group => group.services.map(s => s.id))
+        }
+      },
+      select: {
+        serviceId: true
+      }
+    });
+
+    // Create a map of service ID to status page ID
+    const serviceToPageMap = serviceGroups.reduce<Record<string, string>>((acc, group) => {
+      group.services.forEach(service => {
+        if (service.id) {
+          acc[service.id] = group.statusPageId;
+        }
+      });
+      return acc;
+    }, {});
+
+    // Count incidents per status page
+    const incidentCountMap = incidents.reduce<Record<string, number>>((acc, incident) => {
+      if (incident.serviceId) {
+        const pageId = serviceToPageMap[incident.serviceId];
+        if (pageId) {
+          acc[pageId] = (acc[pageId] || 0) + 1;
+        }
+      }
+      return acc;
+    }, {});
+
+    // Format the response
+    const formattedStatusPages = await Promise.all(statusPages.map(async (page: any) => {
+      // Calculate total services count and average uptime
+      let totalServices = 0;
+      let totalUptime = 0;
+      let serviceCount = 0;
+      
+      // Process each service group and its services
+      const services = page.serviceGroups.flatMap((group: any) => {
+        const groupServices = group.services.map((service: any) => {
+          totalServices++;
+          totalUptime += service.uptime || 0;
+          serviceCount++;
+          
+          return {
+            id: service.id,
+            name: service.name,
+            status: service.status.toLowerCase(),
+            uptime: service.uptime,
+            monitorId: service.monitorId || ''
+          };
+        });
+
+        return groupServices.length > 0 ? [{
+          id: group.id,
+          name: group.name,
+          status: group.status.toLowerCase(),
+          services: groupServices
+        }] : [];
+      });
+      
+      const avgUptime = serviceCount > 0 ? (totalUptime / serviceCount) : 100;
+      const incidentCount = incidentCountMap[page.id] || 0;
+      
+      return {
+        id: page.id,
+        name: page.name,
+        subdomain: page.subdomain,
+        customDomain: page.customDomain || null,
+        description: page.description,
+        status: page.status.toLowerCase(),
+        visibility: page.visibility.toLowerCase(),
+        services,
+        subscribers: 0, // TODO: Implement subscriber count if needed
+        incidents: incidentCount,
+        uptime: parseFloat(avgUptime.toFixed(2)),
+        isPublished: page.isPublished,
+        theme: page.theme || 'light',
+        branding: {
+          primaryColor: page.primaryColor || '#3b82f6',
+          headerBg: page.headerBg || '#ffffff',
+          logo: page.logo || ''
+        },
+        organization: {
+          id: page.organizationId,
+          name: page.organization?.name || ''
+        },
+        createdBy: {
+          id: page.createdById,
+          name: page.createdBy?.fullName || page.createdBy?.email || 'Unknown'
+        },
+        lastUpdated: page.lastUpdated.toISOString(),
+        createdAt: page.createdAt.toISOString()
+      };
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedStatusPages
+    });
+
+  } catch (error) {
+    console.error('Error fetching status pages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch status pages',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
 
 export const createStatusPage = async (req: Request, res: Response) => {
   console.log('Received status page creation request:', {
