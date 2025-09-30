@@ -18,16 +18,16 @@ model User {
   id                              String                 @id @default(uuid())
   fullName                        String?
   email                           String                 @unique
-  phone                           String? 
-  company                         String[]               @default([]) 
-  jobTitle                        String? 
-  location                        String? 
-  bio                             String? 
-  avatar                          String? 
-  joinDate                        DateTime               @default(now()) 
-  lastLogin                       DateTime? 
-  isEmailVerified                 Boolean                @default(false) 
-  isPhoneVerified                 Boolean                @default(false) 
+  phone                           String?
+  company                         String[]               @default([])
+  jobTitle                        String?
+  location                        String?
+  bio                             String?
+  avatar                          String?
+  joinDate                        DateTime               @default(now())
+  lastLogin                       DateTime?
+  isEmailVerified                 Boolean                @default(false)
+  isPhoneVerified                 Boolean                @default(false)
   password                        String
   selectedOrganizationId          String?
   selectedOrganizationRole        String? // Store role like "Admin", "Member", etc.
@@ -57,27 +57,27 @@ model website {
   checkInterval         Int               @default(60000)
   method                Method            @default(GET)
   regions               String[]          @default(["India"])
-  alertTime             Int               @default(0) 
-  severity              Severity          @default(low) 
-  timeAdded             DateTime          @default(now()) 
-  ticks                 WebsiteTick[] 
+  alertTime             Int               @default(0)
+  severity              Severity          @default(low)
+  timeAdded             DateTime          @default(now())
+  ticks                 WebsiteTick[]
   organization          Organization      @relation(fields: [organizationId], references: [id])
   organizationId        String
   createdBy             User              @relation("CreatedBy", fields: [createdById], references: [id]) // Tracks who created a website
   createdById           String
   escalationPolicyId    String?
-  escalationPolicy      EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id]) 
+  escalationPolicy      EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id])
   incidents             Int               @default(0)
   lastChecked           DateTime          @default(now())
-  currently_upForIndays Int               @default(0) 
+  currently_upForIndays Int               @default(0)
   tags                  String[]          @default([])
-  nextCheckTime         DateTime? 
+  nextCheckTime         DateTime?
   uptime                Float             @default(100) // Explicitly set as float, aligned with frontend
-  responseTimeMs        Int               @default(0) 
-  isActive              Boolean           @default(true) 
-  downtimeToday         Int               @default(0) 
-  avgResponseTime24h    Int               @default(0) 
-  uptimeTrend           UptimeTrend       @default(ONLINE) 
+  responseTimeMs        Int               @default(0)
+  isActive              Boolean           @default(true)
+  downtimeToday         Int               @default(0)
+  avgResponseTime24h    Int               @default(0)
+  uptimeTrend           UptimeTrend       @default(ONLINE)
   Incidents             Incident[] // Add this inverse relation
 }
 
@@ -120,7 +120,7 @@ model EscalationPolicy {
 model EscalationStep {
   id       String           @id @default(uuid())
   policyId String
-  policy   EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade) 
+  policy   EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   stepOrder Int // order of step (1, 2, 3, etc.)
 
@@ -132,7 +132,7 @@ model EscalationStep {
   delayMinutes  Int      @default(0) // wait before this step triggers 
   repeatCount   Int      @default(1)
   escalateAfter Int      @default(5) // wait before escalating to next step (in minutes) 
-  customMessage String? 
+  customMessage String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -213,15 +213,15 @@ enum Priority {
 model Region {
   id    String        @id @default(uuid())
   name  String        @unique
-  ticks WebsiteTick[] 
+  ticks WebsiteTick[]
 }
 
 model WebsiteTick {
   id               String        @id @default(uuid())
   response_time_ms Int
   status           WebsiteStatus
-  Website_         website       @relation(fields: [website_id], references: [id]) 
-  Region_          Region        @relation(fields: [region_id], references: [id]) 
+  Website_         website       @relation(fields: [website_id], references: [id])
+  Region_          Region        @relation(fields: [region_id], references: [id])
   website_id       String
   region_id        String
   createdAt        DateTime      @default(now())
@@ -231,8 +231,8 @@ enum WebsiteStatus {
   Online
   Offline
   Unknown
-  Paused 
-  Maintenance 
+  Paused
+  Maintenance
 }
 
 enum MonitorType {
@@ -256,44 +256,44 @@ enum Severity {
 
 enum OrganizationStatus {
   ACTIVE
-  INACTIVE 
+  INACTIVE
 }
 
 enum ReportServiceStatus {
-  OPERATIONAL 
-  DOWN 
-  MAINTENANCE 
+  OPERATIONAL
+  DOWN
+  MAINTENANCE
 }
 
 enum IncidentStatus {
-  RESOLVED 
-  INVESTIGATING 
-  MONITORING 
-  OPERATIONAL 
-  DOWN 
+  RESOLVED
+  INVESTIGATING
+  MONITORING
+  OPERATIONAL
+  DOWN
   MAINTENANCE
   CLOSED
 }
 
 enum IncidentSeverity {
-  CRITICAL 
-  MAJOR 
-  MINOR 
-  MAINTENANCE 
-  NONE 
+  CRITICAL
+  MAJOR
+  MINOR
+  MAINTENANCE
+  NONE
 }
 
 enum StatusPageStatus {
-  OPERATIONAL 
+  OPERATIONAL
 }
 
 enum StatusPageVisibility {
-  PUBLIC 
+  PUBLIC
 }
 
 enum ServiceStatus {
-  OPERATIONAL 
-  DOWN 
+  OPERATIONAL
+  DOWN
 }
 
 model StatusPage {
@@ -305,16 +305,16 @@ model StatusPage {
   status         StatusPageStatus
   visibility     StatusPageVisibility
   // password              String? 
-  services       ServiceGroup[] 
-  incidents      Int                  @default(0) 
-  uptime         Float                @default(100) 
-  lastUpdated    DateTime             @updatedAt 
-  isPublished    Boolean              @default(false) 
-  createdAt      DateTime             @default(now()) 
-  theme          String 
-  logo           String? 
-  primaryColor   String 
-  headerBg       String 
+  services       ServiceGroup[]
+  incidents      Int                  @default(0)
+  uptime         Float                @default(100)
+  lastUpdated    DateTime             @updatedAt
+  isPublished    Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  theme          String
+  logo           String?
+  primaryColor   String
+  headerBg       String
   // emailNotifications    Boolean            @default(false) 
   // slackNotifications    Boolean            @default(false) 
   // webhookNotifications  Boolean            @default(false) 
@@ -322,8 +322,8 @@ model StatusPage {
   // showUptime            Boolean            @default(true) 
   // showIncidents         Boolean            @default(true) 
   // showMetrics           Boolean            @default(true) 
-  customCSS      String? 
-  customHTML     String? 
+  customCSS      String?
+  customHTML     String?
   organization   Organization         @relation(fields: [organizationId], references: [id])
   organizationId String
   createdBy      User                 @relation("CreatedBy", fields: [createdById], references: [id]) // Tracks who created a status page
@@ -333,20 +333,20 @@ model StatusPage {
 model ServiceGroup {
   id           String        @id @default(cuid())
   name         String
-  services     Service[] 
+  services     Service[]
   status       ServiceStatus
-  statusPageId String 
-  statusPage   StatusPage    @relation(fields: [statusPageId], references: [id]) 
+  statusPageId String
+  statusPage   StatusPage    @relation(fields: [statusPageId], references: [id])
 }
 
 model Service {
   id             String        @id @default(cuid())
   name           String
   status         ServiceStatus
-  uptime         Float         @default(100) 
-  monitorId      String? 
-  serviceGroupId String 
-  serviceGroup   ServiceGroup  @relation(fields: [serviceGroupId], references: [id]) 
+  uptime         Float         @default(100)
+  monitorId      String?
+  serviceGroupId String
+  serviceGroup   ServiceGroup  @relation(fields: [serviceGroupId], references: [id])
 }
 
 model Organization {
@@ -354,21 +354,21 @@ model Organization {
   name               String               @unique
   description        String?
   status             OrganizationStatus   @default(ACTIVE)
-  totalMembers       Int                  @default(0) 
-  createdOn          DateTime             @default(now()) 
-  industry           String? 
-  location           String? 
-  memberSince        DateTime?            @default(now()) 
-  foundedYear        Int? 
-  about              String? 
-  members            OrganizationMember[] 
+  totalMembers       Int                  @default(0)
+  createdOn          DateTime             @default(now())
+  industry           String?
+  location           String?
+  memberSince        DateTime?            @default(now())
+  foundedYear        Int?
+  about              String?
+  members            OrganizationMember[]
   websites           website[]
   escalationPolicies EscalationPolicy[]
   integrations       Integration[]
   statusPages        StatusPage[]
   reportServices     ReportService[]
   incidents          Incident[]
-  teams              Team[] 
+  teams              Team[]
   onCallSchedules    OnCallSchedule[]
 }
 
@@ -378,7 +378,7 @@ model OrganizationMember {
   email          String
   roleId         String
   role           Role         @relation(fields: [roleId], references: [id])
-  organizationId String 
+  organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id]) // AI-generated relation
   userId         String? // Made optional to support inactive memberships
   user           User?        @relation(fields: [userId], references: [id]) // AI-generated relation
@@ -398,10 +398,10 @@ model ReportService {
   url            String
   status         ReportServiceStatus
   uptime         Float
-  avgResponse    Int 
-  incidents      Int 
-  lastChecked    DateTime 
-  Incidents      Incident[] 
+  avgResponse    Int
+  incidents      Int
+  lastChecked    DateTime
+  Incidents      Incident[]
   organization   Organization        @relation(fields: [organizationId], references: [id])
   organizationId String
   createdBy      User                @relation("CreatedBy", fields: [createdById], references: [id]) // Tracks who created a report service
@@ -409,54 +409,54 @@ model ReportService {
 }
 
 model Incident {
-  id                      String           @id @default(cuid())
-  title                   String
-  serviceName             String
-  status                  IncidentStatus
-  severity                IncidentSeverity
-  startTime               DateTime
-  endTime                 DateTime?
-  duration                String
-  impact                  String
-  serviceId               String?
-  service                 ReportService?   @relation(fields: [serviceId], references: [id])
-  organization            Organization     @relation(fields: [organizationId], references: [id])
-  organizationId          String
-  createdAt               DateTime         @default(now())
-  Acknowledged            Boolean          @default(false)
-  AcknowledgedBy          User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id])
-  acknowledgedById        String?
-  Resolved                Boolean          @default(false)
-  ResolvedBy              User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id])
-  resolvedById            String?
-  
+  id               String           @id @default(cuid())
+  title            String
+  serviceName      String
+  status           IncidentStatus
+  severity         IncidentSeverity
+  startTime        DateTime
+  endTime          DateTime?
+  duration         String
+  impact           String
+  serviceId        String?
+  service          ReportService?   @relation(fields: [serviceId], references: [id])
+  organization     Organization     @relation(fields: [organizationId], references: [id])
+  organizationId   String
+  createdAt        DateTime         @default(now())
+  Acknowledged     Boolean          @default(false)
+  AcknowledgedBy   User?            @relation("AcknowledgedByIncident", fields: [acknowledgedById], references: [id])
+  acknowledgedById String?
+  Resolved         Boolean          @default(false)
+  ResolvedBy       User?            @relation("ResolvedByIncident", fields: [resolvedById], references: [id])
+  resolvedById     String?
+
   currentEscalationStepId String?
-  nextEscalationTime      DateTime?        // When the next escalation action should happen
-  escalationStepStartTime DateTime?        // When the current step actually started (after delayMinutes)
-  currentRepeatCount      Int              @default(0) // How many times current step has been repeated
-  stepDelayCompleted      Boolean          @default(false) // Whether delayMinutes has passed for current step
-  
-  createdById             String?
-  websiteId               String?
-  website                 website?         @relation(fields: [websiteId], references: [id])
-  updates                 IncidentUpdate[] // Relation to incident updates
+  nextEscalationTime      DateTime? // When the next escalation action should happen
+  escalationStepStartTime DateTime? // When the current step actually started (after delayMinutes)
+  currentRepeatCount      Int       @default(0) // How many times current step has been repeated
+  stepDelayCompleted      Boolean   @default(false) // Whether delayMinutes has passed for current step
+
+  createdById String?
+  websiteId   String?
+  website     website?         @relation(fields: [websiteId], references: [id])
+  updates     IncidentUpdate[] // Relation to incident updates
 }
 
 model IncidentUpdate {
-  id        String   @id @default(cuid())
-  message   String
-  type      String   // 'comment' | 'incident_report' | 'status_change'
-  incident  Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  message    String
+  type       String // 'comment' | 'incident_report' | 'status_change'
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
   incidentId String
-  user      User     @relation("IncidentUpdateUser", fields: [userId], references: [id])
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user       User     @relation("IncidentUpdateUser", fields: [userId], references: [id])
+  userId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 enum UptimeTrend {
-  ONLINE 
-  OFFLINE 
+  ONLINE
+  OFFLINE
 }
 
 model OnCallSchedule {
