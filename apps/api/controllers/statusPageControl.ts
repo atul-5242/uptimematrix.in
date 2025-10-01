@@ -651,9 +651,12 @@ export const getStatusPageByDomain = async (req: Request, res: Response) => {
 
 export const provisionCustomDomain = async (req: Request, res: Response) => {
   try {
-    const { domain } = req.body;
+    const { domain,subdomain } = req.body;
     const { id } = req.params;
-    
+    if(!id) {
+      return res.status(400).json({ success: false, message: 'Status page ID is required' });
+    }
+
     // Verify status page exists and user has access
     const statusPage = await prismaClient.statusPage.findFirst({
       where: {
@@ -666,27 +669,94 @@ export const provisionCustomDomain = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Status page not found' });
     }
     
-    // Execute provisioning script
-    const { exec } = require('child_process');
-    exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
-      if (err) {
-        console.error('Domain provisioning failed:', err, stderr);
-        return res.status(500).json({ 
-          success: false, 
-          message: 'Failed to provision domain',
-          error: stderr 
-        });
-      }
-      
-      // Update database with custom domain
-      prismaClient.statusPage.update({
-        where: { id },
-        data: { customDomain: domain }
-      }).then(() => {
-        res.json({ success: true, message: 'Domain provisioned successfully' });
+    // Execute provisioning script for custom domain
+    if (domain) {
+      const { exec } = require('child_process');
+      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
+        if (err) {
+          console.error('Custom domain provisioning failed:', err, stderr);
+          return res.status(500).json({ 
+            success: false, 
+            message: 'Failed to provision custom domain',
+            error: stderr.toString()
+          });
+        }
+        
+        try {
+          // Update database with custom domain without affecting subdomain
+          const updatedPage = await prismaClient.statusPage.update({
+            where: { id },
+            data: { 
+              customDomain: domain
+              // Keep the existing subdomain
+            },
+            select: {
+              id: true,
+              subdomain: true,
+              customDomain: true
+            }
+          });
+          
+          res.json({ 
+            success: true, 
+            message: 'Custom domain provisioned successfully',
+            data: updatedPage
+          });
+        } catch (error: unknown) {
+          const dbError = error as Error;
+          console.error('Database update failed:', dbError);
+          res.status(500).json({ 
+            success: false, 
+            message: 'Domain provisioned but failed to update database',
+            error: dbError.message 
+          });
+        }
       });
-    });
-    
+      return; // Return to prevent further execution
+    }
+    if (subdomain) {
+      const { exec } = require('child_process');
+      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${subdomain}`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
+        if (err) {
+          console.error('Subdomain provisioning failed:', err, stderr);
+          return res.status(500).json({ 
+            success: false, 
+            message: 'Failed to provision subdomain',
+            error: stderr.toString()
+          });
+        }
+        
+        try {
+          // Update database with subdomain without affecting custom domain
+          const updatedPage = await prismaClient.statusPage.update({
+            where: { id },
+            data: { 
+              subdomain: subdomain
+              // Keep the existing custom domain
+            },
+            select: {
+              id: true,
+              subdomain: true,
+              customDomain: true
+            }
+          });
+          
+          res.json({ 
+            success: true, 
+            message: 'Subdomain provisioned successfully',
+            data: updatedPage
+          });
+        } catch (error: unknown) {
+          const dbError = error as Error;
+          console.error('Database update failed:', dbError);
+          res.status(500).json({ 
+            success: false, 
+            message: 'Subdomain provisioned but failed to update database',
+            error: dbError.message 
+          });
+        }
+      });
+    }
   } catch (error) {
     console.error('Error in domain provisioning:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });

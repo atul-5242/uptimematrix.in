@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     
     // Ensure NEXT_PUBLIC_API_URL is set
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     
     // Ensure we have a Bearer token
     if (!authHeader.startsWith('Bearer ')) {
@@ -95,6 +95,37 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json()
+    
+    // If status page was created successfully, proceed with domain provisioning
+    if (data.id && (body.subdomain || body.customDomain)) {
+      try {
+        const provisionResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_APP_URL}/api/status-pages/provision-domain`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+            body: JSON.stringify({
+              statusPageId: data.id,
+              subdomain: body.subdomain,
+              customDomain: body.customDomain,
+            }),
+          }
+        )
+
+        if (!provisionResponse.ok) {
+          console.error('Domain provisioning failed:', await provisionResponse.text())
+          // Continue with the original response even if provisioning fails
+          // as the status page was created successfully
+        }
+      } catch (error) {
+        console.error('Error in domain provisioning:', error)
+        // Continue with the original response
+      }
+    }
+
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Error creating status page:', error)
