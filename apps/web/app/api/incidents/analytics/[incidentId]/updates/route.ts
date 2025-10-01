@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const API_BASE_URL = "https://api.uptimematrix.atulmaurya.in/";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +19,9 @@ export async function POST(
 
     const { incidentId } = params;
     const body = await request.json();
-    const url = new URL(`/api/incidents/analytics/${incidentId}/updates`, API_BASE_URL);
+    const url = `${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`;
     
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,9 +63,9 @@ export async function GET(
     }
 
     const { incidentId } = params;
-    const url = new URL(`/api/incidents/analytics/${incidentId}/updates`, API_BASE_URL);
+    const url = `${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`;
     
-    const response = await fetch(url.toString(), {
+    const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

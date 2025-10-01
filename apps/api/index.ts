@@ -14,6 +14,7 @@ import onCallRoutes from './routes/oncallRoute/oncallRoutes.js';
 import regionsRouter from "./routes/regions.js";
 import incidentRouter from "./routes/incidentRoutes.js";
 import incidentAnalyticsRouter from "./routes/incidentAnalyticsRoutes.js";
+import statusPageRouter from "./routes/statusPageRoutes.js";
 
 dotenv.config();
 
@@ -152,7 +153,8 @@ app.use("/api/teams", teamRouter);
 app.use("/api/roles", roleRouter);
 app.use("/api/oncall", onCallRoutes);
 app.use("/api/incidents", incidentRouter);
-app.use("/api/incidents/analytics", incidentAnalyticsRouter);
+app.use("/api/incident-analytics", incidentAnalyticsRouter);
+app.use("/api/status-pages", statusPageRouter);
 app.use("/api", sessionRouter);
 
 // Error handling middleware

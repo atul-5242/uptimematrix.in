@@ -15,8 +15,8 @@ router.use(authMiddleware);
 // GET /api/incidents/analytics/:incidentId - Get detailed analytics for a specific incident
 router.get('/:incidentId', getIncidentAnalytics);
 
-// PATCH /api/incidents/analytics/:incidentId/status - Update incident status
-router.patch('/:incidentId/status', updateIncidentStatus);
+// PUT /api/incidents/analytics/:incidentId/status - Update incident status  
+router.put('/:incidentId/status', updateIncidentStatus);
 
 // POST /api/incidents/analytics/:incidentId/updates - Create incident update
 router.post('/:incidentId/updates', createIncidentUpdate);

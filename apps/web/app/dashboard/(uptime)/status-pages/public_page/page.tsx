@@ -39,7 +39,7 @@ interface StatusPageData {
   id: string
   name: string
   description: string
-  status: 'operational' | 'down' | 'major_outage' | 'maintenance' // Re-added 'maintenance'
+  status: 'operational' | 'down' | 'major_outage' | 'maintenance' 
   lastUpdated: string
   logo?: string
   branding: {
@@ -60,14 +60,14 @@ interface StatusPageData {
 interface ServiceGroup {
   id: string
   name: string
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
+  status: 'operational' | 'down' | 'major_outage' 
   services: Service[]
 }
 
 interface Service {
   id: string
   name: string
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
+  status: 'operational' | 'down' | 'major_outage' 
   uptime: number
   responseTime?: number
   description?: string
@@ -78,7 +78,7 @@ interface Service {
 interface UptimeDay {
   date: string
   uptime: number
-  status: 'operational' | 'down' | 'major_outage' // Removed 'degraded'
+  status: 'operational' | 'down' | 'major_outage' 
 }
 
 interface Incident {
@@ -111,166 +111,51 @@ interface ResponseTimeDataPoint {
   responseTime: number
 }
 
+
+
+
+
+interface PublicStatusPageProps {
+  statusPageData: StatusPageData;
+}
+
 export default function PublicStatusPage() {
-  const [statusData, setStatusData] = useState<StatusPageData | null>(null)
-  const [loading, setLoading] = useState<boolean>(true)
-  const [subscriberEmail, setSubscriberEmail] = useState<string>('')
-  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set())
-  const [selectedTimeRange, setSelectedTimeRange] = useState<'24h' | '7d' | '30d' | '90d'>('7d')
-  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set())
+  const [statusData, setStatusData] = useState<StatusPageData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [subscriberEmail, setSubscriberEmail] = useState<string>('');
+  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
+  const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set());
+  const [selectedTimeRange] = useState<'24h' | '7d' | '30d' | '90d'>('7d');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'incidents' | 'status'>('overview');
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data - replace with actual API call based on subdomain/custom domain
+  // Fetch data on mount - domain will be extracted from headers on backend
   useEffect(() => {
-    const mockStatusData: StatusPageData = {
-      id: '1',
-      name: 'My Company Status',
-      description: 'Track the status of our main services and infrastructure',
-      status: 'operational',
-      lastUpdated: new Date().toISOString(),
-      logo: '',
-      branding: {
-        primaryColor: '#2563eb',
-        headerBg: '#ffffff'
-      },
-      serviceGroups: [
-        {
-          id: '1',
-          name: 'Web Services',
-          status: 'operational',
-          services: [
-            {
-              id: '1',
-              name: 'Main Website',
-              status: 'operational',
-              uptime: 99.95,
-              responseTime: 245,
-              description: 'Primary company website and landing pages',
-              lastCheck: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.05 ? Math.random() * 5 + 95 : Math.random() * 30 + 60,
-                status: Math.random() > 0.05 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            },
-            {
-              id: '2',
-              name: 'API Gateway',
-              status: 'operational',
-              uptime: 99.98,
-              responseTime: 89,
-              description: 'REST API and GraphQL endpoints',
-              lastCheck: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.02 ? Math.random() * 3 + 97 : Math.random() * 40 + 50,
-                status: Math.random() > 0.02 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            },
-            {
-              id: '3',
-              name: 'CDN',
-              status: 'operational',
-              uptime: 100,
-              responseTime: 12,
-              description: 'Global content delivery network',
-              lastCheck: new Date(Date.now() - 30 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() * 2 + 98,
-                status: 'operational' as 'operational' | 'down' | 'major_outage'
-              }))
-            }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Database Services',
-          status: 'operational',
-          services: [
-            {
-              id: '4',
-              name: 'Primary Database',
-              status: 'operational',
-              uptime: 99.99,
-              responseTime: 5,
-              description: 'Main PostgreSQL database cluster',
-              lastCheck: new Date(Date.now() - 45 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() * 1 + 99,
-                status: 'operational' as 'operational' | 'down' | 'major_outage'
-              }))
-            },
-            {
-              id: '5',
-              name: 'Redis Cache',
-              status: 'operational',
-              uptime: 99.97,
-              responseTime: 1,
-              description: 'In-memory data structure store',
-              lastCheck: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-              uptimeHistory: Array.from({ length: 90 }, (_, i) => ({
-                date: new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                uptime: Math.random() > 0.03 ? Math.random() * 3 + 97 : Math.random() * 20 + 70,
-                status: Math.random() > 0.03 ? 'operational' : 'down' as 'operational' | 'down' | 'major_outage' // Replaced degraded with down
-              }))
-            }
-          ]
-        }
-      ],
-      incidents: [
-        {
-          id: '1',
-          title: 'API Gateway Increased Response Times',
-          description: 'We are experiencing increased response times on our API gateway affecting some user requests.',
-          status: 'resolved',
-          severity: 'minor',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString(),
-          resolvedAt: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString(),
-          affectedServices: ['2'],
-          updates: [
-            {
-              id: '1',
-              status: 'investigating',
-              message: 'We have identified increased response times on our API gateway and are investigating the root cause.',
-              timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '2',
-              status: 'identified',
-              message: 'The issue has been identified as a database connection pool exhaustion. We are implementing a fix.',
-              timestamp: new Date(Date.now() - 1.8 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: '3',
-              status: 'resolved',
-              message: 'The connection pool has been optimized and response times have returned to normal levels.',
-              timestamp: new Date(Date.now() - 1.5 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        }
-      ],
-      metrics: {
-        overallUptime: 99.96,
-        avgResponseTime: 89,
-        totalChecks: 45892
-      },
-      uptimeData: Array.from({ length: 30 }, (_, i) => ({
-        date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        uptime: Math.random() > 0.1 ? Math.random() * 5 + 95 : Math.random() * 30 + 60
-      })),
-      responseTimeData: Array.from({ length: 24 }, (_, i) => ({
-        time: `${String(i).padStart(2, '0')}:00`,
-        responseTime: Math.floor(Math.random() * 200 + 50)
-      }))
-    }
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/status-pages/by-domain', {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+        });
 
-    setTimeout(() => {
-      setStatusData(mockStatusData)
-      setLoading(false)
-    }, 1000)
-  }, [])
+        if (!response.ok) {
+          throw new Error(`Failed to fetch status: ${response.statusText}`);
+        }
+
+        const { data } = await response.json();
+        setStatusData(data);
+      } catch (err) {
+        console.error('Error fetching status page data:', err);
+        setError('Failed to load status page. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -368,7 +253,7 @@ export default function PublicStatusPage() {
     )
   }
 
-  if (loading) {
+  if (loading || !statusData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -379,7 +264,7 @@ export default function PublicStatusPage() {
     )
   }
 
-  if (!statusData) {
+  if (error || !statusData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

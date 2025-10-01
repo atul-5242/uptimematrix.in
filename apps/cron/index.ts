@@ -1,9 +1,9 @@
 import * as cron from 'node-cron';
 import { prismaClient } from '@uptimematrix/store';
-import { config } from 'dotenv';
+import dotenv from 'dotenv';
 
 // Load environment variables
-config();
+dotenv.config();
 
 const REGION = process.env.REGION!;
 if (!REGION) throw new Error("REGION is required");

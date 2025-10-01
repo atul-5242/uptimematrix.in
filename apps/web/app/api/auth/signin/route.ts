@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
     }
 
-    const baseURL = "https://api.uptimematrix.atulmaurya.in/";
+    const baseURL = process.env.NEXT_PUBLIC_API_URL;;
     const upstream = await fetch(`${baseURL}/auth/user/signin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

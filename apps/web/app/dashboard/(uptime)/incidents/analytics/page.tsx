@@ -74,29 +74,58 @@ export default function IncidentDetailPage() {
       setLoading(true)
       
       try {
-        const [data, updatesData] = await Promise.all([
+        const [data, updatesResponse] = await Promise.all([
           getIncidentAnalytics(incidentId),
           getIncidentUpdates(incidentId)
         ]);
         
+        // Extract updates data properly
+        // Handle both direct array response and wrapped response
+        let updatesData = [];
+        if (Array.isArray(updatesResponse)) {
+          updatesData = updatesResponse;
+        } else if (updatesResponse && updatesResponse.data && Array.isArray(updatesResponse.data)) {
+          updatesData = updatesResponse.data;
+        } else if (updatesResponse && updatesResponse.success && Array.isArray(updatesResponse.data)) {
+          updatesData = updatesResponse.data;
+        }
+  
         // Transform backend data to match frontend interface
+        const status = data?.status ? String(data.status).toLowerCase() : 'open';
+        const severity = data?.severity ? String(data.severity).toLowerCase() : 'medium';
+        
+        // Safely extract metrics with defaults
+        const metrics = data?.metrics || {};
+        const responseTimeMs = typeof metrics.responseTimeMs === 'number' ? metrics.responseTimeMs : 0;
+        const resolutionTimeMs = typeof metrics.resolutionTimeMs === 'number' ? metrics.resolutionTimeMs : 0;
+        
+        // Transform updates to match frontend interface
+        const transformedUpdates = updatesData.map((update: any) => ({
+          id: update.id,
+          message: update.message,
+          type: update.type,
+          author: typeof update.author === 'string' ? update.author : 
+                  (update.author?.name || update.author?.email || 'Unknown'),
+          timestamp: update.createdAt || update.timestamp
+        }));
+        
         const transformedIncident: Incident = {
-          id: data.id,
-          title: data.title,
-          description: data.description,
-          status: data.status.toLowerCase() as IncidentStatus,
-          severity: data.severity.toLowerCase() as IncidentSeverity,
+          id: data.id || incidentId || '',
+          title: data.title || 'Untitled Incident',
+          description: data.description || 'No description provided',
+          status: (status as IncidentStatus) || 'open',
+          severity: (severity as IncidentSeverity) || 'medium',
           affectedServices: [data.service?.name || 'Unknown Service'],
           createdAt: data.createdAt,
           acknowledgedAt: data.acknowledgedAt,
           resolvedAt: data.resolvedAt,
           assignee: data.acknowledgedBy?.name || data.resolvedBy?.name,
-          responseTime: data.metrics.responseTimeMs ? Math.floor(data.metrics.responseTimeMs / 60000) : 0,
-          downtime: data.metrics.resolutionTimeMs ? Math.floor(data.metrics.resolutionTimeMs / 60000) : 0,
-          impactedUsers: 0, // Not available in current backend
+          responseTime: responseTimeMs ? Math.floor(responseTimeMs / 60000) : 0,
+          downtime: resolutionTimeMs ? Math.floor(resolutionTimeMs / 60000) : 0,
+          impactedUsers: 0,
           escalationLevel: 1,
           tags: ['incident'],
-          updates: updatesData || [],
+          updates: transformedUpdates, // Ensure this is always an array
           metrics: {
             responseTimeMs: [],
             errorRate: [],
@@ -109,13 +138,30 @@ export default function IncidentDetailPage() {
         setEditedDescription(transformedIncident.description);
       } catch (error) {
         console.error('Error fetching incident:', error);
+        // Set a default incident with empty updates array to prevent crashes
+        setIncident(prev => prev || {
+          id: incidentId || '',
+          title: 'Error Loading Incident',
+          description: 'Failed to load incident details',
+          status: 'open',
+          severity: 'medium',
+          affectedServices: ['Unknown'],
+          createdAt: new Date().toISOString(),
+          responseTime: 0,
+          downtime: 0,
+          impactedUsers: 0,
+          escalationLevel: 1,
+          tags: [],
+          updates: [], // Ensure updates is always an array
+          metrics: { responseTimeMs: [], errorRate: [], timestamps: [] }
+        });
       } finally {
         setLoading(false);
       }
     }
     
     fetchIncident()
-  }, [incidentId])
+  }, [incidentId])  
 
   const getStatusColor = (status: IncidentStatus) => {
     switch (status) {
@@ -470,46 +516,54 @@ export default function IncidentDetailPage() {
                     </div>
 
                     {/* Timeline */}
-                    <div className="space-y-4">
-                      {incident.updates.slice().reverse().map((update, index) => (
-                        <div key={update.id} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              update.type === 'status_change' ? 'bg-blue-100' : 'bg-gray-100'
-                            }`}>
-                              {update.type === 'status_change' ? (
-                                <Activity className="h-4 w-4 text-blue-600" />
-                              ) : update.type === 'incident_report' ? (
-                                <BookOpen className="h-4 w-4 text-purple-600" />
-                              ) : (
-                                <MessageSquare className="h-4 w-4 text-gray-600" />
-                              )}
-                            </div>
-                            {index < incident.updates.length - 1 && (
-                              <div className="w-px h-16 bg-gray-200 mt-2" />
-                            )}
-                          </div>
-                          <div className="flex-1 pb-4">
-                            <div className="bg-white border border-gray-200 rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-gray-900">{update.author}</span>
-                                  {update.status && (
-                                    <Badge className={getStatusColor(update.status)} variant="outline">
-                                      changed status to {update.status}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <span className="text-sm text-gray-500">
-                                  {formatTimeAgo(update.timestamp)}
-                                </span>
-                              </div>
-                              <p className="text-gray-700">{update.message}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    {/* Timeline */}
+<div className="space-y-4">
+  {Array.isArray(incident.updates) && incident.updates.length > 0 ? (
+    incident.updates.slice().reverse().map((update, index) => (
+      <div key={update.id} className="flex gap-4">
+        <div className="flex flex-col items-center">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            update.type === 'status_change' ? 'bg-blue-100' : 'bg-gray-100'
+          }`}>
+            {update.type === 'status_change' ? (
+              <Activity className="h-4 w-4 text-blue-600" />
+            ) : update.type === 'incident_report' ? (
+              <BookOpen className="h-4 w-4 text-purple-600" />
+            ) : (
+              <MessageSquare className="h-4 w-4 text-gray-600" />
+            )}
+          </div>
+          {index < incident.updates.length - 1 && (
+            <div className="w-px h-16 bg-gray-200 mt-2" />
+          )}
+        </div>
+        <div className="flex-1 pb-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">{update.author}</span>
+                {update.status && (
+                  <Badge className={getStatusColor(update.status)} variant="outline">
+                    changed status to {update.status}
+                  </Badge>
+                )}
+              </div>
+              <span className="text-sm text-gray-500">
+                {formatTimeAgo(update.timestamp)}
+              </span>
+            </div>
+            <p className="text-gray-700">{update.message}</p>
+          </div>
+        </div>
+      </div>
+    ))
+  ) : (
+    <div className="text-center py-8 text-gray-500">
+      <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+      <p>No updates yet. Be the first to add an update!</p>
+    </div>
+  )}
+</div>
                   </CardContent>
                 </TabsContent>
               </Tabs>
