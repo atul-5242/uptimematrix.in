@@ -112,102 +112,16 @@ interface ResponseTimeDataPoint {
 }
 
 
-import { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-export const getServerSideProps: GetServerSideProps = async (context: GetServerSidePropsContext) => {
-  const { req } = context;
-  const host = req.headers.host; // e.g., status.customer.com
-  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
-  const apiUrl = `${protocol}://${host}`;
-  
-  try {
-    const res = await fetch(`${apiUrl}/api/status-pages/by-domain?domain=${host}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch status page: ${res.statusText}`);
-    }
-
-    const { data } = await res.json();
-
-    if (!data) {
-      return { notFound: true };
-    }
-
-    // Transform the data to match our frontend types
-    const statusPageData: StatusPageData = {
-      id: data.id,
-      name: data.name,
-      description: data.description || 'Our services are running smoothly',
-      status: data.status?.toLowerCase() || 'operational',
-      lastUpdated: data.lastUpdated || new Date().toISOString(),
-      logo: data.logo || undefined,
-      branding: {
-        primaryColor: data.branding?.primaryColor || '#2563eb',
-        headerBg: data.branding?.headerBg || '#ffffff',
-      },
-      serviceGroups: data.serviceGroups?.map((group: any) => ({
-        id: group.id,
-        name: group.name,
-        status: group.status?.toLowerCase() || 'operational',
-        services: group.services?.map((service: any) => ({
-          id: service.id,
-          name: service.name,
-          status: service.status?.toLowerCase() || 'operational',
-          uptime: service.uptime || 100,
-          responseTime: service.responseTime,
-          description: service.description,
-          lastCheck: service.lastCheck || new Date().toISOString(),
-          uptimeHistory: service.uptimeHistory || [],
-        })) || [],
-      })) || [],
-      incidents: data.incidents?.map((incident: any) => ({
-        id: incident.id,
-        title: incident.title,
-        description: incident.description || '',
-        status: incident.status?.toLowerCase() || 'investigating',
-        severity: incident.severity?.toLowerCase() || 'minor',
-        createdAt: incident.createdAt,
-        updatedAt: incident.updatedAt,
-        resolvedAt: incident.resolvedAt,
-        updates: incident.updates?.map((update: any) => ({
-          id: update.id,
-          status: update.status,
-          message: update.message,
-          timestamp: update.timestamp || update.createdAt,
-        })) || [],
-        affectedServices: incident.affectedServices || [],
-      })) || [],
-      metrics: {
-        overallUptime: data.metrics?.overallUptime || 100,
-        avgResponseTime: data.metrics?.avgResponseTime || 0,
-        totalChecks: data.metrics?.totalChecks || 0,
-      },
-      uptimeData: data.uptimeData || [],
-      responseTimeData: data.responseTimeData || [],
-    };
-
-    return {
-      props: { statusPageData },
-    };
-  } catch (error) {
-    console.error('Error fetching status page:', error);
-    return { notFound: true };
-  }
-};
 
 
 interface PublicStatusPageProps {
   statusPageData: StatusPageData;
 }
 
-export default function PublicStatusPage({ statusPageData: initialData }: PublicStatusPageProps) {
-  const [statusData, setStatusData] = useState<StatusPageData>(initialData);
-  const [loading, setLoading] = useState<boolean>(!initialData);
+export default function PublicStatusPage() {
+  const [statusData, setStatusData] = useState<StatusPageData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [subscriberEmail, setSubscriberEmail] = useState<string>('');
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [expandedIncidents, setExpandedIncidents] = useState<Set<string>>(new Set());
@@ -215,13 +129,8 @@ export default function PublicStatusPage({ statusPageData: initialData }: Public
   const [selectedTab, setSelectedTab] = useState<'overview' | 'incidents' | 'status'>('overview');
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data if not provided via server-side props
+  // Fetch data on mount - domain will be extracted from headers on backend
   useEffect(() => {
-    if (statusData) {
-      setLoading(false);
-      return;
-    }
-
     const fetchData = async () => {
       try {
         const response = await fetch('/api/status-pages/by-domain', {
@@ -246,7 +155,7 @@ export default function PublicStatusPage({ statusPageData: initialData }: Public
     };
 
     fetchData();
-  }, [statusData]);
+  }, []);
 
   const getStatusColor = (status: string): string => {
     switch (status) {

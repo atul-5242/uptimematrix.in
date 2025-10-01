@@ -6,14 +6,14 @@ interface Service {
   name: string;
   description: string | null;
   status: 'operational' | 'degraded' | 'down' | 'maintenance' | 'major_outage' | 'unknown';
-  uptime: {
-    '24h': number;
-    '7d': number;
-    '30d': number;
-    '90d': number;
-  };
+  uptime: number;  // Changed from object to number
   responseTime: number;
   lastCheck: string;
+  uptimeHistory?: Array<{
+    date: string;
+    uptime: number;
+    status: string;
+  }>;
 }
 
 interface ServiceGroup {
@@ -57,7 +57,12 @@ interface StatusPageData {
   };
   serviceGroups: ServiceGroup[];
   incidents: Incident[];
-  responseTimeData: Array<{ timestamp: string; value: number }>;
+  metrics: {
+    overallUptime: number;
+    avgResponseTime: number;
+    totalChecks: number;
+  };
+  responseTimeData: Array<{ time: string; responseTime: number }>;  // Changed field names
   uptimeData: Array<{ date: string; uptime: number }>;
 }
 
@@ -87,6 +92,11 @@ interface ControllerStatusPageData {
   logo?: string | null;
   primaryColor?: string;
   headerBg?: string;
+  metrics?: {
+    overallUptime: number;
+    avgResponseTime: number;
+    totalChecks: number;
+  };
   serviceGroups?: Array<{
     id: string;
     name: string;
@@ -128,8 +138,17 @@ interface ControllerStatusPageData {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const domain = searchParams.get('domain');
-
+  
+  // Try to get domain from query param first, then from Nginx header
+  let domain = searchParams.get('domain');
+  
+  if (!domain) {
+    // Get from custom header set by Nginx
+    domain = request.headers.get('x-original-domain') || request.headers.get('host');
+  }
+  
+  console.log('[Status Page] Received request for domain:', domain);
+  
   if (!domain) {
     return NextResponse.json(
       { success: false, message: 'Domain parameter is required' },
@@ -213,14 +232,10 @@ export async function GET(request: Request) {
           name: service.name || 'Unnamed Service',
           description: service.description || '',
           status: service.status || 'operational',
-          uptime: {
-            '24h': service.uptime24h ?? 100,
-            '7d': service.uptime7d ?? 100,
-            '30d': service.uptime30d ?? 100,
-            '90d': service.uptime90d ?? 100
-          },
+          uptime: service.uptime ?? 100,  // Single number, not object
           responseTime: service.responseTime ?? 0,
-          lastCheck: toISOString(service.lastCheck || new Date())
+          lastCheck: toISOString(service.lastCheck || new Date()),
+          uptimeHistory: service.uptimeHistory || []  // Add this line
         }))
       })),
       // Map incidents from the controller response
@@ -243,7 +258,12 @@ export async function GET(request: Request) {
       })),
       // Map metrics data
       responseTimeData: data.responseTimeData || [],
-      uptimeData: data.uptimeData || []
+      uptimeData: data.uptimeData || [],
+      metrics: data.metrics || {
+        overallUptime: 100,
+        avgResponseTime: 0,
+        totalChecks: 0
+      }
     };
 
     // Calculate overall status based on services
