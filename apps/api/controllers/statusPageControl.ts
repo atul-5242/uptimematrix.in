@@ -382,12 +382,12 @@ export const getStatusPageByDomain = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Domain parameter is required' });
     }
     
-    // Find status page by custom domain or subdomain
+    // 1. Find status page by custom domain or subdomain
     const statusPage = await prismaClient.statusPage.findFirst({
       where: {
         OR: [
           { customDomain: domain as string },
-          { subdomain: (domain as string).split('.')[0] } // Extract subdomain part
+          { subdomain: (domain as string).split('.')[0] }
         ]
       },
       include: {
@@ -402,12 +402,250 @@ export const getStatusPageByDomain = async (req: Request, res: Response) => {
     if (!statusPage) {
       return res.status(404).json({ success: false, message: 'Status page not found' });
     }
+
+    // 2. Extract all monitor IDs from services
+    const monitorIds: string[] = [];
+    statusPage.services.forEach(group => {
+      group.services.forEach(service => {
+        if (service.monitorId) {
+          monitorIds.push(service.monitorId);
+        }
+      });
+    });
+
+    // 3. Fetch monitors with latest tick data
+    const monitors = await prismaClient.website.findMany({
+      where: { id: { in: monitorIds } },
+      include: {
+        ticks: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    // Create a map of monitorId -> monitor data for quick lookup
+    const monitorMap = new Map(monitors.map(m => [m.id, m]));
+
+    // 4. Fetch 90-day tick history for uptime calculations
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const tickHistory = await prismaClient.websiteTick.findMany({
+      where: {
+        website_id: { in: monitorIds },
+        createdAt: { gte: ninetyDaysAgo }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    // Define type for tick object
+    interface WebsiteTick {
+      website_id: string;
+      // Add other properties that tick might have
+      [key: string]: any;
+    }
+
+    // Group ticks by website_id for easier processing
+    const ticksByMonitor = tickHistory.reduce<Record<string, WebsiteTick[]>>((acc, tick) => {
+      if (!tick.website_id) return acc; // Skip if website_id is missing
+      if (!acc[tick.website_id]) {
+        acc[tick.website_id] = [];
+      }
+      acc[tick.website_id]?.push(tick);
+      return acc;
+    }, {} as Record<string, WebsiteTick[]>);
+
+    // 5. Fetch last 24 hours of ticks for response time chart
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentTicks = await prismaClient.websiteTick.findMany({
+      where: {
+        website_id: { in: monitorIds },
+        createdAt: { gte: twentyFourHoursAgo }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    // 6. Fetch incidents related to this organization
+    const incidents = await prismaClient.incident.findMany({
+      where: {
+        organizationId: statusPage.organizationId,
+        websiteId: { in: monitorIds }
+      },
+      include: {
+        updates: {
+          orderBy: { createdAt: 'desc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20 // Limit to last 20 incidents
+    });
+
+    // 7. Calculate metrics and format response
+    let totalUptime = 0;
+    let totalResponseTime = 0;
+    let serviceCount = 0;
+    let totalChecks = 0;
+
+    const formattedServiceGroups = statusPage.services.map(group => {
+      const formattedServices = group.services.map(service => {
+        const monitor = service.monitorId ? monitorMap.get(service.monitorId) : null;
+        const latestTick = monitor?.ticks[0];
+        const serviceTicks = service.monitorId ? ticksByMonitor[service.monitorId] || [] : [];
+
+        // Calculate uptime percentage for this service
+        const onlineTicks = serviceTicks.filter(t => t.status === 'Online').length;
+        const uptimePercentage = serviceTicks.length > 0 
+          ? (onlineTicks / serviceTicks.length) * 100 
+          : 100;
+
+        // Calculate 90-day uptime history (group by day)
+        const uptimeHistory: Array<{ date: string; uptime: number; status: string }> = [];
+        for (let i = 0; i < 90; i++) {
+          const date = new Date(Date.now() - (89 - i) * 24 * 60 * 60 * 1000);
+          const dayStart = new Date(date.setHours(0, 0, 0, 0));
+          const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+          
+          const dayTicks = serviceTicks.filter(t => {
+            const tickDate = new Date(t.createdAt);
+            return tickDate >= dayStart && tickDate <= dayEnd;
+          });
+
+          const dayOnline = dayTicks.filter(t => t.status === 'Online').length;
+          const dayUptime = dayTicks.length > 0 ? (dayOnline / dayTicks.length) * 100 : 100;
+          
+          if (dayStart) {
+            uptimeHistory.push({
+              date: dayStart?.toISOString().split('T')[0] ?? '',
+              uptime: parseFloat(dayUptime.toFixed(2)),
+              status: dayUptime >= 99 ? 'operational' : 'down'
+            });
+          }
+        }
+
+        // Aggregate for overall metrics
+        totalUptime += uptimePercentage;
+        totalResponseTime += latestTick?.response_time_ms || 0;
+        serviceCount++;
+        totalChecks += serviceTicks.length;
+
+        return {
+          id: service.id,
+          name: service.name,
+          description: service.description || '',
+          status: latestTick?.status === 'Online' ? 'operational' : 'down',
+          uptime: parseFloat(uptimePercentage.toFixed(2)),
+          responseTime: latestTick?.response_time_ms || 0,
+          lastCheck: latestTick?.createdAt?.toISOString() || new Date().toISOString(),
+          uptimeHistory
+        };
+      });
+
+      return {
+        id: group.id,
+        name: group.name,
+        status: group.status === 'OPERATIONAL' ? 'operational' : 'down',
+        services: formattedServices
+      };
+    });
+
+    // 8. Calculate overall metrics
+    const overallUptime = serviceCount > 0 ? totalUptime / serviceCount : 100;
+    const avgResponseTime = serviceCount > 0 ? Math.round(totalResponseTime / serviceCount) : 0;
+
+    // 9. Format response time data (last 24 hours, grouped by hour)
+    const responseTimeData: Array<{ time: string; responseTime: number }> = [];
+    for (let i = 0; i < 24; i++) {
+      const hour = new Date(Date.now() - (23 - i) * 60 * 60 * 1000);
+      const hourStart = new Date(hour.setMinutes(0, 0, 0));
+      const hourEnd = new Date(hour.setMinutes(59, 59, 999));
+      
+      const hourTicks = recentTicks.filter(t => {
+        const tickDate = new Date(t.createdAt);
+        return tickDate >= hourStart && tickDate <= hourEnd;
+      });
+
+      const avgRt = hourTicks.length > 0
+        ? Math.round(hourTicks.reduce((sum, t) => sum + t.response_time_ms, 0) / hourTicks.length)
+        : 0;
+
+      responseTimeData.push({
+        time: `${String(hour.getHours()).padStart(2, '0')}:00`,
+        responseTime: avgRt
+      });
+    }
+
+    // 10. Format uptime data (last 30 days)
+    const uptimeData: Array<{ date: string; uptime: number }> = [];
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
+      const dayStart = new Date(date.setHours(0, 0, 0, 0));
+      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+      
+      const dayTicks = tickHistory.filter(t => {
+        const tickDate = new Date(t.createdAt);
+        return tickDate >= dayStart && tickDate <= dayEnd;
+      });
+
+      const dayOnline = dayTicks.filter(t => t.status === 'Online').length;
+      const dayUptime = dayTicks.length > 0 ? (dayOnline / dayTicks.length) * 100 : 100;
+      
+      uptimeData.push({
+        date: dayStart?.toISOString().split('T')[0] ?? '',
+        uptime: parseFloat(dayUptime.toFixed(2))
+      });
+    }
+
+    // 11. Format incidents
+    const formattedIncidents = incidents.map(incident => ({
+      id: incident.id,
+      title: incident.title,
+      description: incident.impact || '',
+      status: incident.status.toLowerCase() as 'investigating' | 'identified' | 'monitoring' | 'resolved',
+      severity: incident.severity === 'CRITICAL' ? 'critical' : 
+                incident.severity === 'MAJOR' ? 'major' : 'minor',
+      createdAt: incident.createdAt.toISOString(),
+      updatedAt: incident.createdAt.toISOString(),
+      resolvedAt: incident.endTime?.toISOString(),
+      updates: incident.updates.map(update => ({
+        id: update.id,
+        status: update.type,
+        message: update.message,
+        timestamp: update.createdAt.toISOString()
+      })),
+      affectedServices: incident.websiteId ? [incident.websiteId] : []
+    }));
+
+    // 12. Build final response
+    const response = {
+      id: statusPage.id,
+      name: statusPage.name,
+      description: statusPage.description,
+      status: 'operational' as const, // Calculate from services if needed
+      lastUpdated: statusPage.lastUpdated.toISOString(),
+      logo: statusPage.logo || undefined,
+      branding: {
+        primaryColor: statusPage.primaryColor,
+        headerBg: statusPage.headerBg
+      },
+      serviceGroups: formattedServiceGroups,
+      incidents: formattedIncidents,
+      metrics: {
+        overallUptime: parseFloat(overallUptime.toFixed(2)),
+        avgResponseTime,
+        totalChecks
+      },
+      uptimeData,
+      responseTimeData
+    };
     
-    res.json({ success: true, data: statusPage });
+    res.json({ success: true, data: response });
     
   } catch (error) {
     console.error('Error fetching status page by domain:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 

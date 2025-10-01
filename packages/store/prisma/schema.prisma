@@ -345,6 +345,9 @@ model Service {
   status         ServiceStatus
   uptime         Float         @default(100)
   monitorId      String?
+  description    String?       // Service description
+  responseTime   Int?          // Current response time in ms
+  lastCheck      DateTime?     // Last check timestamp
   serviceGroupId String
   serviceGroup   ServiceGroup  @relation(fields: [serviceGroupId], references: [id])
 }
