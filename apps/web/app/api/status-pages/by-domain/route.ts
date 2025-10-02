@@ -43,38 +43,6 @@ interface Incident {
   affectedServices: string[];
 }
 
-interface StatusPageData {
-  id: string;
-  name: string;
-  description: string;
-  status: string;
-  lastUpdated: string;
-  logo: string | null;
-  branding: {
-    primaryColor: string;
-    headerBg: string;
-    logo: string | null;
-  };
-  serviceGroups: ServiceGroup[];
-  incidents: Incident[];
-  metrics: {
-    overallUptime: number;
-    avgResponseTime: number;
-    totalChecks: number;
-  };
-  responseTimeData: Array<{ time: string; responseTime: number }>;  // Changed field names
-  uptimeData: Array<{ date: string; uptime: number }>;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const REQUEST_TIMEOUT = 10000; // 10 seconds
-
-// Helper function to format date to ISO string
-const toISOString = (date: any) => {
-  if (!date) return new Date().toISOString();
-  return new Date(date).toISOString();
-};
-
 // Type for the API response
 interface ApiResponse<T> {
   success: boolean;
@@ -136,18 +104,52 @@ interface ControllerStatusPageData {
   uptimeData?: Array<{ date: string; uptime: number }>;
 }
 
+
+interface StatusPageData {
+  id: string;
+  name: string;
+  description: string;
+  status: string;
+  lastUpdated: string;
+  logo: string | null;
+  branding: {
+    primaryColor: string;
+    headerBg: string;
+    logo: string | null;
+  };
+  serviceGroups: ServiceGroup[];
+  incidents: Incident[];
+  metrics: {
+    overallUptime: number;
+    avgResponseTime: number;
+    totalChecks: number;
+  };
+  responseTimeData: Array<{ time: string; responseTime: number }>;  // Changed field names
+  uptimeData: Array<{ date: string; uptime: number }>;
+}
+
+
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const REQUEST_TIMEOUT = 10000;
+
+const toISOString = (date: any) => {
+  if (!date) return new Date().toISOString();
+  return new Date(date).toISOString();
+};
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   
-  // Try to get domain from query param first, then from Nginx header
+  // Try multiple sources for domain
   let domain = searchParams.get('domain');
   
   if (!domain) {
-    // Get from custom header set by Nginx
     domain = request.headers.get('x-original-domain') || request.headers.get('host');
   }
   
   console.log('[Status Page] Received request for domain:', domain);
+  console.log('[Status Page] All headers:', Object.fromEntries(request.headers.entries()));
   
   if (!domain) {
     return NextResponse.json(
@@ -164,11 +166,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Add request timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-    // Call the backend API to get status page data
     const apiResponse = await fetch(`${API_URL}/api/status-pages/by-domain?domain=${encodeURIComponent(domain)}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +209,6 @@ export async function GET(request: Request) {
 
     const data = response.data;
 
-    // Transform the data to match the frontend's expected format
     const formattedResponse = {
       id: data.id || 'unknown',
       name: data.name || 'Status Page',
@@ -222,7 +221,6 @@ export async function GET(request: Request) {
         headerBg: data.headerBg || '#1e40af',
         logo: data.logo || null
       },
-      // Map service groups from the controller response
       serviceGroups: (data.serviceGroups || []).map((group: any) => ({
         id: group.id || `group-${Math.random().toString(36).substr(2, 9)}`,
         name: group.name || 'Unnamed Group',
@@ -232,13 +230,12 @@ export async function GET(request: Request) {
           name: service.name || 'Unnamed Service',
           description: service.description || '',
           status: service.status || 'operational',
-          uptime: service.uptime ?? 100,  // Single number, not object
+          uptime: service.uptime ?? 100,
           responseTime: service.responseTime ?? 0,
           lastCheck: toISOString(service.lastCheck || new Date()),
-          uptimeHistory: service.uptimeHistory || []  // Add this line
+          uptimeHistory: service.uptimeHistory || []
         }))
       })),
-      // Map incidents from the controller response
       incidents: (data.incidents || []).map((incident: any) => ({
         id: incident.id || `incident-${Math.random().toString(36).substr(2, 9)}`,
         title: incident.title || 'Untitled Incident',
@@ -256,7 +253,6 @@ export async function GET(request: Request) {
         })),
         affectedServices: incident.affectedServices || []
       })),
-      // Map metrics data
       responseTimeData: data.responseTimeData || [],
       uptimeData: data.uptimeData || [],
       metrics: data.metrics || {
@@ -266,12 +262,11 @@ export async function GET(request: Request) {
       }
     };
 
-    // Calculate overall status based on services
     if (formattedResponse.serviceGroups.length > 0) {
-      const allServices = formattedResponse.serviceGroups.flatMap((group: ServiceGroup) => group.services);
-      if (allServices.some((s: Service) => s.status === 'down')) {
+      const allServices = formattedResponse.serviceGroups.flatMap((group: any) => group.services);
+      if (allServices.some((s: any) => s.status === 'down')) {
         formattedResponse.status = 'down';
-      } else if (allServices.some((s: Service) => s.status === 'degraded')) {
+      } else if (allServices.some((s: any) => s.status === 'degraded')) {
         formattedResponse.status = 'degraded';
       } else {
         formattedResponse.status = 'operational';
