@@ -716,7 +716,7 @@ export const provisionCustomDomain = async (req: Request, res: Response) => {
     }
     if (subdomain) {
       const { exec } = require('child_process');
-      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${subdomain}`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
+      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${subdomain}.status.uptimematrix.atulmaurya.in`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
         if (err) {
           console.error('Subdomain provisioning failed:', err, stderr);
           return res.status(500).json({ 
