@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log('Forwarding request to:', `${apiBaseUrl}/api/status-pages`);
+    // console.log('Forwarding request to:', `${apiBaseUrl}/api/status-pages`);
     
     const response = await fetch(`${apiBaseUrl}/api/status-pages`, {
       method: 'POST',
@@ -96,34 +96,65 @@ export async function POST(request: Request) {
 
     const data = await response.json()
     
+    if (!data.id) {
+      return NextResponse.json(
+        { success: false, message: 'Status page ID is required' },
+        { status: 400 }
+      );
+    }
+    
     // If status page was created successfully, proceed with domain provisioning
-    if (data.id && (body.subdomain || body.customDomain)) {
+    if (body.subdomain || body.customDomain) {
       try {
-        const provisionResponse = await fetch(
-          '/api/status-pages/provision-domain',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': authHeader,
-            },  
-            body: JSON.stringify({
-              statusPageId: data.id,
-              subdomain: body.subdomain,
-              customDomain: body.customDomain,
-            }),
-          }
-        )
 
-        if (!provisionResponse.ok) {
-          console.error('Domain provisioning failed:', await provisionResponse.text())
-          // Continue with the original response even if provisioning fails
-          // as the status page was created successfully
-        }
-      } catch (error) {
-        console.error('Error in domain provisioning:', error)
-        // Continue with the original response
+    // Forward the request to the API server
+    const response = await fetch(`${apiBaseUrl}/api/status-pages/${data.id}/provision-domain`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader || ''
+      },
+      body: JSON.stringify({
+        subdomain: body.subdomain,
+        domain: body.customDomain
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: errorData.message || 'Failed to provision domain',
+          error: errorData.error || 'Unknown error',
+          details: errorData.details
+        },
+        { status: response.status }
+      );
+    }
+
+    const domainData = await response.json();
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...domainData,
+        id: domainData.id,
+        subdomain: domainData.subdomain || body.subdomain,
+        domain: domainData.domain || body.customDomain
       }
+    });
+
+  } catch (error) {
+    console.error('Error in domain provisioning:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
+  }
     }
 
     return NextResponse.json(data, { status: 201 })

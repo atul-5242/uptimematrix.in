@@ -346,6 +346,7 @@ export const createStatusPage = async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
+      id: statusPage.id,
       data: statusPage
     });
 
