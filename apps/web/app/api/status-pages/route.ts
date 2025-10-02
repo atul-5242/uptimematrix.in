@@ -100,14 +100,15 @@ export async function POST(request: Request) {
     if (data.id && (body.subdomain || body.customDomain)) {
       try {
         const provisionResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_APP_URL}/api/status-pages/${data.id}/provision-domain`,
+          '/api/status-pages/provision-domain',
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': authHeader,
-            },
+            },  
             body: JSON.stringify({
+              statusPageId: data.id,
               subdomain: body.subdomain,
               customDomain: body.customDomain,
             }),

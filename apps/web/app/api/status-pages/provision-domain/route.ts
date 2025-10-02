@@ -21,11 +21,11 @@ export async function POST(req: Request) {
     }
 
     // Forward the request to the API server
-    const response = await fetch(`${API_BASE_URL}/api/status-pages/${statusPageId}/domains`, {
+    const response = await fetch(`${API_BASE_URL}/api/status-pages/${statusPageId}/provision-domain`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': req.headers.get('Authorization') || ''
+        'Authorization': req.headers.get('authorization') || ''
       },
       body: JSON.stringify({
         subdomain,
