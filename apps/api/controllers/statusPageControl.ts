@@ -650,9 +650,14 @@ export const getStatusPageByDomain = async (req: Request, res: Response) => {
   }
 };
 
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
+
 export const provisionCustomDomain = async (req: Request, res: Response) => {
   try {
-    const { domain,subdomain } = req.body;
+    const { domain, subdomain } = req.body;
     const { id } = req.params;
     if(!id) {
       return res.status(400).json({ success: false, message: 'Status page ID is required' });
@@ -672,91 +677,79 @@ export const provisionCustomDomain = async (req: Request, res: Response) => {
     
     // Execute provisioning script for custom domain
     if (domain) {
-      const { exec } = require('child_process');
-      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
-        if (err) {
-          console.error('Custom domain provisioning failed:', err, stderr);
-          return res.status(500).json({ 
-            success: false, 
-            message: 'Failed to provision custom domain',
-            error: stderr.toString()
-          });
+      try {
+        const { stdout, stderr } = await execAsync(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`);
+        
+        if (stderr) {
+          console.error('Custom domain provisioning stderr:', stderr);
         }
         
-        try {
-          // Update database with custom domain without affecting subdomain
-          const updatedPage = await prismaClient.statusPage.update({
-            where: { id },
-            data: { 
-              customDomain: domain
-              // Keep the existing subdomain
-            },
-            select: {
-              id: true,
-              subdomain: true,
-              customDomain: true
-            }
-          });
-          
-          res.json({ 
-            success: true, 
-            message: 'Custom domain provisioned successfully',
-            data: updatedPage
-          });
-        } catch (error: unknown) {
-          const dbError = error as Error;
-          console.error('Database update failed:', dbError);
-          res.status(500).json({ 
-            success: false, 
-            message: 'Domain provisioned but failed to update database',
-            error: dbError.message 
-          });
-        }
-      });
-      return; // Return to prevent further execution
+        // Update database with custom domain without affecting subdomain
+        const updatedPage = await prismaClient.statusPage.update({
+          where: { id },
+          data: { 
+            customDomain: domain
+            // Keep the existing subdomain
+          },
+          select: {
+            id: true,
+            subdomain: true,
+            customDomain: true
+          }
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: 'Custom domain provisioned successfully',
+          data: updatedPage
+        });
+      } catch (error: unknown) {
+        const execError = error as Error & { stderr?: string };
+        console.error('Custom domain provisioning failed:', execError);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to provision custom domain',
+          error: execError.stderr || execError.message
+        });
+      }
     }
     if (subdomain) {
-      const { exec } = require('child_process');
-      exec(`sudo /usr/local/bin/provision_custom_domain.sh ${subdomain}.status.uptimematrix.atulmaurya.in`, async (err: Error | null, stdout: string | Buffer, stderr: string | Buffer) => {
-        if (err) {
-          console.error('Subdomain provisioning failed:', err, stderr);
-          return res.status(500).json({ 
-            success: false, 
-            message: 'Failed to provision subdomain',
-            error: stderr.toString()
-          });
+      try {
+        const domain = `${subdomain}.status.uptimematrix.atulmaurya.in`;
+        const { stdout, stderr } = await execAsync(`sudo /usr/local/bin/provision_custom_domain.sh ${domain}`);
+        
+        if (stderr) {
+          console.error('Subdomain provisioning stderr:', stderr);
         }
         
-        try {
-          // Update database with subdomain without affecting custom domain
-          const updatedPage = await prismaClient.statusPage.update({
-            where: { id },
-            data: { 
-              subdomain: subdomain
-              // Keep the existing custom domain
-            },
-            select: {
-              id: true,
-              subdomain: true,
-              customDomain: true
-            }
-          });
-          
-          res.json({ 
-            success: true, 
-            message: 'Subdomain provisioned successfully',
-            data: updatedPage
-          });
-        } catch (error: unknown) {
-          const dbError = error as Error;
-          console.error('Database update failed:', dbError);
-          res.status(500).json({ 
-            success: false, 
-            message: 'Subdomain provisioned but failed to update database',
-            error: dbError.message 
-          });
-        }
-      });
+        // Update database with subdomain without affecting custom domain
+        const updatedPage = await prismaClient.statusPage.update({
+          where: { id },
+          data: { 
+            subdomain: subdomain
+            // Keep the existing custom domain
+          },
+          select: {
+            id: true,
+            subdomain: true,
+            customDomain: true
+          }
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: 'Subdomain provisioned successfully',
+          data: updatedPage
+        });
+      } catch (error: unknown) {
+        const execError = error as Error & { stderr?: string };
+        console.error('Subdomain provisioning failed:', execError);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to provision subdomain',
+          error: execError.stderr || execError.message
+        });
+      }
     }
   } catch (error) {
     console.error('Error in domain provisioning:', error);
