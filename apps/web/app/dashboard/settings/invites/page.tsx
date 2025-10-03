@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Plus, CheckCircle, Clock, Send, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useAppSelector } from "@/store";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { setSelectedOrganization } from "@/store/organizationSlice";
+import { fetchUserDetails } from "@/store/userSlice";
 
 interface Invitation {
   id: string;
@@ -73,6 +75,7 @@ export default function InvitesPage() {
   const { fullName } = useAppSelector((state) => state.user);
   const [sendingInvitation, setSendingInvitation] = useState(false); // New loading state for send button
   const [acceptingInvitationId, setAcceptingInvitationId] = useState<string | null>(null); // New loading state for accept button
+  const dispatch = useAppDispatch();
 
   const handleAddInvitationEmail = (email: string) => {
     if (email.trim() && !invitationEmails.includes(email.trim()) && /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email.trim())) {
@@ -149,6 +152,16 @@ export default function InvitesPage() {
       }
 
       alert(result.message);
+      // If backend returns organizationId, set it as the selected organization automatically
+      if (result.organizationId) {
+        try {
+          await dispatch(setSelectedOrganization({ organizationId: result.organizationId })).unwrap();
+        } catch (e) {
+          console.error('Failed to set selected organization:', e);
+        }
+        // Refresh user details so selectedOrganizationId and permissions propagate through the app
+        await dispatch(fetchUserDetails());
+      }
       // Refresh data after accepting
       fetchInitialData(); 
     } catch (error: any) {

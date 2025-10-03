@@ -95,9 +95,9 @@ export default function AcceptInvitationPage() {
 
       if (response.ok) {
         setStep('success');
-        // Redirect to dashboard after 2 seconds
+        // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push('/signin');
         }, 2000);
       } else {
         setError(data.message || 'Failed to accept invitation. Please try again.');
@@ -147,9 +147,9 @@ export default function AcceptInvitationPage() {
 
       if (response.ok) {
         setStep('success');
-        // Redirect to dashboard after 2 seconds
+        // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push('/signin');
         }, 2000);
       } else {
         setError(data.message || 'Failed to accept invitation. Please try again.');
@@ -212,7 +212,7 @@ export default function AcceptInvitationPage() {
           </CardHeader>
           <CardContent>
             <p className="text-center text-gray-600 mb-4">
-              Redirecting you to the dashboard...
+              Redirecting you to sign in...
             </p>
             <div className="flex justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
