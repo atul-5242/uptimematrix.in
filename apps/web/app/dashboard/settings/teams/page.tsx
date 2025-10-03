@@ -35,7 +35,7 @@ import {
   getMembers,
   transferMember
 } from "@/app/all-actions/team-section/members/actions";
-import { getRoles } from "@/app/all-actions/team-section/roles/actions";
+import { getRoles, createRoleAction, updateRoleAction, deleteRoleAction, assignRoleAction } from "@/app/all-actions/team-section/roles/actions";
 import { useAppSelector } from "@/store";
 
 // Types
@@ -441,25 +441,59 @@ export default function TeamsPage() {
     }
 
     try {
-    if (editingMemberId) {
-        // For editing existing members, we need to use the transfer/update member API
-        const result = await transferMember(editingMemberId, {
-          teamIds: newMember.team.map(t => teams.find(team => team.name === t)?.id).filter((id): id is string => id !== undefined), 
-          role: newMember.role
-        });
-        
-        if (result.success) {
-          // Refresh members data
-          const membersResult = await getMembers( currentOrganizationId!);
-          console.log("Raw members data before setMembers (handleSaveMember):", membersResult.data);
-          if (membersResult.success && membersResult.data) {
-            setMembers(membersResult.data.members);
-          }
-      showToast("Member updated successfully!");
-    } else {
-          showToast(result.error || "Failed to update member", 'error');
+      if (editingMemberId) {
+        // Edit member: update teams and role only
+        const memberBefore = members.find(m => m.id === editingMemberId);
+        const beforeTeams = new Set(memberBefore?.teams || []);
+        const afterTeams = new Set(newMember.team);
+
+        const teamsToAdd = Array.from(afterTeams).filter(t => !beforeTeams.has(t));
+        const teamsToRemove = Array.from(beforeTeams).filter(t => !afterTeams.has(t));
+
+        // Map role name to roleId for team add and org role assignment
+        const selectedRole = roles.find(r => r.name === newMember.role);
+        if (!selectedRole) {
+          showToast('Selected role not found', 'error');
           return;
         }
+
+        // Perform team additions
+        for (const teamName of teamsToAdd) {
+          const teamObj = teams.find(t => t.name === teamName);
+          if (teamObj) {
+            const addRes = await addMemberToTeam(teamObj.id, { userId: editingMemberId, roleId: selectedRole.id });
+            if (!addRes.success) {
+              showToast(addRes.error || `Failed to add member to ${teamName}`, 'error');
+              return;
+            }
+          }
+        }
+
+        // Perform team removals
+        for (const teamName of teamsToRemove) {
+          const teamObj = teams.find(t => t.name === teamName);
+          if (teamObj) {
+            const remRes = await removeMemberFromTeam(teamObj.id, editingMemberId);
+            if (!remRes.success) {
+              showToast(remRes.error || `Failed to remove member from ${teamName}`, 'error');
+              return;
+            }
+          }
+        }
+
+        // Assign organization role
+        const assignRes = await assignRoleAction(selectedRole.id, editingMemberId);
+        if (!assignRes.success) {
+          showToast(assignRes.error || 'Failed to assign role', 'error');
+          return;
+        }
+
+        // Refresh members data
+        const membersResult = await getMembers(currentOrganizationId!);
+        if (membersResult.success && membersResult.data) {
+          setMembers(membersResult.data.members);
+        }
+        showToast('Member updated successfully!');
       } else {
         // For new members, use invite member API
         const result = await inviteMember({
@@ -482,7 +516,7 @@ export default function TeamsPage() {
           showToast(result.error || "Failed to invite member", 'error');
           return;
         }
-    }
+      }
 
     setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
     setEditingMemberId(null);
@@ -549,7 +583,7 @@ export default function TeamsPage() {
     setIsRoleModalOpen(true);
   };
 
-  const handleSaveRole = () => {
+  const handleSaveRole = async () => {
     // Form validation
     if (!newRole.name.trim()) {
       showToast("Role name is required", 'error');
@@ -590,31 +624,38 @@ export default function TeamsPage() {
     
     
 
-    if (editingRoleId) {
-      const oldRole = roles.find(r => r.id === editingRoleId);
-      setRoles(prev => prev.map(r => 
-        r.id === editingRoleId 
-          ? { ...r, name: newRole.name, description: newRole.description, permissions: newRole.permissions }
-          : r
-      ));
-
-      if (oldRole && oldRole.name !== newRole.name) {
-        setMembers(prev => prev.map(m => 
-          m.role === oldRole.name ? { ...m, role: newRole.name } : m
-        ));
+    try {
+      if (editingRoleId) {
+        const res = await updateRoleAction(editingRoleId, {
+          name: newRole.name,
+          description: newRole.description,
+          permissions: newRole.permissions,
+        });
+        if (!res.success) {
+          showToast(res.error || "Failed to update role", 'error');
+          return;
+        }
+        const refreshed = await getRoles();
+        if (refreshed.success) setRoles(refreshed.data);
+        showToast("Role updated successfully!");
+      } else {
+        const res = await createRoleAction({
+          name: newRole.name,
+          description: newRole.description,
+          permissions: newRole.permissions,
+        });
+        if (!res.success) {
+          showToast(res.error || "Failed to create role", 'error');
+          return;
+        }
+        const refreshed = await getRoles();
+        if (refreshed.success) setRoles(refreshed.data);
+        showToast("Role created successfully!");
       }
-
-      showToast("Role updated successfully!");
-    } else {
-      const role: Role = {
-        id: generateId(),
-        name: newRole.name,
-        description: newRole.description,
-        permissions: newRole.permissions,
-        isCustom: true,
-      };
-      setRoles(prev => [...prev, role]);
-      showToast("Role created successfully!");
+    } catch (e) {
+      console.error('Role save error:', e);
+      showToast("An error occurred while saving the role", 'error');
+      return;
     }
 
     setNewRole({ name: "", description: "", permissions: [] });
@@ -622,15 +663,24 @@ export default function TeamsPage() {
     setIsRoleModalOpen(false);
   };
 
-  const handleDeleteRole = (roleId: string) => {
+  const handleDeleteRole = async (roleId: string) => {
     const role = roles.find(r => r.id === roleId);
     if (!role) return;
 
-    setRoles(prev => prev.filter(r => r.id !== roleId));
-    setMembers(prev => prev.map(m => 
-      m.role === role.name ? { ...m, role: "Member" } : m
-    ));
-    showToast("Role deleted successfully!");
+    try {
+      const res = await deleteRoleAction(roleId);
+      if (!res.success) {
+        showToast(res.error || "Failed to delete role", 'error');
+        return;
+      }
+      const refreshed = await getRoles();
+      if (refreshed.success) setRoles(refreshed.data);
+      showToast("Role deleted successfully!");
+    } catch (e) {
+      console.error('Role delete error:', e);
+      showToast("An error occurred while deleting the role", 'error');
+      return;
+    }
 
     if (editingRoleId === roleId) {
       setEditingRoleId(null);

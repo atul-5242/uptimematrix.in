@@ -37,6 +37,37 @@ export async function getRoles() {
   }
 }
 
+export async function assignRoleAction(roleId: string, userId: string) {
+  try {
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
+
+    if (!token) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    const response = await fetch(`/api/team-section/roles/${roleId}/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Failed to assign role' };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Assign role action error:', error);
+    return { success: false, error: 'Network error occurred' };
+  }
+}
+
 export async function getRolePermissions(roleId: string) {
   try {
     const rolesResult = await getRoles();
