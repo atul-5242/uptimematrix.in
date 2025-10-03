@@ -1,3 +1,5 @@
+// this is next js in api -> status-page -> by-domain -> route.ts
+
 import { NextResponse } from 'next/server';
 
 // Type definitions
@@ -145,11 +147,21 @@ export async function GET(request: Request) {
   let domain = searchParams.get('domain');
   
   if (!domain) {
-    domain = request.headers.get('x-original-domain') || request.headers.get('host');
+    // Get from nginx headers
+    domain = request.headers.get('x-original-domain');
+  }
+  
+  if (!domain) {
+    // Fallback to host header
+    domain = request.headers.get('host');
   }
   
   console.log('[Status Page] Received request for domain:', domain);
-  console.log('[Status Page] All headers:', Object.fromEntries(request.headers.entries()));
+  console.log('[Status Page] All headers:', {
+    'x-original-domain': request.headers.get('x-original-domain'),
+    'host': request.headers.get('host'),
+    'referer': request.headers.get('referer')
+  });
   
   if (!domain) {
     return NextResponse.json(
@@ -168,6 +180,8 @@ export async function GET(request: Request) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+    console.log(`[Status Page] Calling backend API: ${API_URL}/api/status-pages/by-domain?domain=${encodeURIComponent(domain)}`);
 
     const apiResponse = await fetch(`${API_URL}/api/status-pages/by-domain?domain=${encodeURIComponent(domain)}`, {
       headers: {
@@ -189,7 +203,7 @@ export async function GET(request: Request) {
       throw new Error(errorMessage);
     }
 
-    const response = await apiResponse.json() as ApiResponse<ControllerStatusPageData>;
+    const response = await apiResponse.json();
     
     if (!response.success || !response.data) {
       return NextResponse.json(
@@ -209,50 +223,21 @@ export async function GET(request: Request) {
 
     const data = response.data;
 
+    // [Keep all your existing formattedResponse mapping code exactly as is]
     const formattedResponse = {
       id: data.id || 'unknown',
       name: data.name || 'Status Page',
       description: data.description || 'Our services status',
-      status: data.overallStatus || 'operational',
-      lastUpdated: toISOString(data.updatedAt || new Date()),
+      status: data.status || 'operational',
+      lastUpdated: toISOString(data.lastUpdated || new Date()),
       logo: data.logo || null,
       branding: {
-        primaryColor: data.primaryColor || '#3b82f6',
-        headerBg: data.headerBg || '#1e40af',
+        primaryColor: data.branding?.primaryColor || '#3b82f6',
+        headerBg: data.branding?.headerBg || '#1e40af',
         logo: data.logo || null
       },
-      serviceGroups: (data.serviceGroups || []).map((group: any) => ({
-        id: group.id || `group-${Math.random().toString(36).substr(2, 9)}`,
-        name: group.name || 'Unnamed Group',
-        status: group.status || 'operational',
-        services: (group.services || []).map((service: any) => ({
-          id: service.id || `service-${Math.random().toString(36).substr(2, 9)}`,
-          name: service.name || 'Unnamed Service',
-          description: service.description || '',
-          status: service.status || 'operational',
-          uptime: service.uptime ?? 100,
-          responseTime: service.responseTime ?? 0,
-          lastCheck: toISOString(service.lastCheck || new Date()),
-          uptimeHistory: service.uptimeHistory || []
-        }))
-      })),
-      incidents: (data.incidents || []).map((incident: any) => ({
-        id: incident.id || `incident-${Math.random().toString(36).substr(2, 9)}`,
-        title: incident.title || 'Untitled Incident',
-        description: incident.description || '',
-        status: incident.status?.toLowerCase() || 'investigating',
-        severity: incident.severity || 'none',
-        createdAt: toISOString(incident.createdAt || new Date()),
-        updatedAt: toISOString(incident.updatedAt || new Date()),
-        resolvedAt: incident.resolvedAt ? toISOString(incident.resolvedAt) : null,
-        updates: (incident.updates || []).map((update: any) => ({
-          id: update.id || `update-${Math.random().toString(36).substr(2, 9)}`,
-          status: update.status || 'pending',
-          message: update.message || '',
-          timestamp: toISOString(update.timestamp || update.createdAt || new Date())
-        })),
-        affectedServices: incident.affectedServices || []
-      })),
+      serviceGroups: (data.serviceGroups || []),
+      incidents: (data.incidents || []),
       responseTimeData: data.responseTimeData || [],
       uptimeData: data.uptimeData || [],
       metrics: data.metrics || {
@@ -261,17 +246,6 @@ export async function GET(request: Request) {
         totalChecks: 0
       }
     };
-
-    if (formattedResponse.serviceGroups.length > 0) {
-      const allServices = formattedResponse.serviceGroups.flatMap((group: any) => group.services);
-      if (allServices.some((s: any) => s.status === 'down')) {
-        formattedResponse.status = 'down';
-      } else if (allServices.some((s: any) => s.status === 'degraded')) {
-        formattedResponse.status = 'degraded';
-      } else {
-        formattedResponse.status = 'operational';
-      }
-    }
 
     return NextResponse.json({ 
       success: true, 
