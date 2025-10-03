@@ -446,6 +446,23 @@ export default function CreateStatusPage() {
                   {errors.customDomain && <p className="text-sm text-red-600">{errors.customDomain}</p>}
                 </div>
 
+                <div className="p-4 rounded-xl bg-gray-900 text-gray-100">
+                  <h2 className="text-lg font-semibold mb-2">Custom Domain Setup</h2>
+                  <p className="mb-2">
+                    To connect your custom domain (e.g. <code>status.yourdomain.com</code>) with UptimeMatrix, please add the
+                    following DNS record at your domain provider:
+                  </p>
+                  <pre className="bg-gray-800 text-green-300 p-3 rounded-lg text-sm mb-2 overflow-x-auto">
+                    Type: CNAME{"\n"}
+                    Host/Name: status{"\n"}
+                    Value/Points to: status.uptimematrix.atulmaurya.in
+                  </pre>
+                  <p className="text-sm text-gray-400">
+                    ⚡ DNS changes may take up to 24 hours to propagate. Once connected, SSL will be automatically provisioned
+                    and your status page will be live.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="description">Description *</Label>
                   <Textarea
