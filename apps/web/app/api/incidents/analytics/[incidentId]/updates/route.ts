@@ -19,7 +19,7 @@ export async function POST(
 
     const { incidentId } = params;
     const body = await request.json();
-    const url = `${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`;
+    const url = `${API_BASE_URL}/api/incident-analytics/${incidentId}/updates`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -63,7 +63,7 @@ export async function GET(
     }
 
     const { incidentId } = params;
-    const url = `${API_BASE_URL}/api/incidents/analytics/${incidentId}/updates`;
+    const url = `${API_BASE_URL}/api/incident-analytics/${incidentId}/updates`;
     
     const response = await fetch(url, {
       headers: {
