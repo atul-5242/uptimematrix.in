@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +72,7 @@ export async function PATCH(
     const url = new URL(`/api/incidents/analytics/${incidentId}/status`, API_BASE_URL);
     
     const response = await fetch(url.toString(), {
-      method: 'PATCH',
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

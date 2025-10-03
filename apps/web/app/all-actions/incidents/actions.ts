@@ -1,40 +1,14 @@
-"use server"
-
-import { cookies } from 'next/headers';
+// Note: These are client-safe helpers that call our Next.js API routes under /api
+// Our Next.js API routes handle authentication via cookies and proxy to the backend API.
 import type { Incident, IncidentStats } from '@/types/incident';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
-// Helper function to get auth token
-async function getAuthToken(): Promise<string | null> {
-  const cookieStore = cookies();
-  const token = cookieStore.get('auth_token')?.value;
-  return token || null;
-}
-
-// Helper function to create authenticated headers
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const token = await getAuthToken();
-  
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  return headers;
-}
 
 export async function getIncidents(organizationId: string): Promise<Incident[]> {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/${organizationId}`, {
+    const response = await fetch(`/api/incidents/${organizationId}`, {
       method: 'GET',
-      headers,
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       cache: 'no-store'
     });
 
@@ -52,12 +26,11 @@ export async function getIncidents(organizationId: string): Promise<Incident[]> 
 
 export async function getIncidentStats(organizationId: string): Promise<IncidentStats> {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/stats/${organizationId}`, {
+    const response = await fetch(`/api/incidents/stats/${organizationId}`, {
       method: 'GET',
-      headers,
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       cache: 'no-store'
     });
 
@@ -75,12 +48,12 @@ export async function getIncidentStats(organizationId: string): Promise<Incident
 
 export async function getIncidentAnalytics(incidentId: string) {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${encodeURIComponent(incidentId)}`, {
+    // Call our Next.js API route which proxies to backend with auth
+    const response = await fetch(`/api/incidents/analytics/${encodeURIComponent(incidentId)}`, {
       method: 'GET',
-      headers,
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       cache: 'no-store'
     });
 
@@ -98,12 +71,12 @@ export async function getIncidentAnalytics(incidentId: string) {
 
 export async function updateIncidentStatus(incidentId: string, status: string) {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${encodeURIComponent(incidentId)}/status`, {
-      method: 'PUT',
-      headers,
-      credentials: 'include',
+    // Our Next.js API route expects PATCH at /api/incidents/analytics/[incidentId]
+    const response = await fetch(`/api/incidents/analytics/${encodeURIComponent(incidentId)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ status }),
     });
 
@@ -121,12 +94,11 @@ export async function updateIncidentStatus(incidentId: string, status: string) {
 
 export async function createIncidentUpdate(incidentId: string, message: string, type: string) {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${encodeURIComponent(incidentId)}/updates`, {
+    const response = await fetch(`/api/incidents/analytics/${encodeURIComponent(incidentId)}/updates`, {
       method: 'POST',
-      headers,
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ message, type }),
     });
 
@@ -156,12 +128,11 @@ export async function createIncidentUpdate(incidentId: string, message: string, 
 
 export async function getIncidentUpdates(incidentId: string) {
   try {
-    const headers = await getAuthHeaders();
-    
-    const response = await fetch(`${API_BASE_URL}/api/incidents/analytics/${encodeURIComponent(incidentId)}/updates`, {
+    const response = await fetch(`/api/incidents/analytics/${encodeURIComponent(incidentId)}/updates`, {
       method: 'GET',
-      headers,
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (!response.ok) {
