@@ -5,20 +5,21 @@ import { getAllOrganizationMembers } from '../../controllers/teamsSectionControl
 import { getPendingInvitations } from '../../controllers/invitationController.js';
 import { authMiddleware } from '../../middlewares/middleware.js';
 import { acceptInvitation } from '../../controllers/invitationController.js';
+import { requirePermission } from '../../middlewares/authorization.js';
 
 const router = express.Router();
 
 // Route to get details of a single organization
-router.get('/:id', authMiddleware, getOrganizationDetails);
+router.get('/:id', authMiddleware, requirePermission('member:view'), getOrganizationDetails);
 
 // Route to delete an organization
-router.delete('/:id', authMiddleware, deleteOrganization);
+router.delete('/:id', authMiddleware, requirePermission('organization:delete'), deleteOrganization);
 
 // Route to get all organization members
-router.get('/members', authMiddleware, getAllOrganizationMembers);
+router.get('/members', authMiddleware, requirePermission('member:view'), getAllOrganizationMembers);
 
 // Route to get all pending invitations for the current organization
-router.get('/invitations/pending', authMiddleware, getPendingInvitations);
+router.get('/invitations/pending', authMiddleware, requirePermission('member:view'), getPendingInvitations);
 
 // Route to accept an organization invitation
 router.post('/invitations/accept', authMiddleware, acceptInvitation);

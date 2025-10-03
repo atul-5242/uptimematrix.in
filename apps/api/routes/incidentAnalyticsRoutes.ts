@@ -6,6 +6,7 @@ import {
   getIncidentUpdates
 } from '../controllers/incidentAnalyticsController.js';
 import { authMiddleware } from '../middlewares/middleware.js';
+import { requirePermission } from '../middlewares/authorization.js';
 
 const router = express.Router();
 
@@ -13,15 +14,19 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // GET /api/incidents/analytics/:incidentId - Get detailed analytics for a specific incident
-router.get('/:incidentId', getIncidentAnalytics);
+// Read analytics requires reporting:view (aligns with seeded permissions)
+router.get('/:incidentId', requirePermission('reporting:view'), getIncidentAnalytics);
 
 // PUT /api/incidents/analytics/:incidentId/status - Update incident status  
-router.put('/:incidentId/status', updateIncidentStatus);
+// Update status requires incident:resolve
+router.put('/:incidentId/status', requirePermission('incident:resolve'), updateIncidentStatus);
 
 // POST /api/incidents/analytics/:incidentId/updates - Create incident update
-router.post('/:incidentId/updates', createIncidentUpdate);
+// Create update requires incident:edit
+router.post('/:incidentId/updates', requirePermission('incident:edit'), createIncidentUpdate);
 
 // GET /api/incidents/analytics/:incidentId/updates - Get incident updates
-router.get('/:incidentId/updates', getIncidentUpdates);
+// Read updates requires reporting:view
+router.get('/:incidentId/updates', requirePermission('reporting:view'), getIncidentUpdates);
 
 export default router;
