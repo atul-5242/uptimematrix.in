@@ -134,7 +134,12 @@ export default function PublicStatusPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/status-pages/by-domain', {
+        // Extract domain from current URL
+        const currentDomain = window.location.hostname;
+        
+        console.log('[Frontend] Fetching status for domain:', currentDomain);
+        
+        const response = await fetch(`/api/status-pages/by-domain?domain=${encodeURIComponent(currentDomain)}`, {
           headers: {
             'Content-Type': 'application/json',
           },
