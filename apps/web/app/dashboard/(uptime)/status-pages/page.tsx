@@ -34,8 +34,8 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
-  Settings,
-  HelpCircle
+  HelpCircle,
+  Delete
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { getStatusPages } from '@/app/all-actions/status-page/status-page-actions'
@@ -239,7 +239,7 @@ export default function StatusPagesDashboard() {
     if (page.customDomain) {
       return `https://${page.customDomain}`;
     }
-    return `https://${page.subdomain}.status.yourdomain.com`;
+    return `https://${page.subdomain}.status.uptimematrix.atulmaurya.in`;
   };
 
   return (
@@ -416,8 +416,8 @@ export default function StatusPagesDashboard() {
                             }}
                             className="cursor-pointer"
                           >
-                            <Settings className="mr-2 h-4 w-4" />
-                            Settings
+                            <Delete className="mr-2 h-4 w-4" />
+                            Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
