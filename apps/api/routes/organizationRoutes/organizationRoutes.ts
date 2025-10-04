@@ -1,7 +1,7 @@
 
 import express from 'express';
 import { getOrganizationDetails, deleteOrganization } from '../../controllers/organizationsController.js';
-import { getAllOrganizationMembers } from '../../controllers/teamsSectionController.js';
+import { getAllOrganizationMembers, removeMemberFromOrganization } from '../../controllers/teamsSectionController.js';
 import { getPendingInvitations } from '../../controllers/invitationController.js';
 import { authMiddleware } from '../../middlewares/middleware.js';
 import { acceptInvitation } from '../../controllers/invitationController.js';
@@ -17,6 +17,9 @@ router.delete('/:id', authMiddleware, requirePermission('organization:delete'), 
 
 // Route to get all organization members
 router.get('/members', authMiddleware, requirePermission('member:view'), getAllOrganizationMembers);
+
+// Route to remove a member from the current organization (keep user account)
+router.delete('/members/:userId', authMiddleware, requirePermission('member:edit'), removeMemberFromOrganization);
 
 // Route to get all pending invitations for the current organization
 router.get('/invitations/pending', authMiddleware, requirePermission('member:view'), getPendingInvitations);

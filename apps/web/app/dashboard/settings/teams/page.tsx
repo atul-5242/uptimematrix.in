@@ -33,7 +33,8 @@ import {
 import { 
   inviteMember,
   getMembers,
-  transferMember
+  transferMember,
+  deleteMemberFromOrganization
 } from "@/app/all-actions/team-section/members/actions";
 import { getRoles, createRoleAction, updateRoleAction, deleteRoleAction, assignRoleAction } from "@/app/all-actions/team-section/roles/actions";
 import { useAppSelector } from "@/store";
@@ -406,38 +407,44 @@ export default function TeamsPage() {
   };
 
   const handleSaveMember = async () => {
-    // Form validation
-    if (!newMember.name.trim()) {
-      showToast("Full name is required", 'error');
-      return;
-    }
-    
-    if (!newMember.email.trim()) {
-      showToast("Email address is required", 'error');
-      return;
-    }
-    
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newMember.email.trim())) {
-      showToast("Please enter a valid email address", 'error');
-      return;
-    }
-    
-    if (!newMember.role) {
-      showToast("Please select a role", 'error');
-      return;
-    }
-    
-    if (newMember.team.length === 0) {
-      showToast("Please select at least one team", 'error');
-      return;
-    }
-    
-    // Phone validation (optional but if provided, should be valid)
-    if (newMember.phone && newMember.phone.trim() !== '' && !/^[\+]?[0-9\\s\\-\\(\\)]{10,}$/.test(newMember.phone as string)) {
-      showToast("Please enter a valid phone number", 'error');
-      return;
+    // Validation
+    if (editingMemberId) {
+      // Edit mode: only validate role and teams
+      if (!newMember.role) {
+        showToast('Please select a role', 'error');
+        return;
+      }
+      if (newMember.team.length === 0) {
+        showToast('Please select at least one team', 'error');
+        return;
+      }
+    } else {
+      // Invite mode: full validations
+      if (!newMember.name.trim()) {
+        showToast('Full name is required', 'error');
+        return;
+      }
+      if (!newMember.email.trim()) {
+        showToast('Email address is required', 'error');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newMember.email.trim())) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+      }
+      if (!newMember.role) {
+        showToast('Please select a role', 'error');
+        return;
+      }
+      if (newMember.team.length === 0) {
+        showToast('Please select at least one team', 'error');
+        return;
+      }
+      if (newMember.phone && newMember.phone.trim() !== '' && !/^[\+]?[- 0-9()]{10,}$/.test(newMember.phone as string)) {
+        showToast('Please enter a valid phone number', 'error');
+        return;
+      }
     }
 
     try {
@@ -529,44 +536,27 @@ export default function TeamsPage() {
 
   const handleDeleteMember = async (memberId: string) => {
     try {
-      const memberToDelete = members.find(m => m.id === memberId);
-      if (!memberToDelete || memberToDelete.teams.length === 0) return; 
-      
-      const removePromises = memberToDelete.teams.map(async (teamName) => {
-      const team = teams.find(t => t.name === teamName);
-        if (team) {
-          return removeMemberFromTeam(team.id, memberId);
-        }
-        return { success: false, error: 'Team not found' };
-      });
-
-      const results = await Promise.all(removePromises);
-      const failedRemovals = results.filter(r => !r.success);
-
-      if (failedRemovals.length === 0) {
-        showToast("Member removed from all teams successfully!");
-      } else if (failedRemovals.length === memberToDelete.teams.length) {
-        showToast("Failed to remove member from any team.", 'error');
+      const res = await deleteMemberFromOrganization(memberId);
+      if (!res.success) {
+        showToast(res.error || 'Failed to remove member from organization', 'error');
         return;
-      } else {
-        showToast(`Member removed from some teams, but failed for ${failedRemovals.length} team(s).`, 'error');
       }
-
-        const membersResult = await getMembers(currentOrganizationId!);
-        if (membersResult.success && membersResult.data) {
-          setMembers(membersResult.data.members);
-        }
-
+      // Refresh members
+      const membersResult = await getMembers(currentOrganizationId!);
+      if (membersResult.success && membersResult.data) {
+        setMembers(membersResult.data.members);
+      }
+      showToast('Member removed from organization');
     } catch (error) {
-      console.error('Error removing member:', error);
-      showToast("An error occurred while removing the member", 'error');
+      console.error('Error removing member from organization:', error);
+      showToast('An error occurred while removing the member', 'error');
       return;
     }
 
     if (editingMemberId === memberId) {
       setEditingMemberId(null);
       setIsMemberModalOpen(false);
-      setNewMember({ name: "", email: "", phone: "", role: "", team: [] });
+      setNewMember({ name: '', email: '', phone: '', role: '', team: [] });
     }
   };
 

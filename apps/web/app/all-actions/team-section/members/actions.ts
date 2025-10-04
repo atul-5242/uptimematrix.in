@@ -25,7 +25,7 @@ export async function inviteMemberToOrganization(memberData: {
     const orgResponse = await fetch(`${API_BASE_URL}/api/organizations/invite`, {
       method: 'POST',
       headers: {
-                'Content-Type': 'application/json',
+        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
@@ -253,6 +253,35 @@ export async function getMembers( currentOrganizationId: string) {
     return { success: true, data: { members: data.members } };
   } catch (error) {
     console.error('Get members action error:', error);
+    return { success: false, error: 'Network error occurred' };
+  }
+}
+
+// Delete member's association from organization (keep user account)
+export async function deleteMemberFromOrganization(userId: string) {
+  try {
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
+
+    if (!token) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    const res = await fetch(`/api/organization/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data.error || 'Failed to remove member from organization' };
+    }
+    return { success: true, data };
+  } catch (error) {
+    console.error('Delete member from organization action error:', error);
     return { success: false, error: 'Network error occurred' };
   }
 }

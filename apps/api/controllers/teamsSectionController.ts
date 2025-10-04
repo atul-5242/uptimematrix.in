@@ -96,6 +96,47 @@ export const createTeam = async (req: Request, res: Response) => {
   }
 };
 
+// Remove a member's association from the current organization (keeps the user account intact)
+export const removeMemberFromOrganization = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.organizationId) {
+      return res.status(401).json({ error: 'Unauthorized: No organization selected' });
+    }
+    const organizationId = req.user.organizationId;
+    const { userId } = req.params as { userId: string };
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Ensure organization membership exists
+    const existingMembership = await prisma.organizationMember.findFirst({
+      where: { organizationId, userId },
+    });
+    if (!existingMembership) {
+      return res.status(404).json({ error: 'Organization membership not found' });
+    }
+
+    // Remove all team memberships for this user within this organization
+    const teamsInOrg = await prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    if (teamsInOrg.length > 0) {
+      const teamIds = teamsInOrg.map((t) => t.id);
+      await prisma.teamMember.deleteMany({ where: { userId, teamId: { in: teamIds } } });
+    }
+
+    // Remove the organization membership entry
+    await prisma.organizationMember.deleteMany({ where: { organizationId, userId } });
+
+    return res.json({ success: true, message: 'Member removed from organization' });
+  } catch (error) {
+    console.error('Remove member from organization error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getTeams = async (req: Request, res: Response) => {
   try {
     if (!req.user?.organizationId) {
@@ -399,21 +440,23 @@ export const removeMemberFromTeam = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Team not found' });
     }
 
-    // Find and delete team member
+    // Find by teamMember id first
     const teamMember = await prisma.teamMember.findFirst({
-      where: {
-        id: memberId,
-        teamId: teamId
+      where: { id: memberId, teamId }
+    });
+
+    if (teamMember) {
+      await prisma.teamMember.delete({ where: { id: memberId } });
+    } else {
+      // Fallback: treat memberId as userId and delete membership by userId within this team
+      const existingByUser = await prisma.teamMember.findFirst({
+        where: { teamId, userId: memberId }
+      });
+      if (!existingByUser) {
+        return res.status(404).json({ error: 'Team member not found' });
       }
-    });
-
-    if (!teamMember) {
-      return res.status(404).json({ error: 'Team member not found' });
+      await prisma.teamMember.deleteMany({ where: { teamId, userId: memberId } });
     }
-
-    await prisma.teamMember.delete({
-      where: { id: memberId }
-    });
 
     res.json({
       success: true,

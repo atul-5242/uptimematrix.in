@@ -78,7 +78,7 @@ export async function updateTeam(teamId: string, formData: { name?: string; desc
     const response = await fetch(`/api/team-section/team/${teamId}`, {
       method: 'PUT',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(formData),
@@ -109,7 +109,7 @@ export async function deleteTeam(teamId: string) {
     const response = await fetch(`/api/team-section/team/${teamId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -173,7 +173,7 @@ export async function getTeamMembers(teamId: string) {
     const response = await fetch(`/api/team-section/members?teamId=${teamId}`, {
       method: 'GET',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
@@ -204,7 +204,7 @@ export async function updateTeamMember(teamId: string, memberId: string, memberD
     const response = await fetch(`/api/team-section/members/${teamId}/${memberId}`, {
       method: 'PUT',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(memberData),
@@ -235,7 +235,7 @@ export async function removeMemberFromTeam(teamId: string, memberId: string) {
     const response = await fetch(`/api/team-section/members/${teamId}/${memberId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -266,7 +266,7 @@ export async function getAvailableUsers(teamId: string) {
     const response = await fetch(`${API_BASE_URL}/api/teams/${teamId}/available-users`, {
       method: 'GET',
       headers: {
-        'Authorization': token,
+    'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
@@ -297,7 +297,7 @@ export async function getRoles() {
     const response = await fetch('/api/team-section/roles', {
       method: 'GET',
       headers: {
-        'Authorization': token,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
