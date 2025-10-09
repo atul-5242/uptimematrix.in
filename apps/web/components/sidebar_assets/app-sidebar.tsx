@@ -40,6 +40,10 @@ const data = {
       isActive: true,
       items: [
         {
+          title: "Dashboard",
+          url: "/dashboard",
+        },
+        {
           title: "Incidents",
           url: "/dashboard/incidents",
         },
@@ -137,11 +141,11 @@ const data = {
     },
   ],
   navSecondary: [
-    {
-      title: "Notifications",
-      url: "#",
-      icon: Bell,
-    },
+    // {
+    //   title: "Notifications",
+    //   url: "#",
+    //   icon: Bell,
+    // },
     {
       title: "Organizations",
       url: "/dashboard/organizations",
@@ -194,8 +198,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Command className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden">
+                  <img 
+                    src="https://pbs.twimg.com/profile_images/1971130228299718656/jODXiBTJ_400x400.jpg" 
+                    alt="UptimeMatrix Logo" 
+                    className="w-8 h-8 rounded object-cover"
+                  />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{selectedOrganization?.name || "Uptime Matrix"}</span>

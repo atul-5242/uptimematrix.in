@@ -83,7 +83,7 @@ export default function EscalationPolicyCreatePage() {
       {
         id: 1,
         alertMethod: {
-          primary: [],
+          primary: [], // All alert methods start UNSELECTED - user must choose
           additional: []
         },
         recipients: [],
@@ -108,9 +108,9 @@ export default function EscalationPolicyCreatePage() {
   const [membersLoading, setMembersLoading] = useState<boolean>(true);
 
   const primaryAlertMethods = [
-    { value: 'email', label: 'Email Notification', icon: Mail },
-    { value: 'sms', label: 'SMS Alert', icon: MessageSquare },
-    { value: 'phone', label: 'Phone Call', icon: Phone }
+    { value: 'email', label: 'Email Notification', icon: Mail, disabled: false },
+    { value: 'sms', label: 'SMS Alert', icon: MessageSquare, disabled: true },
+    { value: 'phone', label: 'Phone Call', icon: Phone, disabled: true }
   ]
 
   // Fetch all necessary data: teams, organization members, on-call schedules
@@ -850,15 +850,23 @@ export default function EscalationPolicyCreatePage() {
                       <Label className="text-sm font-medium text-gray-700">Primary Methods</Label>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {primaryAlertMethods.map((method) => (
-                          <div key={method.value} className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg bg-white/80">
+                          <div key={method.value} className={`flex items-center space-x-2 p-3 border border-gray-200 rounded-lg ${
+                            method.disabled ? 'bg-gray-50 opacity-60' : 'bg-white/80'
+                          }`}>
                             <Checkbox
                               id={`${step.id}-${method.value}`}
                               checked={step.alertMethod.primary.includes(method.value)}
+                              disabled={method.disabled}
                               onCheckedChange={(checked: boolean) => updatePrimaryAlertMethod(step.id, method.value, checked)}
                             />
-                            <method.icon className="h-4 w-4 text-gray-600" />
-                            <Label htmlFor={`${step.id}-${method.value}`} className="text-sm font-medium cursor-pointer">
+                            <method.icon className={`h-4 w-4 ${
+                              method.disabled ? 'text-gray-400' : 'text-gray-600'
+                            }`} />
+                            <Label htmlFor={`${step.id}-${method.value}`} className={`text-sm font-medium ${
+                              method.disabled ? 'cursor-not-allowed text-gray-400' : 'cursor-pointer'
+                            }`}>
                               {method.label}
+                              {method.disabled && <span className="ml-2 text-xs">(Coming Soon)</span>}
                             </Label>
                           </div>
                         ))}
@@ -868,9 +876,7 @@ export default function EscalationPolicyCreatePage() {
                     {/* Additional Methods (Dropdown) */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-gray-700">Additional Integrated Methods</Label>
-                      <Select
-                        onValueChange={(value) => addAdditionalAlertMethod(step.id, value)}
-                      >
+                      <Select>
                         <SelectTrigger>
                           <SelectValue placeholder="Add more notification methods" />
                         </SelectTrigger>
@@ -890,11 +896,11 @@ export default function EscalationPolicyCreatePage() {
                             </Button>
                           </div>
                           {availableIntegrations.filter(method => method.integrated).map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              <div className="flex items-center gap-2">
+                            <SelectItem key={method.value} value={method.value} disabled>
+                              <div className="flex items-center gap-2 opacity-60">
                                 <method.icon className="h-4 w-4" />
                                 {method.label}
-                                <Badge variant="outline" className="text-xs">Integrated</Badge>
+                                <Badge variant="outline" className="text-xs">Coming Soon</Badge>
                               </div>
                             </SelectItem>
                           ))}
@@ -903,7 +909,7 @@ export default function EscalationPolicyCreatePage() {
                               <div className="flex items-center gap-2 opacity-50">
                                 <method.icon className="h-4 w-4" />
                                 {method.label}
-                                <Badge variant="secondary" className="text-xs">Not Integrated</Badge>
+                                <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                               </div>
                             </SelectItem>
                           ))}
