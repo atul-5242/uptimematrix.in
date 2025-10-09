@@ -59,14 +59,15 @@ const data = {
           title: "Status pages",
           url: "/dashboard/status-pages",
         },
-        {
-          title: "Integrations",
-          url: "/dashboard/integrations",
-        },
-        {
-          title: "Reporting",
-          url: "/dashboard/reporting",
-        },
+        // TODO: Uncomment when backend data integration is ready
+        // {
+        //   title: "Integrations",
+        //   url: "/dashboard/integrations",
+        // },
+        // {
+        //   title: "Reporting",
+        //   url: "/dashboard/reporting",
+        // },
       ],
     },
     {
@@ -75,12 +76,39 @@ const data = {
       icon: Bot,
       items: [
         {
-          title: "Alerts(upcoming)",
+          title: "Metrics",
           url: "#",
+          disabled: true,
         },
         {
-          title: "Source(upcoming)",
+          title: "Logs",
           url: "#",
+          disabled: true,
+        },
+        {
+          title: "Traces",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Performance",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Errors",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Infrastructure",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Dashboards",
+          url: "#",
+          disabled: true,
         },
       ],
     },
