@@ -129,10 +129,10 @@ const data = {
           title: "Team",
           url: "/dashboard/settings/teams",
         },
-        {
-          title: "Billing",
-          url: "/dashboard/settings/billings",
-        },
+        // {
+        //   title: "Billing",
+        //   url: "/dashboard/settings/billings",
+        // },
         {
           title: "Invites",
           url: "/dashboard/settings/invites",

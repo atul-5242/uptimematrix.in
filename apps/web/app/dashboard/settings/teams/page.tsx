@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -149,6 +150,7 @@ const initialSettings: NotificationSettings = {
 };
 
 export default function TeamsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("teams");
   const [teams, setTeams] = useState<Team[]>([]);
@@ -831,7 +833,7 @@ export default function TeamsPage() {
               </Button>
             )}
             {activeTab === "members" && (
-              <Button onClick={openCreateMember} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+              <Button onClick={() => router.push('/dashboard/settings/invites')} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
                 <UserPlus className="h-4 w-4 mr-2" />
                 Invite Member
               </Button>
@@ -1019,7 +1021,7 @@ export default function TeamsPage() {
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No members yet</h3>
                   <p className="text-gray-600 mb-4">Invite your first member to get started</p>
-                  <Button onClick={openCreateMember}>Invite Member</Button>
+                  <Button onClick={() => router.push('/dashboard/settings/invites')}>Invite Member</Button>
                 </div>
               ) : (
                 members.map((member) => (
@@ -1487,34 +1489,20 @@ export default function TeamsPage() {
               </p>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="memberName">Full Name *</Label>
-                <Input
-                  id="memberName"
-                  value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="memberEmail">Email Address *</Label>
-                <Input
-                  id="memberEmail"
-                  type="email"
-                  value={newMember.email}
-                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                  placeholder="john@company.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="memberPhone">Phone Number</Label>
-                <Input
-                  id="memberPhone"
-                  value={newMember.phone}
-                  onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
-                />
-              </div>
+
+              {!editingMemberId && (
+                <div className="space-y-2">
+                  <Label htmlFor="memberEmail">Email Address *</Label>
+                  <Input
+                    id="memberEmail"
+                    type="email"
+                    value={newMember.email}
+                    onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                    placeholder="john@company.com"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="memberRole">Role *</Label>
                 <Select value={newMember.role} onValueChange={(value) => setNewMember({ ...newMember, role: value || "" })}>
