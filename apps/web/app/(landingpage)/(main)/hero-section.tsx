@@ -3,133 +3,203 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Play, ArrowRight, CheckCircle, AlertTriangle, TrendingUp, Activity } from 'lucide-react'
+import { Play, ArrowRight, CheckCircle, Shield, Zap, BarChart3, Globe, Clock, AlertTriangle, TrendingUp } from 'lucide-react'
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-background via-blue-50/30 to-purple-50/30 dark:from-background dark:via-blue-950/10 dark:to-purple-950/10 pt-20 pb-16 lg:pt-28 lg:pb-24">
-      <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-        <div className="lg:grid lg:grid-cols-12 lg:gap-8">
-          {/* Content */}
-          <div className="lg:col-span-6">
-            <Badge variant="secondary" className="mb-4 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border-blue-200 dark:border-blue-800">
-              <Activity className="w-3 h-3 mr-1" />
-              New: Advanced Incident Response 3.0
-            </Badge>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl xl:text-6xl">
-              Monitor everything.
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Break nothing.</span>
-              <br />
-              Fix instantly.
-            </h1>
-            <p className="mt-6 text-xl text-muted-foreground leading-relaxed">
-              UptimeMatrix provides comprehensive monitoring for your entire infrastructure. Get instant alerts, detailed analytics, and automated incident response to keep your services running 24/7.
-            </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg px-8 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-lg">
+    <section className="relative py-12 lg:py-16 bg-white dark:bg-slate-950 overflow-hidden">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-30"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-indigo-50/30 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/10"></div>
+      </div>
+
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 relative w-full">
+        <div className="grid lg:grid-cols-2 gap-8 items-center">
+          {/* Left Content */}
+          <div className="space-y-6">
+            {/* Status Badge */}
+            <div className="inline-flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800/50">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-medium">All Systems Operational</span>
+              </div>
+            </div>
+
+            {/* Main Heading */}
+            <div className="space-y-6">
+              <h1 className="text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
+                <span className="text-slate-900 dark:text-white">Monitor everything.</span>
+                <br />
+                <span className="text-slate-900 dark:text-white">Break </span>
+                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">nothing.</span>
+                <br />
+                <span className="text-slate-900 dark:text-white">Fix instantly.</span>
+              </h1>
+              
+              <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed max-w-lg">
+                Keep your services running 24/7 with real-time monitoring, instant alerts, and automated incident response. Catch issues before your users do.
+              </p>
+              
+              {/* Key Features */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Monitor websites, APIs, servers, and databases in real-time</span>
+                </div>
+                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Get instant alerts via email, SMS, Slack, and 20+ integrations</span>
+                </div>
+                <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm font-medium">Beautiful status pages and detailed analytics & reporting</span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button 
+                size="lg" 
+                className="h-11 px-6 text-base bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
                 Start monitoring free
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 border-2">
-                <Play className="mr-2 h-5 w-5" />
-                Watch 2-min demo
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="h-11 px-6 text-base border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300"
+              >
+                <Play className="mr-2 h-4 w-4" />
+                See how it works
               </Button>
             </div>
-            <div className="mt-8 flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-muted-foreground">
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                14-day free trial
+
+            {/* Trust Indicators */}
+            <div className="flex flex-wrap items-center gap-6 text-sm text-slate-600 dark:text-slate-400">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Free forever</span>
               </div>
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                No credit card required
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Open source</span>
               </div>
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Setup in 2 minutes
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span>Setup in 2 minutes</span>
               </div>
             </div>
           </div>
 
-          {/* System Status Dashboard */}
-          <div className="mt-12 lg:mt-0 lg:col-span-6">
-            <div className="relative">
-              {/* Main Dashboard Card */}
-              <Card className="p-6 bg-card/80 backdrop-blur-sm border shadow-2xl">
+          {/* Right Content - Dashboard Preview */}
+          <div className="relative">
+            {/* Main Dashboard */}
+            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-0 shadow-2xl">
+              <CardContent className="p-5">
+                {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-semibold text-lg">System Status Dashboard</h3>
-                  <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                    All systems operational
-                  </Badge>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Infrastructure Overview</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mt-1">Real-time monitoring dashboard</p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg">
+                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">All Systems Operational</span>
+                  </div>
                 </div>
-                
+
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Uptime</span>
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white">99.98%</div>
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400">+0.02% from last month</div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-indigo-500" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Response Time</span>
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white">127ms</div>
+                    <div className="text-xs text-emerald-600 dark:text-emerald-400">-23ms from last month</div>
+                  </div>
+                </div>
+
+                {/* Service Status */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="font-medium">Website</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-green-600 dark:text-green-400">99.9% uptime</div>
-                      <div className="text-xs text-muted-foreground">Last 30 days</div>
-                    </div>
-                  </div>
+                  <h4 className="text-base font-semibold text-slate-900 dark:text-white">Service Status</h4>
                   
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="font-medium">API</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-green-600 dark:text-green-400">100% uptime</div>
-                      <div className="text-xs text-muted-foreground">Last 30 days</div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
-                      <span className="font-medium">Database</span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Degraded performance</div>
-                      <div className="text-xs text-muted-foreground">Response time: 450ms</div>
-                    </div>
+                  <div className="space-y-2">
+                    {[
+                      { name: 'Web Application', status: 'operational', uptime: '100%' },
+                      { name: 'API Gateway', status: 'operational', uptime: '99.9%' },
+                      { name: 'Database Cluster', status: 'operational', uptime: '99.8%' },
+                      { name: 'CDN Network', status: 'degraded', uptime: '98.5%' }
+                    ].map((service, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-slate-50/50 dark:bg-slate-800/50 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            service.status === 'operational' 
+                              ? 'bg-emerald-500' 
+                              : 'bg-amber-500 animate-pulse'
+                          }`}></div>
+                          <span className="font-medium text-slate-900 dark:text-white">{service.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-semibold ${
+                            service.status === 'operational'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}>
+                            {service.uptime}
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 capitalize">{service.status}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="mt-6 pt-4 border-t">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Average response time</span>
-                    <span className="font-medium">127ms</span>
+            {/* Floating Alert */}
+            <Card className="absolute -top-4 -right-4 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 shadow-lg max-w-[240px]">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-amber-100 dark:bg-amber-950/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   </div>
-                </div>
-              </Card>
-
-              {/* Floating Alert - Fixed positioning */}
-              <Card className="absolute -top-2 -right-2 p-3 bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800 shadow-lg max-w-[200px]">
-                <div className="flex items-start space-x-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-red-700 dark:text-red-400 truncate">High Response Time</p>
-                    <p className="text-xs text-red-600 dark:text-red-500">2 minutes ago</p>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Performance Alert</h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">CDN response time increased by 15%</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">3 minutes ago</p>
                   </div>
                 </div>
-              </Card>
+              </CardContent>
+            </Card>
 
-              {/* Floating Metric - Fixed positioning */}
-              <Card className="absolute -bottom-2 -left-2 p-3 bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800 shadow-lg max-w-[180px]">
-                <div className="flex items-start space-x-2">
-                  <TrendingUp className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+            {/* Floating Success Metric */}
+            <Card className="absolute -bottom-4 -left-4 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 shadow-lg max-w-[220px]">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-950/50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-green-700 dark:text-green-400 truncate">Performance +15%</p>
-                    <p className="text-xs text-green-600 dark:text-green-500">vs last week</p>
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Incident Resolved</h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Database latency back to normal</p>
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">Auto-resolved in 2m</p>
                   </div>
                 </div>
-              </Card>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

@@ -40,13 +40,7 @@ const features = [
     badge: "New",
     color: "green"
   },
-  {
-    icon: Shield,
-    title: "Security Monitoring",
-    description: "Monitor SSL certificates, domain expiry, security vulnerabilities, and compliance across your entire infrastructure.",
-    badge: "Pro",
-    color: "red"
-  },
+
   {
     icon: Zap,
     title: "Status Pages",
@@ -82,20 +76,8 @@ const features = [
     badge: "Pro",
     color: "orange"
   },
-  {
-    icon: Smartphone,
-    title: "Mobile App Monitoring",
-    description: "Track mobile app performance, crashes, and user experience across iOS and Android platforms.",
-    badge: "New",
-    color: "cyan"
-  },
-  {
-    icon: Database,
-    title: "Database Performance",
-    description: "Monitor database queries, connections, and performance with detailed insights and optimization recommendations.",
-    badge: "Enterprise",
-    color: "violet"
-  },
+
+
   {
     icon: Activity,
     title: "Real-time Metrics",
@@ -123,7 +105,7 @@ const colorClasses = {
 export function FeaturesSection() {
   return (
     <section id="features" className="py-24 bg-muted/30">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Features</Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
@@ -167,20 +149,20 @@ export function FeaturesSection() {
         <div className="mt-20">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">99.99%</div>
-              <div className="text-sm text-muted-foreground">Platform Uptime</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">1</div>
+              <div className="text-sm text-muted-foreground">Monitoring Location</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent mb-2">300+</div>
-              <div className="text-sm text-muted-foreground">Global Locations</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent mb-2">24/7</div>
+              <div className="text-sm text-muted-foreground">Real-time Monitoring</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">100M+</div>
-              <div className="text-sm text-muted-foreground">Checks Per Month</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">Open</div>
+              <div className="text-sm text-muted-foreground">Source Project</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent mb-2">5000+</div>
-              <div className="text-sm text-muted-foreground">Happy Customers</div>
+              <div className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent mb-2">Free</div>
+              <div className="text-sm text-muted-foreground">Self-hosted Solution</div>
             </div>
           </div>
         </div>

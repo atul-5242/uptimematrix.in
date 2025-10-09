@@ -55,21 +55,46 @@ const SignIn: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <img 
-            src="https://pbs.twimg.com/profile_images/1971130228299718656/jODXiBTJ_400x400.jpg" 
-            alt="UptimeMatrix Logo" 
-            className="w-16 h-16 rounded-xl mb-4 object-cover scale-125 shadow-lg mx-auto"
-          />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h1>
-          <p className="text-slate-600">Sign in to your account to continue</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <style jsx>{`
+        .glass-effect {
+          backdrop-filter: blur(20px);
+          background: rgba(255, 255, 255, 0.85);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+      `}</style>
+      
+      <div className="w-full max-w-lg">
+        {/* Logo/Brand */}
+        <div className="text-center mb-6">
+          <div className="relative inline-block mb-4">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 rounded-xl blur-md opacity-30"></div>
+            <img 
+              src="https://pbs.twimg.com/profile_images/1971130228299718656/jODXiBTJ_400x400.jpg" 
+              alt="UptimeMatrix Logo" 
+              className="relative w-14 h-14 rounded-xl object-cover shadow-xl mx-auto"
+            />
+          </div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-2">Welcome back</h1>
+          <p className="text-slate-500 text-sm leading-relaxed max-w-sm mx-auto">Sign in to your account to continue</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* Sign In Form */}
+        <div className="glass-effect rounded-2xl shadow-xl p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Global Error Display */}
+            {(validationErrors.email === 'Invalid credentials' || validationErrors.password === 'Invalid credentials') && (
+              <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-lg text-red-700 mb-4 shadow-sm">
+                <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertCircle size={16} />
+                </div>
+                <span className="text-sm font-medium">Invalid email or password. Please try again.</span>
+              </div>
+            )}
+
+            {/* Email Field */}
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email</label>
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400" />
@@ -79,17 +104,23 @@ const SignIn: React.FC = () => {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-lg ${
-                    validationErrors.email ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  placeholder="Enter your email"
+                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-lg transition-all duration-200 ${
+                    validationErrors.email && validationErrors.email !== 'Invalid credentials' 
+                      ? 'border-red-300 bg-red-50 focus:border-red-400' 
+                      : 'border-slate-200 bg-slate-50 hover:border-slate-300 focus:border-blue-400 focus:bg-white'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-100`}
+                  placeholder="john.doe@example.com"
                   disabled={submitting}
                 />
               </div>
-              {validationErrors.email && <p className="text-sm text-red-600">{validationErrors.email}</p>}
+              {validationErrors.email && validationErrors.email !== 'Invalid credentials' && (
+                <p className="text-sm text-red-600 font-medium mt-1">{validationErrors.email}</p>
+              )}
             </div>
+
+            {/* Password Field */}
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">Password</label>
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">Password</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-slate-400" />
@@ -99,27 +130,55 @@ const SignIn: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={handleChange('password')}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-lg ${validationErrors.password ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  className={`w-full pl-10 pr-12 py-3 border-2 rounded-lg transition-all duration-200 ${
+                    validationErrors.password && validationErrors.password !== 'Invalid credentials' 
+                      ? 'border-red-300 bg-red-50 focus:border-red-400' 
+                      : 'border-slate-200 bg-slate-50 hover:border-slate-300 focus:border-blue-400 focus:bg-white'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-100`}
                   placeholder="Enter your password"
                   disabled={submitting}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600" disabled={submitting}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)} 
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors" 
+                  disabled={submitting}
+                >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {validationErrors.password && <p className="text-sm text-red-600">{validationErrors.password}</p>}
+              {validationErrors.password && validationErrors.password !== 'Invalid credentials' && (
+                <p className="text-sm text-red-600 font-medium mt-1">{validationErrors.password}</p>
+              )}
             </div>
-            <button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-              {submitting ? (<><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Signing in...</>) : 'Sign in'}
-            </button>
+
+            {/* Submit Button */}
+            <div className="pt-3">
+              <button 
+                type="submit" 
+                disabled={submitting} 
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white font-semibold py-3 px-6 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign in'
+                )}
+              </button>
+            </div>
           </form>
+
+          {/* Sign Up Link */}
           <div className="mt-6 text-center">
-            <p className="text-slate-600">
+            <p className="text-slate-600 text-sm">
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => router.push('/signup')}
-                className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                className="text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200 underline decoration-blue-200 hover:decoration-blue-400"
                 disabled={submitting}
               >
                 Sign up

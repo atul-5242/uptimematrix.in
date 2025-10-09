@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Menu, X, Moon, Sun, Monitor } from 'lucide-react'
+import { Menu, X, Moon, Sun, Monitor, Star, Github } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Logo } from '@/app/(landingpage)/(main)/logo'
 import { 
@@ -24,10 +24,10 @@ export function Header() {
 
   const navigation = [
     { name: 'Features', href: '#features' },
-    { name: 'Pricing', href: '#pricing' },
     { name: 'Integrations', href: '#integrations' },
-    { name: 'Customers', href: '#testimonials' },
-    { name: 'Docs', href: '#' },
+    { name: 'Pricing', href: '#pricing' },
+    { name: 'Testimonials', href: '#testimonials' },
+    { name: 'GitHub', href: 'https://github.com/atul-5242/uptimematrix.in' },
   ]
 
   const goCta = () => {
@@ -46,20 +46,14 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            {token ? (
-              // Show dashboard link for authenticated users
-              <a
-                href="/dashboard"
-                className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
-              >
-                Dashboard
-              </a>
-            ) : (
-              // Show regular navigation for non-authenticated users
+            {!token && (
+              // Show regular navigation for non-authenticated users only
               navigation.map((item) => (
                 <a
                   key={item.name}
                   href={item.href}
+                  target={item.href.startsWith('http') ? '_blank' : '_self'}
+                  rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {item.name}
@@ -106,8 +100,27 @@ export function Header() {
               }}>Logout</Button>
             }
             
-            <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700" onClick={goCta}>
-              Start free trial
+            {/* GitHub Star Button */}
+            <Button 
+              variant="outline" 
+              className="group relative overflow-hidden border-2 border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              onClick={() => window.open('https://github.com/atul-5242/uptimematrix.in', '_blank')}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/20 to-orange-200/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <Github className="mr-2 h-4 w-4 text-slate-600 group-hover:text-slate-800 transition-colors" />
+              <Star className="mr-1 h-3 w-3 text-yellow-500 group-hover:text-yellow-600 transition-all duration-300 group-hover:scale-110" />
+              <span className="text-slate-700 group-hover:text-slate-900 font-medium transition-colors">Star us</span>
+            </Button>
+            
+            {/* Start Free Trial Button */}
+            <Button 
+              className="group relative overflow-hidden bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-indigo-300/40 transform"
+              onClick={goCta}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-white/15 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-400 to-indigo-500 opacity-0 group-hover:opacity-25 blur transition-all duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out"></div>
+              <span className="relative font-semibold group-hover:text-indigo-50 transition-colors">✨ Start free trial</span>
             </Button>
           </div>
 
@@ -149,6 +162,8 @@ export function Header() {
                 <a
                   key={item.name}
                   href={item.href}
+                  target={item.href.startsWith('http') ? '_blank' : '_self'}
+                  rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                   className="block px-3 py-2 text-base font-medium text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -159,8 +174,24 @@ export function Header() {
                 <Button variant="ghost" className="w-full justify-start" onClick={() => { setIsMenuOpen(false); goCta(); }}>
                   {token ? 'Dashboard' : 'Sign in'}
                 </Button>
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700" onClick={() => { setIsMenuOpen(false); goCta(); }}>
-                  Start free trial
+                {/* Mobile GitHub Button */}
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start group border-2 border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50" 
+                  onClick={() => { setIsMenuOpen(false); window.open('https://github.com/atul-5242/uptimematrix.in', '_blank'); }}
+                >
+                  <Github className="mr-2 h-4 w-4 text-slate-600" />
+                  <Star className="mr-1 h-3 w-3 text-yellow-500" />
+                  <span className="text-slate-700">Star us on GitHub</span>
+                </Button>
+                
+                {/* Mobile Start Free Trial Button */}
+                <Button 
+                  className="w-full group relative overflow-hidden bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold transition-all duration-300" 
+                  onClick={() => { setIsMenuOpen(false); goCta(); }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/15 to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  <span className="relative">✨ Start free trial</span>
                 </Button>
               </div>
             </div>
