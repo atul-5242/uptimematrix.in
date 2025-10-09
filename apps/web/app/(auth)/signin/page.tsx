@@ -58,11 +58,11 @@ const SignIn: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-blue-600 rounded-sm"></div>
-            </div>
-          </div>
+          <img 
+            src="https://pbs.twimg.com/profile_images/1971130228299718656/jODXiBTJ_400x400.jpg" 
+            alt="UptimeMatrix Logo" 
+            className="w-16 h-16 rounded-xl mb-4 object-cover scale-125 shadow-lg mx-auto"
+          />
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h1>
           <p className="text-slate-600">Sign in to your account to continue</p>
         </div>

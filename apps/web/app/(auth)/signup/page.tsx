@@ -134,11 +134,11 @@ const SignUp: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-blue-600 rounded-sm"></div>
-            </div>
-          </div>
+          <img 
+            src="https://pbs.twimg.com/profile_images/1971130228299718656/jODXiBTJ_400x400.jpg" 
+            alt="UptimeMatrix Logo" 
+            className="w-16 h-16 rounded-xl mb-4 object-cover scale-125 shadow-lg mx-auto"
+          />
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Create your account</h1>
           <p className="text-slate-600">Get started with your free account today</p>
         </div>
@@ -185,7 +185,7 @@ const SignUp: React.FC = () => {
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="h-5 w-5 text-slate-400">🏢</span>
                 </div>
-                <input id="organizationName" type="text" value={formData.organizationName} onChange={handleChange('organizationName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.organizationName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="Acme Corp" disabled={submitting} />
+                <input id="organizationName" type="text" value={formData.organizationName} onChange={handleChange('organizationName')} className={`w-full pl-10 pr-4 py-3 border rounded-lg ${validationErrors.organizationName ? 'border-red-300 bg-red-50' : 'border-slate-300 bg-white hover:border-slate-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`} placeholder="TechSolutions Inc." disabled={submitting} />
               </div>
               {validationErrors.organizationName && (<p className="text-sm text-red-600">{validationErrors.organizationName}</p>)}
             </div>
