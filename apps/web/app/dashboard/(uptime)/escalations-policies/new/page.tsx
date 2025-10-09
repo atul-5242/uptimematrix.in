@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Plus, Trash2, Clock, Users, AlertTriangle, ArrowLeft, Globe, Zap, Webhook, Bell, Phone, Mail, MessageSquare, X, Info, Settings } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from 'sonner'
+import { handleApiError, handleApiSuccess, apiRequest } from '@/lib/errorHandler'
 
 type EscalationStep = {
   id: number;
@@ -154,21 +155,11 @@ export default function EscalationPolicyCreatePage() {
             if (!response.ok) {
               const errorText = await response.text();
               console.error('Failed to fetch organization members:', errorText);
-              // Handle different error responses from the backend
-              if (response.status === 401) {
-                toast.error('Unauthorized', {
-                  description: 'Your session has expired. Please log in again.',
-                });
-                router.push('/signin');
-              } else if (response.status === 403) {
-                toast.error('Forbidden', {
-                  description: 'You do not have permission to view organization members.',
-                });
-              } else {
-                toast.error('Error', {
-                  description: `Failed to fetch organization members: ${response.statusText}`,
-                });
-              }
+              // Use centralized error handling
+              handleApiError({
+                error: errorText || response.statusText,
+                status: response.status
+              }, 'Load Organization Members');
               return;
             }
 
@@ -176,9 +167,7 @@ export default function EscalationPolicyCreatePage() {
             setOrganizationMembers(data.data || []);
           } catch (error) {
             console.error('Error fetching organization members:', error);
-            toast.error('Network Error', {
-              description: 'Unable to connect to the server. Please check your internet connection.',
-            });
+            handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Load Organization Members');
           } finally {
             setMembersLoading(false);
           }

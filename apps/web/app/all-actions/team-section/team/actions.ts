@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 
@@ -10,27 +12,25 @@ export async function createTeam(formData: { name: string; description?: string 
     const { token } = await tokenResponse.json();
 
     if (!token) {
+      handleApiError('Authentication required', 'Create Team');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch('/api/team-section/team', {
+    const result = await apiRequest('/api/team-section/team', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
       body: JSON.stringify(formData),
-    });
+    }, 'Create Team');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to create team' };
+    if (result.success) {
+      handleApiSuccess('Team created successfully', 'Create Team');
     }
 
-    return { success: true, data: data.data };
-  } catch (error) {
-    console.error('Create team action error:', error);
+    return result;
+  } catch (error: any) {
+    handleApiError(error.message || 'Network error occurred', 'Create Team');
     return { success: false, error: 'Network error occurred' };
   }
 }
@@ -103,26 +103,24 @@ export async function deleteTeam(teamId: string) {
     const { token } = await tokenResponse.json();
 
     if (!token) {
+      handleApiError('Authentication required', 'Delete Team');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch(`/api/team-section/team/${teamId}`, {
+    const result = await apiRequest(`/api/team-section/team/${teamId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
-    });
+    }, 'Delete Team');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to delete team' };
+    if (result.success) {
+      handleApiSuccess('Team deleted successfully', 'Delete Team');
     }
 
-    return { success: true, message: data.message };
+    return result;
   } catch (error) {
-    console.error('Delete team action error:', error);
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Delete Team');
     return { success: false, error: 'Network error occurred' };
   }
 }
@@ -135,59 +133,57 @@ export async function addMemberToTeam(teamId: string, memberData: { userId: stri
     const { token } = await tokenResponse.json();
 
     if (!token) {
+      handleApiError('Authentication required', 'Add Member to Team');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch('/api/team-section/members', {
+    const result = await apiRequest('/api/team-section/members', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ teamId, ...memberData }),
-    });
+    }, 'Add Member to Team');
+    
     console.log("Add member to team request body:", { teamId, ...memberData });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to add member to team' };
+    if (result.success) {
+      handleApiSuccess('Member added to team successfully', 'Add Member to Team');
+      return { success: true, data: result.data };
+    } else {
+      return { success: false, error: result.error || 'Failed to add member to team' };
     }
-
-    return { success: true, data: data.data };
   } catch (error) {
-    console.error('Add member to team action error:', error);
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Add Member to Team');
     return { success: false, error: 'Network error occurred' };
   }
 }
 
 export async function getTeamMembers(teamId: string) {
   try {
-        const tokenResponse = await fetch('/api/auth/get-token');
+    const tokenResponse = await fetch('/api/auth/get-token');
     const { token } = await tokenResponse.json();
     
     if (!token) {
+      handleApiError('Authentication required', 'Load Team Members');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch(`/api/team-section/members?teamId=${teamId}`, {
+    const result = await apiRequest(`/api/team-section/members?teamId=${teamId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
       cache: 'no-store',
-    });
+    }, 'Load Team Members');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to fetch team members' };
-    }
-
-    return { success: true, data: data.data };
+    return {
+      success: result.success,
+      data: result.success ? result.data : [],
+      error: result.error
+    };
   } catch (error) {
-    console.error('Get team members action error:', error);
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Load Team Members');
     return { success: false, error: 'Network error occurred' };
   }
 }

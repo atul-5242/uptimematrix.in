@@ -12,6 +12,10 @@ import { Incident, IncidentStatus, IncidentSeverity, IncidentStats } from '@/typ
 import { formatTimeAgo, formatDuration } from '@/lib/time'
 import { useAppSelector } from '@/store'
 import { toast } from '@/hooks/use-toast'
+import { handleApiError, handleApiSuccess } from '@/lib/errorHandler'
+import { PermissionGate } from '@/components/permissions/PermissionGate'
+import { usePermissions } from '@/hooks/usePermissions'
+import { SYSTEM_PERMISSIONS } from '@/lib/permissions'
 
 export default function IncidentsPage() {
   const router = useRouter()
@@ -33,6 +37,7 @@ export default function IncidentsPage() {
 
   const selectedOrganizationId = useAppSelector((state) => state.user.selectedOrganizationId);
   const authToken = useAppSelector((state) => state.auth.token);
+  const { hasPermission } = usePermissions();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,11 +94,7 @@ export default function IncidentsPage() {
         setStats(statsData);
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to fetch incidents. Please try again.',
-          variant: 'destructive',
-        });
+        handleApiError(error instanceof Error ? error.message : 'Failed to fetch incidents. Please try again.', 'Load Incidents');
       } finally {
         setLoading(false);
       }
@@ -170,10 +171,24 @@ export default function IncidentsPage() {
               <p className="text-gray-600 mt-1">Monitor, track, and resolve incidents across your infrastructure</p>
             </div>
             <div className="flex items-center gap-3">
-              <Button onClick={() => router.push('/dashboard/incidents/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Incident
-              </Button>
+              <PermissionGate 
+                permission={SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT}
+                fallback={
+                  <Button 
+                    disabled 
+                    className="opacity-50 cursor-not-allowed"
+                    title="You don't have permission to create incidents"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Incident
+                  </Button>
+                }
+              >
+                <Button onClick={() => router.push('/dashboard/incidents/create')}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Incident
+                </Button>
+              </PermissionGate>
             </div>
           </div>
         </div>
@@ -344,18 +359,34 @@ export default function IncidentsPage() {
 
                       {/* View Button */}
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/dashboard/incidents/analytics?incidentId=${incident.id}`)
-                          }}
-                          className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
+                        <PermissionGate 
+                          permissions={[SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT, SYSTEM_PERMISSIONS.ANALYTICS]}
+                          fallback={
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled
+                              className="opacity-50 cursor-not-allowed"
+                              title="You don't have permission to view incident analytics"
+                            >
+                              <TrendingUp className="h-3.5 w-3.5" />
+                              <span>Analytics</span>
+                            </Button>
+                          }
                         >
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          <span>Analytics</span>
-                        </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/dashboard/incidents/analytics?incidentId=${incident.id}`)
+                            }}
+                            className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50"
+                          >
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            <span>Analytics</span>
+                          </Button>
+                        </PermissionGate>
                       </div>
                     </div>
                   </div>

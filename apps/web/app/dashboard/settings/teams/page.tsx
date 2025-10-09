@@ -39,6 +39,10 @@ import {
 } from "@/app/all-actions/team-section/members/actions";
 import { getRoles, createRoleAction, updateRoleAction, deleteRoleAction, assignRoleAction } from "@/app/all-actions/team-section/roles/actions";
 import { useAppSelector } from "@/store";
+import { handleApiError, handleApiSuccess } from '@/lib/errorHandler';
+import { PermissionGate } from '@/components/permissions/PermissionGate';
+import { usePermissions } from '@/hooks/usePermissions';
+import { TEAM_PERMISSIONS, MEMBER_PERMISSIONS, ROLE_PERMISSIONS } from '@/lib/permissions';
 
 // Types
 interface Team {
@@ -185,6 +189,7 @@ export default function TeamsPage() {
   const [rolePermissionOpen, setRolePermissionOpen] = useState(false);
   const [rolePermissionSearch, setRolePermissionSearch] = useState("");
   const { currentOrganizationId } = useAppSelector(state => state.organization);
+  const { hasPermission } = usePermissions();
 
   // Utility functions
   const getInitials = (name: string) => {
@@ -198,8 +203,11 @@ export default function TeamsPage() {
   const generateId = () => Math.random().toString(36).slice(2, 11);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    // In a real app, you'd use a proper toast library
-    console.log(`${type.toUpperCase()}: ${message}`);
+    if (type === 'error') {
+      handleApiError(message);
+    } else {
+      handleApiSuccess(message);
+    }
   };
 
   // Handle client-side mounting
@@ -712,25 +720,70 @@ export default function TeamsPage() {
     if (!selectedTeamForMembers || selectedMembersForTeam.length === 0) return;
 
     try {
-      const promises = selectedMembersForTeam.map(member => {
+      const promises = selectedMembersForTeam.map(async (member) => {
         const role = roles.find(r => r.name === member.role);
         if (!role) {
           showToast(`Role '${member.role}' not found for member '${member.name}'`, 'error');
-          return { success: false, error: 'Role not found' };
+          return { success: false, error: 'Role not found', member };
         }
-          return addMemberToTeam(selectedTeamForMembers.id, {
+        
+        try {
+          const result = await addMemberToTeam(selectedTeamForMembers.id, {
             userId: member.id,
             roleId: role.id
           });
+          return { ...result, member };
+        } catch (error: any) {
+          console.error(`Error adding ${member.name} to team:`, error);
+          return { success: false, error: error.message || 'Unknown error', member };
+        }
       });
 
       const results = await Promise.all(promises);
-      const failedCount = results.filter(r => !r.success).length;
+      const failedResults = results.filter(r => !r.success);
+      const successCount = results.length - failedResults.length;
       
-      if (failedCount === 0) {
-    showToast(`Added ${selectedMembersForTeam.length} member(s) to ${selectedTeamForMembers.name}`);
+      // Check for specific permission errors
+      const permissionErrors = failedResults.filter(r => 
+        r.error && (
+          r.error.toLowerCase().includes('permission') ||
+          r.error.toLowerCase().includes('unauthorized') ||
+          r.error.toLowerCase().includes('forbidden') ||
+          r.error.toLowerCase().includes('access denied')
+        )
+      );
+      
+      if (successCount === results.length) {
+        showToast(`Successfully added ${successCount} member(s) to ${selectedTeamForMembers.name}`);
+      } else if (successCount > 0) {
+        if (permissionErrors.length > 0) {
+          showToast(`Added ${successCount} member(s). ${permissionErrors.length} failed due to insufficient permissions`, 'error');
+        } else {
+          showToast(`Added ${successCount} member(s), ${failedResults.length} failed`, 'error');
+        }
       } else {
-        showToast(`Added ${selectedMembersForTeam.length - failedCount} member(s), ${failedCount} failed`, 'error');
+        // All failed
+        if (permissionErrors.length === failedResults.length) {
+          showToast(`Failed to add members: You don't have permission to add members to this team`, 'error');
+        } else if (permissionErrors.length > 0) {
+          showToast(`Failed to add members: ${permissionErrors.length} failed due to insufficient permissions`, 'error');
+        } else {
+          showToast(`Failed to add all ${failedResults.length} member(s) to the team`, 'error');
+        }
+      }
+
+      // Show detailed error for permission issues
+      if (permissionErrors.length > 0) {
+        const memberNames = permissionErrors
+          .map(r => r.member?.name)
+          .filter(name => name)
+          .join(', ');
+        
+        if (memberNames) {
+          setTimeout(() => {
+            showToast(`Permission denied for: ${memberNames}. Contact your administrator for team management permissions.`, 'error');
+          }, 2000);
+        }
       }
 
       // Refresh members and teams data
@@ -747,9 +800,20 @@ export default function TeamsPage() {
       if (teamsResult.success && teamsResult.data) {
         setTeams(teamsResult.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding members to team:', error);
-      showToast("An error occurred while adding members to team", 'error');
+      
+      // Check if it's a permission error
+      if (error.message && (
+        error.message.toLowerCase().includes('permission') ||
+        error.message.toLowerCase().includes('unauthorized') ||
+        error.message.toLowerCase().includes('forbidden') ||
+        error.message.toLowerCase().includes('access denied')
+      )) {
+        showToast("Permission denied: You don't have permission to add members to teams. Contact your administrator.", 'error');
+      } else {
+        showToast("An error occurred while adding members to team", 'error');
+      }
     }
     
     setSelectedMembersForTeam([]);
@@ -821,22 +885,52 @@ export default function TeamsPage() {
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {activeTab === "teams" && (
-              <Button onClick={openCreateTeam} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
+              <PermissionGate 
+                permission={TEAM_PERMISSIONS.CREATE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to create teams">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Team
+                  </Button>
+                }
+              >
+                <Button onClick={openCreateTeam} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Team
+                </Button>
+              </PermissionGate>
             )}
             {activeTab === "members" && (
-              <Button onClick={() => router.push('/dashboard/settings/invites')} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Invite Member
-              </Button>
+              <PermissionGate 
+                permission={MEMBER_PERMISSIONS.INVITE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to invite members">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Invite Member
+                  </Button>
+                }
+              >
+                <Button onClick={() => router.push('/dashboard/settings/invites')} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Invite Member
+                </Button>
+              </PermissionGate>
             )}
             {activeTab === "roles" && (
-              <Button onClick={openCreateRole} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Role
-              </Button>
+              <PermissionGate 
+                permission={ROLE_PERMISSIONS.CREATE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to create roles">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Role
+                  </Button>
+                }
+              >
+                <Button onClick={openCreateRole} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Role
+                </Button>
+              </PermissionGate>
             )}
           </div>
         </div>
@@ -858,7 +952,16 @@ export default function TeamsPage() {
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No teams yet</h3>
                   <p className="text-gray-600 mb-4">Create your first team to get started</p>
-                  <Button onClick={openCreateTeam}>Create Team</Button>
+                  <PermissionGate 
+                    permission={TEAM_PERMISSIONS.CREATE}
+                    fallback={
+                      <Button disabled className="opacity-50 cursor-not-allowed" title="You don't have permission to create teams">
+                        Create Team
+                      </Button>
+                    }
+                  >
+                    <Button onClick={openCreateTeam}>Create Team</Button>
+                  </PermissionGate>
                 </CardContent>
               </Card>
             ) : (
@@ -1082,10 +1185,11 @@ export default function TeamsPage() {
                       </DropdownMenu>
                     </div>
                   </div>
-                )).concat(
-                  // Desktop Layout
-                  members.map((member) => (
-                    <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
+                ))
+              )}
+              {/* Desktop Layout - separate map to avoid hydration issues */}
+              {members.length > 0 && members.map((member) => (
+                <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-orange-500 text-white text-sm">
@@ -1144,10 +1248,8 @@ export default function TeamsPage() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </div>
-                  ))
-                )
-              )}
+                </div>
+              ))}
             </Card>
           </TabsContent>
 

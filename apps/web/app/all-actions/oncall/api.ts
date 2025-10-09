@@ -1,40 +1,57 @@
+import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler';
+
 export const fetchOnCallSchedules = async () => {
   const tokenResponse = await fetch('/api/auth/get-token');
   const { token } = await tokenResponse.json();
-  const res = await fetch('/api/oncall/schedules', {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.message || 'Failed to fetch schedules');
+  if (!token) {
+    handleApiError('Authentication required', 'Load OnCall Schedules');
+    throw new Error('Authentication required');
   }
-  return res.json();
+  
+  const result = await apiRequest('/api/oncall/schedules', {
+    headers: { 'Authorization': `Bearer ${token}` },
+  }, 'Load OnCall Schedules');
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch schedules');
+  }
+  return result.data;
 };
 
 export const fetchTeamMembers = async (teamId: string) => {
   const tokenResponse = await fetch('/api/auth/get-token');
   const { token } = await tokenResponse.json();
-  const res = await fetch(`/api/teams/${teamId}/members`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.message || `Failed to fetch members for team ${teamId}`);
+  if (!token) {
+    handleApiError('Authentication required', 'Load Team Members');
+    throw new Error('Authentication required');
   }
-  return res.json();
+  
+  const result = await apiRequest(`/api/teams/${teamId}/members`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  }, 'Load Team Members');
+  
+  if (!result.success) {
+    throw new Error(result.error || `Failed to fetch members for team ${teamId}`);
+  }
+  return result.data;
 };
 
 export const fetchOrganizationMembers = async () => {
   const tokenResponse = await fetch('/api/auth/get-token');
   const { token } = await tokenResponse.json();
-  const res = await fetch('/api/userprofile/organization-members', {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.message || 'Failed to fetch available users');
+  if (!token) {
+    handleApiError('Authentication required', 'Load Organization Members');
+    throw new Error('Authentication required');
   }
-  return res.json();
+  
+  const result = await apiRequest('/api/userprofile/organization-members', {
+    headers: { 'Authorization': `Bearer ${token}` },
+  }, 'Load Organization Members');
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch available users');
+  }
+  return result.data;
 };
 
 export const fetchAvailableTeams = async () => {

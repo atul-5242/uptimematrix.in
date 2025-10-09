@@ -1,6 +1,7 @@
 // Note: These are client-safe helpers that call our Next.js API routes under /api
 // Our Next.js API routes handle authentication via cookies and proxy to the backend API.
 import type { Incident, IncidentStats } from '@/types/incident';
+import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler';
 
 export async function getIncidents(organizationId: string): Promise<Incident[]> {
   try {
@@ -12,15 +13,21 @@ export async function getIncidents(organizationId: string): Promise<Incident[]> 
       cache: 'no-store'
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Failed to fetch incidents');
+    const result = await apiRequest(`/api/incidents/${organizationId}`, {
+      method: 'GET',
+      cache: 'no-store'
+    }, 'Load Incidents');
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch incidents');
     }
 
-    return response.json();
+    return result.data;
   } catch (error) {
-    console.error('Error fetching incidents:', error);
-    throw new Error('Failed to fetch incidents');
+    if (!error.message.includes('Load Incidents')) {
+      handleApiError(error instanceof Error ? error.message : 'Failed to fetch incidents', 'Load Incidents');
+    }
+    throw error instanceof Error ? error : new Error('Failed to fetch incidents');
   }
 }
 
@@ -71,23 +78,21 @@ export async function getIncidentAnalytics(incidentId: string) {
 
 export async function updateIncidentStatus(incidentId: string, status: string) {
   try {
-    // Our Next.js API route expects PATCH at /api/incidents/analytics/[incidentId]
-    const response = await fetch(`/api/incidents/analytics/${encodeURIComponent(incidentId)}`, {
+    const result = await apiRequest(`/api/incidents/analytics/${encodeURIComponent(incidentId)}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ status }),
-    });
+    }, 'Update Incident Status');
 
-    if (!response.ok) {
-      throw new Error(`Failed to update incident status: ${response.statusText}`);
+    if (result.success) {
+      handleApiSuccess('Incident status updated successfully', 'Update Incident Status');
+      return result.data;
+    } else {
+      throw new Error(result.error || 'Failed to update incident status');
     }
-
-    const data = await response.json();
-    return data;
   } catch (error) {
-    console.error('Error updating incident status:', error);
+    if (!error.message.includes('Update Incident Status')) {
+      handleApiError(error instanceof Error ? error.message : 'Failed to update incident status', 'Update Incident Status');
+    }
     throw error;
   }
 }

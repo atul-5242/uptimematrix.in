@@ -1,5 +1,7 @@
 'use client';
 
+import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler';
+
 // Organization Member Management Actions
 
 export async function updateOrganizationMember(memberId: string, memberData: { 
@@ -13,27 +15,25 @@ export async function updateOrganizationMember(memberId: string, memberData: {
     const { token } = await tokenResponse.json();
     
     if (!token) {
+      handleApiError('Authentication required', 'Update Member');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch(`/api/organization/members/${memberId}`, {
+    const result = await apiRequest(`/api/organization/members/${memberId}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
       body: JSON.stringify(memberData),
-    });
+    }, 'Update Member');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to update organization member' };
+    if (result.success) {
+      handleApiSuccess('Member updated successfully', 'Update Member');
     }
 
-    return { success: true, data: data.data };
-  } catch (error) {
-    console.error('Update organization member action error:', error);
+    return result;
+  } catch (error: any) {
+    handleApiError(error.message || 'Network error occurred', 'Update Member');
     return { success: false, error: 'Network error occurred' };
   }
 }
@@ -44,27 +44,19 @@ export async function getRoles() {
     const { token } = await tokenResponse.json();
     
     if (!token) {
+      handleApiError('Authentication required', 'Load Roles');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch('/api/team-section/roles', {
+    return await apiRequest('/api/team-section/roles', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
       cache: 'no-store',
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to fetch roles' };
-    }
-
-    return { success: true, data: data.data };
-  } catch (error) {
-    console.error('Get roles action error:', error);
+    }, 'Load Roles');
+  } catch (error: any) {
+    handleApiError(error.message || 'Network error occurred', 'Load Roles');
     return { success: false, error: 'Network error occurred' };
   }
 }
@@ -106,26 +98,24 @@ export async function removeOrganizationMember(memberId: string) {
     const { token } = await tokenResponse.json();
 
     if (!token) {
+      handleApiError('Authentication required', 'Remove Member');
       return { success: false, error: 'Authentication required' };
     }
 
-    const response = await fetch(`/api/organization/members/${memberId}`, {
+    const result = await apiRequest(`/api/organization/members/${memberId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
-    });
+    }, 'Remove Member');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, error: data.error || 'Failed to remove organization member' };
+    if (result.success) {
+      handleApiSuccess('Member removed successfully', 'Remove Member');
     }
 
-    return { success: true, message: data.message };
-  } catch (error) {
-    console.error('Remove organization member action error:', error);
+    return result;
+  } catch (error: any) {
+    handleApiError(error.message || 'Network error occurred', 'Remove Member');
     return { success: false, error: 'Network error occurred' };
   }
 }

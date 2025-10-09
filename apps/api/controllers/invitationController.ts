@@ -246,7 +246,20 @@ export const acceptInvitation = async (req: CustomRequest, res: Response) => {
       },
     });
 
-    return res.status(200).json({ message: "Invitation accepted successfully.", organizationId: updatedInvitation.organizationId });
+    // Update the user's selectedOrganizationId to the organization they just joined
+    await prismaClient.user.update({
+      where: { id: userId },
+      data: {
+        selectedOrganizationId: updatedInvitation.organizationId,
+      },
+    });
+
+    console.log(`[API] User ${userId} accepted invitation and selectedOrganizationId updated to ${updatedInvitation.organizationId}`);
+
+    return res.status(200).json({ 
+      message: "Invitation accepted successfully.", 
+      organizationId: updatedInvitation.organizationId 
+    });
   } catch (error: unknown) {
     console.error("[API] Error accepting invitation:", error);
     return res.status(500).json({ message: "Failed to accept invitation.", error: (error as Error).message });

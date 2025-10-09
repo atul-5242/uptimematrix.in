@@ -98,61 +98,57 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }, [pathname])
   
   return (
-    <html lang="en">
-      <body>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            {/* Header stays fixed */}
-            <header className="flex h-16 shrink-0 items-center gap-2">
-              <div className="flex items-center gap-2 px-4">
-                <SidebarTrigger className="-ml-1" />
-                <Separator
-                  orientation="vertical"
-                  className="mr-2 data-[orientation=vertical]:h-4"
-                />
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    {isClient ? (
-                      breadcrumbs.map((breadcrumb, index) => (
-                        <div key={breadcrumb.href} className="flex items-center">
-                          {index > 0 && <BreadcrumbSeparator className="mx-2" />}
-                          <BreadcrumbItem>
-                            {breadcrumb.isLast && breadcrumb.label !== 'Dashboard' ? (
-                              <BreadcrumbPage className="font-medium">
-                                {breadcrumb.label}
-                              </BreadcrumbPage>
-                            ) : (
-                              <BreadcrumbLink 
-                                asChild
-                                className={breadcrumb.isLast && breadcrumb.label === 'Dashboard' ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground transition-colors"}
-                              >
-                                <Link href={breadcrumb.href}>
-                                  {breadcrumb.label}
-                                </Link>
-                              </BreadcrumbLink>
-                            )}
-                          </BreadcrumbItem>
-                        </div>
-                      ))
-                    ) : (
-                      // Fallback for server-side rendering
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        {/* Header stays fixed */}
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                {isClient ? (
+                  breadcrumbs.map((breadcrumb, index) => (
+                    <div key={breadcrumb.href} className="flex items-center">
+                      {index > 0 && <BreadcrumbSeparator className="mx-2" />}
                       <BreadcrumbItem>
-                        <BreadcrumbPage className="font-medium">Dashboard</BreadcrumbPage>
+                        {breadcrumb.isLast && breadcrumb.label !== 'Dashboard' ? (
+                          <BreadcrumbPage className="font-medium">
+                            {breadcrumb.label}
+                          </BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink 
+                            asChild
+                            className={breadcrumb.isLast && breadcrumb.label === 'Dashboard' ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground transition-colors"}
+                          >
+                            <Link href={breadcrumb.href}>
+                              {breadcrumb.label}
+                            </Link>
+                          </BreadcrumbLink>
+                        )}
                       </BreadcrumbItem>
-                    )}
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
-            </header>
+                    </div>
+                  ))
+                ) : (
+                  // Fallback for server-side rendering
+                  <BreadcrumbItem>
+                    <BreadcrumbPage className="font-medium">Dashboard</BreadcrumbPage>
+                  </BreadcrumbItem>
+                )}
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
 
-            {/* 👇 This is where each page's content will be injected */}
-            <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-              {children}
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </body>
-    </html>
+        {/* 👇 This is where each page's content will be injected */}
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          {children}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

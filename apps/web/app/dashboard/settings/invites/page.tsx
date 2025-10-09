@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setSelectedOrganization } from "@/store/organizationSlice";
 import { fetchUserDetails } from "@/store/userSlice";
+import { PermissionGate } from '@/components/permissions/PermissionGate';
+import { usePermissions } from '@/hooks/usePermissions';
+import { MEMBER_PERMISSIONS } from '@/lib/permissions';
 
 interface Invitation {
   id: string;
@@ -76,6 +79,7 @@ export default function InvitesPage() {
   const [sendingInvitation, setSendingInvitation] = useState(false); // New loading state for send button
   const [acceptingInvitationId, setAcceptingInvitationId] = useState<string | null>(null); // New loading state for accept button
   const dispatch = useAppDispatch();
+  const { hasPermission } = usePermissions();
 
   const handleAddInvitationEmail = (email: string) => {
     if (email.trim() && !invitationEmails.includes(email.trim()) && /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email.trim())) {
@@ -265,59 +269,96 @@ export default function InvitesPage() {
           </TabsList>
 
           <TabsContent value="pending" className="space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <h3 className="text-lg font-semibold text-gray-900">Invite New Member</h3>
-                <Send className="h-5 w-5 text-gray-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <div className="relative">
-                      <input
-                        id="invitationEmailInput"
-                        type="email"
-                        className="w-full pr-4 py-3 border rounded-lg border-slate-300 bg-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-gray-500"
-                        placeholder="Enter email and press Enter or Tab"
-                        value={currentEmailInput}
-                        onChange={(e) => setCurrentEmailInput(e.target.value)}
-                        onKeyDown={handleEmailInputKeyDown}
-                        onBlur={handleEmailInputBlur}
-                      />
-                    </div>
-                    {invitationEmails.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {invitationEmails.map((email) => (
-                          <span key={email} className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
-                            {email}
-                            <button type="button" onClick={() => handleRemoveInvitationEmail(email)} className="text-blue-600 hover:text-blue-800">
-                              &times;
-                            </button>
-                          </span>
-                        ))}
+            <PermissionGate 
+              permission={MEMBER_PERMISSIONS.INVITE}
+              fallback={
+                <Card className="opacity-60">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <h3 className="text-lg font-semibold text-gray-500">Invite New Member</h3>
+                    <Send className="h-5 w-5 text-gray-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-gray-500">Email Address</Label>
+                        <div className="relative">
+                          <input
+                            id="invitationEmailInput"
+                            type="email"
+                            className="w-full pr-4 py-3 border rounded-lg border-slate-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                            placeholder="You don't have permission to invite members"
+                            disabled
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  <Button onClick={handleSendInvitation} className="bg-gray-900 hover:bg-gray-800" disabled={sendingInvitation}>
-                    {sendingInvitation ? (
-                      <span className="flex items-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Sending...
-                      </span>
-                    ) : (
-                      <>
+                      <Button disabled className="bg-gray-400 cursor-not-allowed opacity-50" title="You don't have permission to invite members">
                         <Send className="h-4 w-4 mr-2" />
                         Send Invitation
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                      </Button>
+                    </div>
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ You don't have permission to invite new members. Contact your administrator to request member invitation permissions.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              }
+            >
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">Invite New Member</h3>
+                  <Send className="h-5 w-5 text-gray-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <div className="relative">
+                        <input
+                          id="invitationEmailInput"
+                          type="email"
+                          className="w-full pr-4 py-3 border rounded-lg border-slate-300 bg-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-gray-500"
+                          placeholder="Enter email and press Enter or Tab"
+                          value={currentEmailInput}
+                          onChange={(e) => setCurrentEmailInput(e.target.value)}
+                          onKeyDown={handleEmailInputKeyDown}
+                          onBlur={handleEmailInputBlur}
+                        />
+                      </div>
+                      {invitationEmails.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {invitationEmails.map((email) => (
+                            <span key={email} className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                              {email}
+                              <button type="button" onClick={() => handleRemoveInvitationEmail(email)} className="text-blue-600 hover:text-blue-800">
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button onClick={handleSendInvitation} className="bg-gray-900 hover:bg-gray-800" disabled={sendingInvitation}>
+                      {sendingInvitation ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Sending...
+                        </span>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Invitation
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </PermissionGate>
 
             <h3 className="text-lg font-semibold text-gray-900 mt-8 mb-4 flex items-center gap-2">
               Pending Invitations List

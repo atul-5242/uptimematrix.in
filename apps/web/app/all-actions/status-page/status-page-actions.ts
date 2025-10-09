@@ -1,6 +1,7 @@
 'use client'
 
 import { revalidatePath } from 'next/cache'
+import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler'
 
 export type StatusPageFormData = {
   name: string
@@ -39,28 +40,27 @@ export async function createStatusPage(data: StatusPageFormData) {
     const { token } = await tokenResponse.json();
 
     if (!token) {
-      throw new Error('Authentication token not found');
+      handleApiError('Authentication required', 'Create Status Page');
+      return { success: false, error: 'Authentication token not found' };
     }
 
-    const response = await fetch('/api/status-pages', {
+    const result = await apiRequest('/api/status-pages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(data),
-    });
+    }, 'Create Status Page');
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create status page');
+    if (result.success) {
+      handleApiSuccess('Status page created successfully', 'Create Status Page');
+      revalidatePath('/dashboard/status-pages');
+      return { success: true, data: result.data };
+    } else {
+      return { success: false, error: result.error || 'Failed to create status page' };
     }
-
-    const result = await response.json();
-    revalidatePath('/dashboard/status-pages');
-    return { success: true, data: result };
   } catch (error) {
-    console.error('Error creating status page:', error);
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Create Status Page');
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Failed to create status page' 
@@ -113,32 +113,26 @@ export async function getStatusPages() {
     const { token } = await tokenResponse.json();
 
     if (!token) {
-      throw new Error('Authentication token not found');
+      handleApiError('Authentication required', 'Load Status Pages');
+      return { success: false, error: 'Authentication token not found', data: [] };
     }
 
-    const response = await fetch('/api/status-pages', {
+    const result = await apiRequest('/api/status-pages', {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
       cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to fetch status pages');
-    }
-
-    const responseData = await response.json();
+    }, 'Load Status Pages');
     
     // Return the response in the expected format
     return {
-      success: true,
-      data: responseData.data || []
+      success: result.success,
+      data: result.success ? (result.data || []) : [],
+      error: result.error
     };
   } catch (error) {
-    console.error('Error in getStatusPages:', error);
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Load Status Pages');
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch status pages',

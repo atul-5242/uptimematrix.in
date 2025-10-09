@@ -86,11 +86,10 @@ export default function EditMemberModal({
       if (result.success) {
         onMemberUpdated();
         onClose();
-      } else {
-        setError(result.error || 'Failed to update member');
       }
+      // Error handling is now done automatically by the action function
     } catch (error) {
-      setError('An unexpected error occurred');
+      // Error handling is now done automatically by the action function
     } finally {
       setLoading(false);
     }
