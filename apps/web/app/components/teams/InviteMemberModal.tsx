@@ -238,9 +238,9 @@ export default function InviteMemberModal({
           {teamId && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
               <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Add to Team</Label>
+                <Label className="text-sm font-medium">Add to Team (Optional)</Label>
                 <div className="text-xs text-gray-600">
-                  Automatically add to {teamName} after accepting invitation
+                  Automatically add to {teamName} after accepting invitation. Members can work without team assignment.
                 </div>
               </div>
               <Switch

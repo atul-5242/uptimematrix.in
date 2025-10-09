@@ -2,6 +2,7 @@
 import express from 'express';
 import { getOrganizationDetails, deleteOrganization } from '../../controllers/organizationsController.js';
 import { getAllOrganizationMembers, removeMemberFromOrganization } from '../../controllers/teamsSectionController.js';
+import { updateOrganizationMember } from '../../controllers/organizationMemberController.js';
 import { getPendingInvitations } from '../../controllers/invitationController.js';
 import { authMiddleware } from '../../middlewares/middleware.js';
 import { acceptInvitation } from '../../controllers/invitationController.js';

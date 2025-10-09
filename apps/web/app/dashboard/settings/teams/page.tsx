@@ -416,10 +416,7 @@ export default function TeamsPage() {
         showToast('Please select a role', 'error');
         return;
       }
-      if (newMember.team.length === 0) {
-        showToast('Please select at least one team', 'error');
-        return;
-      }
+      // Team assignment is optional - members can exist without teams
     } else {
       // Invite mode: full validations
       if (!newMember.name.trim()) {
@@ -439,10 +436,7 @@ export default function TeamsPage() {
         showToast('Please select a role', 'error');
         return;
       }
-      if (newMember.team.length === 0) {
-        showToast('Please select at least one team', 'error');
-        return;
-      }
+      // Team assignment is optional - members can exist without teams
       if (newMember.phone && newMember.phone.trim() !== '' && !/^[\+]?[- 0-9()]{10,}$/.test(newMember.phone as string)) {
         showToast('Please enter a valid phone number', 'error');
         return;
@@ -1519,7 +1513,7 @@ export default function TeamsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="memberTeam">Teams *</Label>
+                <Label htmlFor="memberTeam">Teams (Optional)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1533,7 +1527,7 @@ export default function TeamsPage() {
                               {teamName}
                             </Badge>
                           ))
-                        : "Select teams..."}
+                        : "Select teams (optional)..."}
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
