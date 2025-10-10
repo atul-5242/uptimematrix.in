@@ -68,7 +68,7 @@ export function IntegrationsSection() {
 
   return (
     <section id="integrations" className="py-24">
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4">Integrations</Badge>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">

@@ -14,7 +14,7 @@ export function HeroSection() {
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-transparent to-indigo-50/30 dark:from-blue-950/20 dark:via-transparent dark:to-indigo-950/10"></div>
       </div>
 
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 relative w-full">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative w-full">
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           {/* Left Content */}
           <div className="space-y-6">

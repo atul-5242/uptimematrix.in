@@ -82,7 +82,7 @@ export function TestimonialsSection() {
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-r from-emerald-400/10 to-cyan-400/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
       
-      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 relative">
         <div className="text-center mb-16">
           <Badge variant="secondary" className="mb-4 px-4 py-2 text-sm font-semibold bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 border-0">
             <Sparkles className="w-3 h-3 mr-1" />
