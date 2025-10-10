@@ -16,15 +16,25 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { 
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { 
   Plus, 
   Search, 
   Filter, 
   MoreHorizontal, 
   Edit, 
-  Copy, 
   Trash2, 
-  Power, 
-  PowerOff,
   Clock,
   Users,
   AlertTriangle,
@@ -72,6 +82,8 @@ export default function EscalationPoliciesListPage() {
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
   const [triggerFilter, setTriggerFilter] = useState<'all' | 'recent' | 'never'>('all')
   const [availableMonitors, setAvailableMonitors] = useState<any[]>([])
+  const [selectedPolicy, setSelectedPolicy] = useState<EscalationPolicy | null>(null)
+  const [isPolicyDetailOpen, setIsPolicyDetailOpen] = useState(false)
 
   // Fetch available monitors
   useEffect(() => {
@@ -237,31 +249,7 @@ export default function EscalationPoliciesListPage() {
     setFilteredPolicies(filtered)
   }, [policies, searchTerm, statusFilter, severityFilter, triggerFilter])
 
-  // Replace handleToggleActive, handleDeletePolicy, handleDuplicatePolicy with API calls
-  const handleToggleActive = async (policyId: string, currentStatus: boolean) => {
-    try {
-      setLoading(true)
-      const policy = policies.find(p => p.id === policyId)
-      if (!policy) return
-      const res = await fetch(API_URL, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({ ...policy, isActive: !currentStatus }),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setPolicies(prev => prev.map(p => p.id === policyId ? updated.policy : p))
-      }
-    } catch (error) {
-      console.error('Error toggling policy status:', error)
-      alert('Failed to update policy status')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // API calls for policy management
 
   const handleDeletePolicy = async (policyId: string) => {
     if (!confirm('Are you sure you want to delete this escalation policy? This action cannot be undone.')) {
@@ -288,35 +276,7 @@ export default function EscalationPoliciesListPage() {
     }
   }
 
-  const handleDuplicatePolicy = async (policyId: string) => {
-    try {
-      setLoading(true)
-      const originalPolicy = policies.find(p => p.id === policyId)
-      if (!originalPolicy) return
-      const newPolicy = {
-        ...originalPolicy,
-        id: undefined,
-        name: `${originalPolicy.name} (Copy)`
-      }
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify(newPolicy),
-      })
-      if (res.ok) {
-        const created = await res.json()
-        setPolicies(prev => [created.policy, ...prev])
-      }
-    } catch (error) {
-      console.error('Error duplicating policy:', error)
-      alert('Failed to duplicate policy')
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   const getSeverityColor = (severity: EscalationPolicy['severity']) => {
     switch (severity) {
@@ -374,6 +334,17 @@ export default function EscalationPoliciesListPage() {
   const handleEditPolicy = (policyId: string) => {
     // TODO(stagewise): Implement edit functionality - for now redirect to create new policy
     router.push('/dashboard/escalations-policies/new')
+  }
+
+  const handleViewPolicyDetails = (policy: EscalationPolicy) => {
+    setSelectedPolicy(policy)
+    setIsPolicyDetailOpen(true)
+  }
+
+  const handleToggleMonitorPolicy = async (monitorId: string, isEnabled: boolean) => {
+    // TODO(stagewise): This will be implemented when backend is ready
+    console.log(`Toggle monitor ${monitorId} policy to ${isEnabled}`)
+    // For now, just update the local state
   }
 
   if (loading) {
@@ -638,25 +609,6 @@ export default function EscalationPoliciesListPage() {
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Policy
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicatePolicy(policy.id)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleToggleActive(policy.id, policy.isActive)}
-                        >
-                          {policy.isActive ? (
-                            <>
-                              <PowerOff className="h-4 w-4 mr-2" />
-                              Disable
-                            </>
-                          ) : (
-                            <>
-                              <Power className="h-4 w-4 mr-2" />
-                              Enable
-                            </>
-                          )}
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => handleDeletePolicy(policy.id)}
@@ -821,6 +773,18 @@ export default function EscalationPoliciesListPage() {
                       <span>{formatDate(policy.updatedAt)}</span>
                     </div>
                   </div>
+
+                  {/* View Details Button */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handleViewPolicyDetails(policy)}
+                    >
+                      View Full Details
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -847,6 +811,241 @@ export default function EscalationPoliciesListPage() {
             </Card>
           </div>
         )}
+
+        {/* Policy Details Dialog */}
+        <Dialog open={isPolicyDetailOpen} onOpenChange={setIsPolicyDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-blue-600" />
+                {selectedPolicy?.name}
+                <Badge variant={getSeverityBadgeVariant(selectedPolicy?.severity || 'medium')} className="ml-2">
+                  {selectedPolicy?.severity}
+                </Badge>
+                <div className="flex items-center gap-1 ml-2">
+                  {selectedPolicy?.isActive ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {selectedPolicy?.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedPolicy && (
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="monitors">Active Monitors</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Basic Info */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Policy Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Description</label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.description}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Trigger Conditions</label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedPolicy.triggerConditions.map((condition, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {condition}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Alert Methods</label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {selectedPolicy.alertMethods.map((method, index) => (
+                              <div key={index} className="flex items-center gap-1 text-gray-600">
+                                {getAlertMethodIcon(method)}
+                                <span className="text-xs capitalize">{method}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stats */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Performance Stats</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-3 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">{selectedPolicy.triggeredCount}</div>
+                            <div className="text-xs text-blue-600">Total Triggers</div>
+                          </div>
+                          <div className="text-center p-3 bg-green-50 rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                              {selectedPolicy.avgResponseTime || 'N/A'}
+                            </div>
+                            <div className="text-xs text-green-600">Avg Response (min)</div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Last Triggered</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.lastTriggered)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Last Updated</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.updatedAt)}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="monitors" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Globe className="h-5 w-5" />
+                        Monitors Using This Policy
+                      </CardTitle>
+                      <p className="text-sm text-gray-600">
+                        Toggle individual monitors on/off for this escalation policy
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      {availableMonitors.filter(monitor => 
+                        selectedPolicy.assignedMonitors.includes(monitor.name)
+                      ).length > 0 ? (
+                        <div className="space-y-3">
+                          {availableMonitors
+                            .filter(monitor => selectedPolicy.assignedMonitors.includes(monitor.name))
+                            .map((monitor) => (
+                            <div key={monitor.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  monitor.status === 'up' ? 'bg-green-500' : 'bg-red-500'
+                                }`} />
+                                <div>
+                                  <h4 className="font-medium">{monitor.name}</h4>
+                                  <p className="text-sm text-gray-600">{monitor.url}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {monitor.method || 'GET'}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {monitor.interval}s interval
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">
+                                  Policy {monitor.escalationPolicyId === selectedPolicy.id ? 'ON' : 'OFF'}
+                                </span>
+                                <Switch
+                                  checked={monitor.escalationPolicyId === selectedPolicy.id}
+                                  onCheckedChange={(checked) => handleToggleMonitorPolicy(monitor.id, checked)}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">
+                            No monitors assigned
+                          </h3>
+                          <p className="text-gray-600 mb-4">
+                            This policy is not currently assigned to any monitors.
+                          </p>
+                          <Button variant="outline">
+                            Assign Monitors
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="settings" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Policy Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Policy ID</label>
+                          <p className="text-sm text-gray-600 mt-1 font-mono">{selectedPolicy.id}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Escalation Steps</label>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {Array.isArray(selectedPolicy.steps) ? selectedPolicy.steps.length : selectedPolicy.steps} steps configured
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Created</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.createdAt)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Tags</label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedPolicy.tags && selectedPolicy.tags.length > 0 ? (
+                              selectedPolicy.tags.map((tag, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  #{tag}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-gray-500">No tags</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-gray-200">
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => {
+                              setIsPolicyDetailOpen(false)
+                              handleEditPolicy(selectedPolicy.id)
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit Policy
+                          </Button>
+                          <Button 
+                            variant="destructive"
+                            onClick={() => {
+                              setIsPolicyDetailOpen(false)
+                              handleDeletePolicy(selectedPolicy.id)
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete Policy
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
