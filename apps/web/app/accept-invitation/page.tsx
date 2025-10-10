@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { useAppDispatch } from '@/store';
+import { setCurrentOrganizationId } from '@/store/organizationSlice';
+import { fetchUserDetails } from '@/store/userSlice';
 
 interface InvitationData {
   email: string;
@@ -95,6 +98,14 @@ export default function AcceptInvitationPage() {
 
       if (response.ok) {
         setStep('success');
+        
+        // If organizationId is returned, set it in Redux store for when user logs in
+        if (data.organizationId) {
+          dispatch(setCurrentOrganizationId(data.organizationId));
+          // Also refresh user details to get updated organization info
+          dispatch(fetchUserDetails());
+        }
+        
         // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
           router.push('/signin');
@@ -147,6 +158,14 @@ export default function AcceptInvitationPage() {
 
       if (response.ok) {
         setStep('success');
+        
+        // If organizationId is returned, set it in Redux store for when user logs in
+        if (data.organizationId) {
+          dispatch(setCurrentOrganizationId(data.organizationId));
+          // Also refresh user details to get updated organization info
+          dispatch(fetchUserDetails());
+        }
+        
         // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
           router.push('/signin');

@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'Invitation accepted successfully',
       user: backendData.user,
+      organizationId: backendData.organizationId, // Pass through the organizationId from backend
     });
 
   } catch (error: any) {
