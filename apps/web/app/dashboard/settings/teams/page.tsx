@@ -540,18 +540,57 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDeleteMember = async (memberId: string) => {
+  // Remove member from specific team (used in Teams tab)
+  const handleRemoveMemberFromTeam = async (memberId: string, teamName: string) => {
+    try {
+      const team = teams.find(t => t.name === teamName);
+      if (!team) {
+        showToast('Team not found', 'error');
+        return;
+      }
+
+      const res = await removeMemberFromTeam(team.id, memberId);
+      if (!res.success) {
+        showToast(res.error || 'Failed to remove member from team', 'error');
+        return;
+      }
+      
+      // Refresh members and teams data
+      const [membersResult, teamsResult] = await Promise.all([
+        getMembers(currentOrganizationId!),
+        getTeams()
+      ]);
+      
+      if (membersResult.success && membersResult.data) {
+        setMembers(membersResult.data.members);
+      }
+      
+      if (teamsResult.success && teamsResult.data) {
+        setTeams(teamsResult.data);
+      }
+      
+      showToast(`Member removed from ${teamName} team`);
+    } catch (error) {
+      console.error('Error removing member from team:', error);
+      showToast('An error occurred while removing the member from team', 'error');
+    }
+  };
+
+  // Remove member from organization (used in Members tab)
+  const handleDeleteMemberFromOrganization = async (memberId: string) => {
     try {
       const res = await deleteMemberFromOrganization(memberId);
       if (!res.success) {
         showToast(res.error || 'Failed to remove member from organization', 'error');
         return;
       }
+      
       // Refresh members
       const membersResult = await getMembers(currentOrganizationId!);
       if (membersResult.success && membersResult.data) {
         setMembers(membersResult.data.members);
       }
+      
       showToast('Member removed from organization');
     } catch (error) {
       console.error('Error removing member from organization:', error);
@@ -1078,11 +1117,11 @@ export default function TeamsPage() {
                                         Edit Member
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        onClick={() => handleDeleteMember(member.id)}
+                                        onClick={() => handleRemoveMemberFromTeam(member.id, team.name)}
                                         className="text-red-600"
                                       >
                                         <Trash2 className="h-4 w-4 mr-2" />
-                                        Remove Member
+                                        Remove from Team
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -1177,11 +1216,11 @@ export default function TeamsPage() {
                             Edit Member
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDeleteMember(member.id)}
+                            onClick={() => handleDeleteMemberFromOrganization(member.id)}
                             className="text-red-600"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Remove Member
+                            Remove from Organization
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1241,11 +1280,11 @@ export default function TeamsPage() {
                               Edit Member
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDeleteMember(member.id)}
+                              onClick={() => handleDeleteMemberFromOrganization(member.id)}
                               className="text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
-                              Remove Member
+                              Remove from Organization
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
