@@ -22,7 +22,9 @@ import { useAppDispatch, useAppSelector } from '@/store';
 // import { setCurrentOrganizationId } from '@/store/organizationSlice';
 // import { fetchUserDetails } from '@/store/userSlice';
 // import { setSelectedOrganization } from '@/store/organizationSlice';
-import { selectAndSyncOrganization } from '@/app/all-actions/organizations/actions'; // Import the new action
+import { selectAndSyncOrganization, createOrganizationAction } from '@/app/all-actions/organizations/actions'; // Import the new action
+import { fetchUserDetails } from '@/store/userSlice';
+
 
 // Demo data - replace with actual API calls
 interface Organization {
@@ -50,6 +52,8 @@ export default function OrganizationsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgDescription, setNewOrgDescription] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
 
   // Convert userOrganizations to match the local Organization interface and add isSelected
   const organizations: Organization[] = React.useMemo(() => {
@@ -90,20 +94,46 @@ export default function OrganizationsPage() {
     router.push(`/dashboard/organizations/${id}`);
   };
 
-  const handleCreateOrganization = () => {
+  const handleCreateOrganization = async () => {
     if (!newOrgName.trim() || !newOrgDescription.trim()) {
       alert('Please fill in all fields');
       return;
     }
 
-    // TODO: Implement actual API call to create organization and fetch updated user details
-    alert('Organization creation is not yet implemented fully with backend.');
-    
-    setNewOrgName('');
-    setNewOrgDescription('');
-    setIsCreateDialogOpen(false);
-    // After creating, ideally re-fetch user details to get updated organizations list
-    // dispatch(fetchUserDetails());
+    // Validate name length
+    if (newOrgName.trim().length < 2) {
+      alert('Organization name must be at least 2 characters long');
+      return;
+    }
+
+    if (newOrgName.trim().length > 100) {
+      alert('Organization name must be less than 100 characters');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      
+      const result = await createOrganizationAction({
+        name: newOrgName.trim(),
+        description: newOrgDescription.trim()
+      });
+
+      if (result.success) {
+        // Refresh user details to get updated organizations list
+        await dispatch(fetchUserDetails());
+        
+        // Clear form and close dialog
+        setNewOrgName('');
+        setNewOrgDescription('');
+        setIsCreateDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error creating organization:', error);
+      // Error is already handled by the action (shows toast)
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -161,15 +191,23 @@ export default function OrganizationsPage() {
                 <Button
                   variant="outline"
                   onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={isCreating}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleCreateOrganization}>
-                  Create Organization
+                <Button onClick={handleCreateOrganization} disabled={isCreating}>
+                  {isCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Organization'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
         </div>
 
         {/* Currently Active Organization Banner */}

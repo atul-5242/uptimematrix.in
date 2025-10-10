@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { updateOrganizationMember, getRoles } from '@/app/all-actions/organization/members/actions';
+import { useAppDispatch } from '@/hooks/redux';
+import { fetchUserDetails } from '@/store/userSlice';
 
 interface EditMemberModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ export default function EditMemberModal({
   });
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
+  const dispatch = useAppDispatch();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -86,6 +89,13 @@ export default function EditMemberModal({
       if (result.success) {
         onMemberUpdated();
         onClose();
+        
+        // If the current user's role was updated, refresh their data
+        if (result.needsUserRefresh) {
+          // Refresh user data to get the latest role and permissions
+          dispatch(fetchUserDetails());
+          alert('Your role has been updated successfully! If you don\'t see all changes immediately, try switching to another organization and back.');
+        }
       }
       // Error handling is now done automatically by the action function
     } catch (error) {

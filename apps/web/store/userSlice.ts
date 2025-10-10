@@ -75,7 +75,13 @@ export const fetchUserDetails = createAsyncThunk(
   'user/fetchDetails',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/userprofile/me');
+      const response = await fetch('/api/userprofile/me', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) {
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch user details');
@@ -97,7 +103,11 @@ const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {
-    clearUserData: () => initialState
+    clearUserData: () => initialState,
+    // Add a reducer to trigger user data refresh
+    triggerUserRefresh: (state) => {
+      state.loading = true;
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -151,5 +161,5 @@ const userSlice = createSlice({
   }
 });
 
-export const { clearUserData } = userSlice.actions;
+export const { clearUserData, triggerUserRefresh } = userSlice.actions;
 export const userReducer = userSlice.reducer;

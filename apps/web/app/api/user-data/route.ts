@@ -19,13 +19,17 @@ export async function GET(request: NextRequest) {
     // Backend API URL (adjust as needed)
     const backendUrl = process.env.BACKEND_API_URL || 'http://localhost:3001';
 
-    // Proxy the request to the backend
+    // Proxy the request to the backend with no-cache headers
     const response = await fetch(`${backendUrl}/userprofile/me` + (organizationId ? `?organizationId=${organizationId}` : ''), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader
-      }
+        'Authorization': authHeader,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+      cache: 'no-store'
     });
 
     // Handle backend response
@@ -38,9 +42,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Return the user data
+    // Return the user data with no-cache headers
     const userData = await response.json();
-    return NextResponse.json(userData);
+    const nextResponse = NextResponse.json(userData);
+    
+    // Set cache headers to prevent caching
+    nextResponse.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    nextResponse.headers.set('Pragma', 'no-cache');
+    nextResponse.headers.set('Expires', '0');
+    
+    return nextResponse;
 
   } catch (error) {
     console.error('User data fetch error:', error);

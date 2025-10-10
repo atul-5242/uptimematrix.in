@@ -37,6 +37,7 @@ export async function createTeam(formData: { name: string; description?: string 
 
 export async function getTeams() {
   try {
+    console.log('[Frontend Action] getTeams called');
     const tokenResponse = await fetch('/api/auth/get-token');
     const { token } = await tokenResponse.json();
 
@@ -44,6 +45,7 @@ export async function getTeams() {
       return { success: false, error: 'Authentication required' };
     }
 
+    console.log('[Frontend Action] Calling /api/team-section/team');
     const response = await fetch('/api/team-section/team', {
       method: 'GET',
       headers: {
@@ -52,6 +54,7 @@ export async function getTeams() {
       },
       cache: 'no-store',
     });
+    console.log(`[Frontend Action] Response status: ${response.status}`);
 
     const data = await response.json();
 

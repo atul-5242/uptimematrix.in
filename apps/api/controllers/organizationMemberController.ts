@@ -104,13 +104,50 @@ export const updateOrganizationMember = async (req: Request, res: Response) => {
       },
       include: {
         user: true,
-        role: true
+        role: {
+          include: {
+            permissions: true
+          }
+        }
       }
     });
 
+    // If the role was updated and this member has a user account,
+    // ALWAYS update their global organization context if this is their selected organization
+    // This ensures the user gets the new permissions immediately
+    if (roleId && existingMember.userId) {
+      const userToUpdate = await prisma.user.findUnique({
+        where: { id: existingMember.userId },
+        select: { selectedOrganizationId: true }
+      });
+
+      console.log(`[API] Role update - User ${existingMember.userId}, Organization ${organizationId}, User's selected org: ${userToUpdate?.selectedOrganizationId}`);
+      console.log(`[API] New role: ${updatedMember.role.name}, New permissions: ${updatedMember.role.permissions.map(p => p.name).join(', ')}`);
+
+      // Update global context if this organization is the user's currently selected organization
+      if (userToUpdate?.selectedOrganizationId === organizationId) {
+        await prisma.user.update({
+          where: { id: existingMember.userId },
+          data: {
+            selectedOrganizationRole: updatedMember.role.name,
+            selectedOrganizationPermissions: updatedMember.role.permissions.map(p => p.name)
+          }
+        });
+        
+        console.log(`[API] ✅ Updated global organization context for user ${existingMember.userId} - new role: ${updatedMember.role.name}`);
+      } else {
+        console.log(`[API] ⚠️ Did not update global context - organization ${organizationId} is not user's selected organization (selected: ${userToUpdate?.selectedOrganizationId})`);
+      }
+    }
+
+    // Check if the updated member is the current user making the request
+    const isCurrentUser = existingMember.userId === userId;
+    
     res.json({
       success: true,
-      data: updatedMember
+      data: updatedMember,
+      isCurrentUser: isCurrentUser,
+      message: isCurrentUser ? 'Your role has been updated. Please refresh to see changes.' : 'Member updated successfully'
     });
   } catch (error) {
     console.error('Update organization member error:', error);

@@ -25,6 +25,8 @@ export const useAppInitialization = () => {
     }
   }, [selectedOrganizationId, currentOrganizationId, dispatch]);
 
+
+
   return {
     isInitialized: isAuthenticated && !!userId && !userLoading,
     isLoading: userLoading

@@ -139,11 +139,16 @@ export const removeMemberFromOrganization = async (req: Request, res: Response) 
 
 export const getTeams = async (req: Request, res: Response) => {
   try {
+    console.log(`[API] getTeams called by user ${req.user?.id} with organizationId: ${req.user?.organizationId}`);
+    
     if (!req.user?.organizationId) {
+      console.warn(`[API] getTeams - No organization selected for user ${req.user?.id}`);
       return res.status(401).json({ error: "Unauthorized: No organization selected" });
     }
     const organizationId = req.user.organizationId;
 
+    console.log(`[API] getTeams - Fetching teams for organization: ${organizationId}`);
+    
     const teams = await prisma.team.findMany({
       where: {
         organizationId: organizationId
@@ -180,6 +185,8 @@ export const getTeams = async (req: Request, res: Response) => {
         joinedAt: member.createdAt
       }))
     }));
+
+    console.log(`[API] getTeams - Found ${transformedTeams.length} teams for organization ${organizationId}`);
 
     res.json({
       success: true,

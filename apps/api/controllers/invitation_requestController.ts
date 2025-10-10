@@ -161,7 +161,7 @@ export const acceptInvitation = async (req: Request, res: Response) => {
               }
             });
       
-            console.log(`[API] Existing user ${existingUser.email} joined organization via invitation`);
+            console.log(`[API] Existing user ${existingUser.email} joined organization via invitation and selectedOrganizationId updated to ${decoded.organizationId}`);
       
             return res.json({
               message: 'Invitation accepted successfully',
@@ -213,7 +213,7 @@ export const acceptInvitation = async (req: Request, res: Response) => {
             }
           });
       
-          console.log(`[API] New user ${user.email} accepted invitation and joined organization`);
+          console.log(`[API] New user ${user.email} accepted invitation, joined organization, and selectedOrganizationId updated to ${decoded.organizationId}`);
       
           res.json({
             message: 'Invitation accepted successfully',

@@ -84,6 +84,38 @@ export async function deleteOrganizationAction(organizationId: string): Promise<
 }
 
 // New action to select an organization and sync user details
+export async function createOrganizationAction(data: { name: string; description: string }) {
+  try {
+    // Fetch token securely from the API route
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
+
+    if (!token) {
+      throw new Error("Authentication token not found");
+    }
+
+    const result = await apiRequest('/api/organizations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    }, 'Create Organization');
+
+    if (result.success) {
+      handleApiSuccess('Organization created successfully', 'Create Organization');
+      return { success: true, data: result.data };
+    } else {
+      throw new Error(result.error || 'Failed to create organization');
+    }
+  } catch (error: any) {
+    console.error('Error creating organization:', error);
+    handleApiError(error.message || 'Failed to create organization', 'Create Organization');
+    throw error;
+  }
+}
+
 export async function selectAndSyncOrganization(organizationId: string, dispatch: any) {
   try {
     // 1. Update frontend state immediately with the selected organization

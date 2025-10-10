@@ -230,7 +230,9 @@ export default function TeamsPage() {
           getRoles()
         ]);
         
+        console.log('Teams result from backend:', teamsResult);
         if (teamsResult.success && teamsResult.data) {
+          console.log('Teams data:', teamsResult.data);
           setTeams(teamsResult.data);
         } else {
           console.error('Failed to load teams:', teamsResult.error);

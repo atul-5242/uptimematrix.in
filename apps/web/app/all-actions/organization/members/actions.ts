@@ -28,7 +28,14 @@ export async function updateOrganizationMember(memberId: string, memberData: {
     }, 'Update Member');
 
     if (result.success) {
-      handleApiSuccess('Member updated successfully', 'Update Member');
+      const message = result.message || 'Member updated successfully';
+      handleApiSuccess(message, 'Update Member');
+      
+      // Return additional information about whether current user was updated
+      return {
+        ...result,
+        needsUserRefresh: result.isCurrentUser || false
+      };
     }
 
     return result;

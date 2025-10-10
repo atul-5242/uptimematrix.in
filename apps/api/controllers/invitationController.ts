@@ -244,13 +244,18 @@ export const acceptInvitation = async (req: CustomRequest, res: Response) => {
         isVerified: true,
         name: name, // Update the name here
       },
+      include: {
+        role: { include: { permissions: true } }
+      }
     });
 
-    // Update the user's selectedOrganizationId to the organization they just joined
+    // Update the user's selectedOrganizationId and role information
     await prismaClient.user.update({
       where: { id: userId },
       data: {
         selectedOrganizationId: updatedInvitation.organizationId,
+        selectedOrganizationRole: updatedInvitation.role.name,
+        selectedOrganizationPermissions: updatedInvitation.role.permissions.map(p => p.name)
       },
     });
 

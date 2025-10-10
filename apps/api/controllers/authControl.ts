@@ -104,6 +104,8 @@ export const setSelectedOrganization = async (req: Request, res: Response) => {
     const roleName = organizationMember.role.name;
     const permissions = organizationMember.role.permissions.map(p => p.name);
 
+    console.log(`[API] setSelectedOrganization - User ${userId} selecting org ${organizationId}, role: ${roleName}, permissions: ${permissions.join(', ')}`);
+
     await prismaClient.user.update({
       where: { id: userId },
       data: {
@@ -113,7 +115,13 @@ export const setSelectedOrganization = async (req: Request, res: Response) => {
       },
     });
 
-    res.status(200).json({ message: 'Selected organization updated successfully' });
+    console.log(`[API] Successfully updated user ${userId} selected organization context`);
+
+    res.status(200).json({ 
+      message: 'Selected organization updated successfully',
+      role: roleName,
+      permissions: permissions
+    });
 
   } catch (error) {
     console.error('Error setting selected organization:', error);
