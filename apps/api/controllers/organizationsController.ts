@@ -1,6 +1,61 @@
 
 import { Request, Response } from 'express';
-import { prismaClient } from '@uptimematrix/store';
+import { prismaClient, EscalationPolicy, Priority } from '@uptimematrix/store';
+
+// Helper function to create a default escalation policy
+async function createDefaultEscalationPolicy(organizationId: string, createdById: string, adminEmail: string): Promise<EscalationPolicy> {
+    console.log(`[API] Creating default escalation policy for organization ${organizationId}, createdBy: ${createdById}, email: ${adminEmail}`);
+    
+    const defaultPolicyName = "Default Admin Notification Policy";
+    const defaultPolicyDescription = "Automatically generated policy to notify the organization admin via email when monitors fail.";
+
+    // Validate inputs before creating
+    if (!organizationId || !createdById || !adminEmail) {
+        throw new Error(`Invalid parameters for escalation policy creation: organizationId=${organizationId}, createdById=${createdById}, adminEmail=${adminEmail}`);
+    }
+    
+    const defaultPolicy = await prismaClient.escalationPolicy.create({
+        data: {
+            name: defaultPolicyName,
+            description: defaultPolicyDescription,
+            priorityLevel: Priority.medium, // Default priority
+            isActive: true,
+            organization: { connect: { id: organizationId } },
+            createdBy: { connect: { id: createdById } },
+            terminationCondition: "stop_after_last_step",
+            repeatLastStepIntervalMinutes: 30,
+            steps: {
+                create: [
+                    {
+                        stepOrder: 1,
+                        primaryMethods: ["email"],
+                        additionalMethods: [],
+                        recipients: [adminEmail],
+                        delayMinutes: 0,
+                        repeatCount: 1,
+                        escalateAfter: 5, // Escalate after 5 minutes without acknowledgment
+                        customMessage: "Website is down. Please investigate.",
+                    },
+                ],
+            },
+        },
+        include: { steps: true },
+    });
+    console.log(`[API] Default escalation policy created for organization ${organizationId}: ${defaultPolicy.id}`);
+    
+    // Verify the policy was created by querying it
+    const verifyPolicy = await prismaClient.escalationPolicy.findUnique({
+        where: { id: defaultPolicy.id },
+        include: { steps: true }
+    });
+    
+    if (!verifyPolicy) {
+        throw new Error(`Failed to verify escalation policy creation for organization ${organizationId}`);
+    }
+    
+    console.log(`[API] Verified escalation policy exists with ${verifyPolicy.steps.length} steps`);
+    return defaultPolicy;
+}
 
 export const getOrganizationDetails = async (req: Request, res: Response) => {
   try {
@@ -219,6 +274,14 @@ export const createOrganization = async (req: Request, res: Response) => {
         selectedOrganizationPermissions: adminRole.permissions.map(p => p.name)
       },
     });
+
+    // Create the default escalation policy for the new organization
+    try {
+      await createDefaultEscalationPolicy(newOrganization.id, userId, userDetails.email);
+    } catch (escalationError) {
+      console.error(`[API] Failed to create default escalation policy for organization ${newOrganization.id}:`, escalationError);
+      // Continue with organization creation even if escalation policy fails
+    }
 
     console.log(`[Backend] Successfully created organization ${newOrganization.id} and set as selected for user ${userId}`);
 

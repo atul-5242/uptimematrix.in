@@ -50,6 +50,7 @@ type EscalationPolicyFormData = {
   tags: string[];
   terminationCondition: 'stop_after_last_step' | 'repeat_last_step' | ''; // New field
   repeatLastStepIntervalMinutes?: number; // New field for configurable interval
+  assignedMonitors: string[]; // New field for monitor assignment
 }
 
 type ErrorState = {
@@ -96,7 +97,8 @@ export default function EscalationPolicyCreatePage() {
     ],
     tags: [],
     terminationCondition: '',
-    repeatLastStepIntervalMinutes: 30 // Default to 30 minutes
+    repeatLastStepIntervalMinutes: 30, // Default to 30 minutes
+    assignedMonitors: [] // Initialize empty
   })
 
   const [loading, setLoading] = useState(false)
@@ -107,6 +109,8 @@ export default function EscalationPolicyCreatePage() {
   const [onCallSchedules, setOnCallSchedules] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState<boolean>(true);
   const [membersLoading, setMembersLoading] = useState<boolean>(true);
+  const [availableMonitors, setAvailableMonitors] = useState<any[]>([]);
+  const [selectedMonitors, setSelectedMonitors] = useState<string[]>([]);
 
   const primaryAlertMethods = [
     { value: 'email', label: 'Email Notification', icon: Mail, disabled: false },
@@ -183,6 +187,17 @@ export default function EscalationPolicyCreatePage() {
           setOnCallSchedules(data || []);
         } else {
           console.error("Failed to fetch on-call schedules:", await onCallRes.text());
+        }
+
+        // Fetch Available Monitors
+        const monitorsRes = await fetch('/api/uptime/getallmonitors', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (monitorsRes.ok) {
+          const data = await monitorsRes.json();
+          setAvailableMonitors(data.data || []);
+        } else {
+          console.error("Failed to fetch monitors:", await monitorsRes.text());
         }
       } catch (error) {
         console.error("Error fetching escalation recipients data:", error);
@@ -449,6 +464,7 @@ export default function EscalationPolicyCreatePage() {
       const payload = {
         ...rest,
         monitorsDown: triggerConditions.monitorsDown, // Flatten monitorsDown
+        assignedMonitors: selectedMonitors, // Include selected monitor IDs
         steps: steps.map((s, index) => ({
           stepOrder: index + 1, // Prisma requires stepOrder
           primaryMethods: s.alertMethod.primary,
@@ -669,6 +685,72 @@ export default function EscalationPolicyCreatePage() {
                   </div>
                 )}
                 <p className="text-xs text-gray-500">Define what happens when all escalation steps have been exhausted if no one acknowledges the escalation.</p>
+              </div>
+
+              {/* Monitor Assignment */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Assign to Monitors</Label>
+                  <p className="text-xs text-gray-500">Select which monitors should use this escalation policy</p>
+                </div>
+                
+                {availableMonitors.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-lg p-4">
+                    {availableMonitors.map((monitor) => (
+                      <div key={monitor.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`monitor-${monitor.id}`}
+                          checked={selectedMonitors.includes(monitor.id)}
+                          onCheckedChange={(checked: boolean) => {
+                            if (checked) {
+                              setSelectedMonitors(prev => [...prev, monitor.id]);
+                              setFormData(prev => ({
+                                ...prev,
+                                assignedMonitors: [...prev.assignedMonitors, monitor.name || monitor.url]
+                              }));
+                            } else {
+                              setSelectedMonitors(prev => prev.filter(id => id !== monitor.id));
+                              setFormData(prev => ({
+                                ...prev,
+                                assignedMonitors: prev.assignedMonitors.filter(name => name !== (monitor.name || monitor.url))
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`monitor-${monitor.id}`} className="text-sm cursor-pointer">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{monitor.name || 'Unnamed Monitor'}</span>
+                            <span className="text-xs text-gray-500">{monitor.url}</span>
+                          </div>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border rounded-lg bg-gray-50">
+                    <Globe className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">No monitors found</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open('/dashboard/monitoring/new', '_blank')}
+                    >
+                      Create Your First Monitor
+                    </Button>
+                  </div>
+                )}
+                
+                {selectedMonitors.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.assignedMonitors.map((monitorName, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {monitorName}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">

@@ -8,7 +8,6 @@ export const getEscalationPolicies = async (req: Request, res: Response) => {
   try {
     const policies = await prismaClient.escalationPolicy.findMany({
       where: {
-        createdById: req.user.id!,
         organizationId: req.user.organizationId!,
       },
       // Include new fields for EscalationPolicy
@@ -34,6 +33,7 @@ export const getEscalationPolicies = async (req: Request, res: Response) => {
             escalateAfter: true,
             customMessage: true,
           },
+          orderBy: { stepOrder: "asc" },
         },
         createdAt: true,
         updatedAt: true,
@@ -41,7 +41,33 @@ export const getEscalationPolicies = async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    return res.json({ policies });
+    // Format the policies for frontend consumption
+    const formattedPolicies = policies.map(policy => ({
+      id: policy.id,
+      name: policy.name,
+      description: policy.description,
+      severity: policy.priorityLevel,
+      isActive: policy.isActive,
+      tags: policy.tags || [],
+      triggerConditions: policy.monitorsDown ? ['Monitor down'] : [],
+      assignedMonitors: [], // TODO: Add monitor assignment logic
+      steps: policy.steps.length,
+      alertMethods: [
+        ...new Set([
+          ...policy.steps.flatMap(step => step.primaryMethods),
+          ...policy.steps.flatMap(step => step.additionalMethods)
+        ])
+      ],
+      createdAt: policy.createdAt.toISOString(),
+      updatedAt: policy.updatedAt.toISOString(),
+      lastTriggered: null, // TODO: Add incident tracking
+      triggeredCount: 0, // TODO: Add incident tracking
+      avgResponseTime: null, // TODO: Add response time tracking
+      terminationCondition: policy.terminationCondition,
+      repeatLastStepIntervalMinutes: policy.repeatLastStepIntervalMinutes
+    }));
+
+    return res.json({ policies: formattedPolicies });
   } catch (error) {
     console.error("Error fetching policies:", error);
     return res.status(500).json({ message: "Failed to fetch policies" });

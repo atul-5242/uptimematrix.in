@@ -29,6 +29,16 @@ export async function POST(request: NextRequest) {
       requestBody.fullName = fullName.trim();
     }
 
+    // Check if API URL is configured
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      console.error('[Frontend API] NEXT_PUBLIC_API_URL is not configured!');
+      return NextResponse.json(
+        { message: 'API configuration error. Please contact support.' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Frontend API] Making accept invitation request to:', process.env.NEXT_PUBLIC_API_URL);
     // Make API call to backend to accept invitation
     const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/accept-invitation`, {
       method: 'POST',

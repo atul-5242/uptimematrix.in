@@ -71,6 +71,29 @@ export default function EscalationPoliciesListPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
   const [triggerFilter, setTriggerFilter] = useState<'all' | 'recent' | 'never'>('all')
+  const [availableMonitors, setAvailableMonitors] = useState<any[]>([])
+
+  // Fetch available monitors
+  useEffect(() => {
+    const fetchMonitors = async () => {
+      try {
+        const res = await fetch('/api/uptime/getallmonitors', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableMonitors(data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching monitors:', error);
+      }
+    };
+    fetchMonitors();
+  }, []);
 
   // Fetch policies from API
   useEffect(() => {
@@ -87,63 +110,93 @@ export default function EscalationPoliciesListPage() {
         const data = await res.json();
         const policies = data.policies || [];
         
-        // TODO(stagewise): Add mock data when no policies exist for demo purposes
-        if (policies.length === 0) {
-          const mockPolicies = [
-            {
-              id: 'mock-1',
-              name: 'Default Admin Notification Policy',
-              description: 'Automatically generated policy to notify the organization admin via email.',
-              severity: 'medium' as const,
-              triggerConditions: ['Monitor down', 'High response time'],
-              assignedMonitors: ['Website Monitor', 'API Monitor'],
-              isActive: true,
-              steps: 3,
-              tags: ['default', 'admin'],
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              lastTriggered: null,
-              triggeredCount: 0,
-              avgResponseTime: null,
-              alertMethods: ['email']
-            }
-          ];
-          setPolicies(mockPolicies);
-          setFilteredPolicies(mockPolicies);
-        } else {
-          setPolicies(policies);
-          setFilteredPolicies(policies);
-        }
-      } catch (error) {
-        console.error('Error fetching policies:', error);
-        // TODO(stagewise): Show mock data when API fails
-        const mockPolicies = [
-          {
-            id: 'mock-1',
-            name: 'Default Admin Notification Policy',
-            description: 'Automatically generated policy to notify the organization admin via email.',
-            severity: 'medium' as const,
-            triggerConditions: ['Monitor down', 'High response time'],
-            assignedMonitors: ['Website Monitor', 'API Monitor'],
-            isActive: true,
-            steps: 3,
-            tags: ['default', 'admin'],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+        // Process policies from backend with real monitor assignments and incident data
+        const processedPolicies = await Promise.all(policies.map(async (policy: any) => {
+          // Get monitors assigned to this policy
+          const assignedMonitors = availableMonitors
+            .filter(monitor => monitor.escalationPolicyId === policy.id)
+            .map(monitor => monitor.name);
+
+          // Get incident data for this policy
+          let incidentData = {
             lastTriggered: null,
             triggeredCount: 0,
-            avgResponseTime: null,
-            alertMethods: ['email']
+            avgResponseTime: null
+          };
+
+          try {
+            // Fetch incidents for monitors using this policy
+            const monitorIds = availableMonitors
+              .filter(monitor => monitor.escalationPolicyId === policy.id)
+              .map(monitor => monitor.id);
+
+            if (monitorIds.length > 0) {
+              const orgId = localStorage.getItem('organizationId') || 'default';
+              const incidentRes = await fetch(`/api/incidents/${orgId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                },
+              });
+              
+              if (incidentRes.ok) {
+                const incidentResponse = await incidentRes.json();
+                const incidents = incidentResponse.incidents || [];
+                
+                // Filter incidents for monitors using this policy
+                const policyIncidents = incidents.filter((incident: any) => 
+                  monitorIds.includes(incident.websiteId)
+                );
+
+                if (policyIncidents.length > 0) {
+                  incidentData.triggeredCount = policyIncidents.length;
+                  
+                  // Get most recent incident
+                  const sortedIncidents = policyIncidents.sort((a: any, b: any) => 
+                    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+                  );
+                  incidentData.lastTriggered = sortedIncidents[0].startTime;
+                  
+                  // Calculate average response time for resolved incidents
+                  const resolvedIncidents = policyIncidents.filter((inc: any) => inc.endTime);
+                  if (resolvedIncidents.length > 0) {
+                    const totalResponseTime = resolvedIncidents.reduce((sum: number, inc: any) => {
+                      const start = new Date(inc.startTime).getTime();
+                      const end = new Date(inc.endTime).getTime();
+                      return sum + Math.round((end - start) / (1000 * 60)); // minutes
+                    }, 0);
+                    incidentData.avgResponseTime = Math.round(totalResponseTime / resolvedIncidents.length);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching incident data for policy:', policy.id, error);
           }
-        ];
-        setPolicies(mockPolicies);
-        setFilteredPolicies(mockPolicies)
+
+          return {
+            ...policy,
+            assignedMonitors,
+            triggerConditions: policy.triggerConditions || ['Monitor down'],
+            alertMethods: policy.alertMethods || ['email'],
+            ...incidentData
+          };
+        }));
+        
+        setPolicies(processedPolicies);
+        setFilteredPolicies(processedPolicies);
+      } catch (error) {
+        console.error('Error fetching policies:', error);
+        // Show empty state instead of mock data - backend should always have default policy
+        setPolicies([]);
+        setFilteredPolicies([]);
       } finally {
         setLoading(false)
       }
     }
     fetchPolicies()
-  }, [])
+  }, [availableMonitors]) // Re-fetch when monitors are available
 
   useEffect(() => {
     let filtered = policies
@@ -319,7 +372,8 @@ export default function EscalationPoliciesListPage() {
   }
 
   const handleEditPolicy = (policyId: string) => {
-    alert(`Navigate to edit policy: ${policyId}`)
+    // TODO(stagewise): Implement edit functionality - for now redirect to create new policy
+    router.push('/dashboard/escalations-policies/new')
   }
 
   if (loading) {
@@ -643,28 +697,26 @@ export default function EscalationPoliciesListPage() {
                     </div>
                   </div>
 
-                  {/* Trigger Conditions */}
+                  {/* Recent Incidents/Triggers */}
                   <div>
                     <div className="flex items-center gap-1 mb-2">
                       <Zap className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-700">Triggers:</span>
+                      <span className="text-sm font-medium text-gray-700">Recent Triggers:</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {policy.triggerConditions && policy.triggerConditions.length > 0 ? (
+                      {policy.triggeredCount > 0 ? (
                         <>
-                          {policy.triggerConditions.slice(0, 2).map((condition, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
-                              {condition}
-                            </Badge>
-                          ))}
-                          {policy.triggerConditions.length > 2 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{policy.triggerConditions.length - 2}
+                          <Badge variant="destructive" className="text-xs">
+                            {policy.triggeredCount} incidents
+                          </Badge>
+                          {policy.lastTriggered && (
+                            <Badge variant="outline" className="text-xs">
+                              Last: {formatDate(policy.lastTriggered)}
                             </Badge>
                           )}
                         </>
                       ) : (
-                        <span className="text-xs text-gray-500">No triggers configured</span>
+                        <span className="text-xs text-gray-500">No recent triggers</span>
                       )}
                     </div>
                   </div>
