@@ -38,7 +38,7 @@ import {
   Delete
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { getStatusPages } from '@/app/all-actions/status-page/status-page-actions'
+import { getStatusPages, deleteStatusPage } from '@/app/all-actions/status-page/status-page-actions'
 
 // Define the StatusPageData interface
 export interface Service {
@@ -120,14 +120,24 @@ export default function StatusPagesDashboard() {
     }
   }
 
-  const handleDeleteStatusPage = async (id: string) => {
-    if (confirm('Are you sure you want to delete this status page? This action cannot be undone.')) {
+  const handleDeleteStatusPage = async (id: string, pageName: string) => {
+    if (confirm(`Are you sure you want to delete the status page "${pageName}"? This action cannot be undone and will remove all associated nginx configurations.`)) {
       try {
-        console.log('Deleting status page:', id)
-        setStatusPages(prev => prev.filter(page => page.id !== id))
-        setFilteredPages(prev => prev.filter(page => page.id !== id))
+        setLoading(true)
+        const result = await deleteStatusPage(id)
+        
+        if (result.success) {
+          // Remove from local state immediately for better UX
+          setStatusPages(prev => prev.filter(page => page.id !== id))
+          setFilteredPages(prev => prev.filter(page => page.id !== id))
+        } else {
+          setError(result.error || 'Failed to delete status page')
+        }
       } catch (error) {
         console.error('Error deleting status page:', error)
+        setError('Failed to delete status page')
+      } finally {
+        setLoading(false)
       }
     }
   }
@@ -416,7 +426,18 @@ export default function StatusPagesDashboard() {
                             }}
                             className="cursor-pointer"
                           >
-                            <Delete className="mr-2 h-4 w-4" />
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDeleteStatusPage(page.id, page.name);
+                            }}
+                            className="cursor-pointer text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>

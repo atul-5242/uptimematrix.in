@@ -1,85 +1,54 @@
-
 "use client"
 
 import { Separator } from '@/components/ui/separator'
-import { Logo } from '@/app/(landingpage)//(main)/logo'
+import { Logo } from '@/app/(landingpage)/(main)/logo'
 import { 
   Twitter, 
   Github, 
-  Linkedin, 
   Mail,
-  MapPin,
-  Phone
+  Heart
 } from 'lucide-react'
-
-const navigation = {
-  product: [
-    { name: 'Website Monitoring', href: '#' },
-    { name: 'API Monitoring', href: '#' },
-    { name: 'Incident Management', href: '#' },
-    { name: 'Status Pages', href: '#' },
-    { name: 'Performance Monitoring', href: '#' },
-    { name: 'Security Monitoring', href: '#' },
-  ],
-  company: [
-    { name: 'About Us', href: '#' },
-    { name: 'Blog', href: '#' },
-    { name: 'Careers', href: '#' },
-    { name: 'Press Kit', href: '#' },
-    { name: 'Contact', href: '#' },
-    { name: 'Partners', href: '#' },
-  ],
-  resources: [
-    { name: 'Documentation', href: '#' },
-    { name: 'API Reference', href: '#' },
-    { name: 'Help Center', href: '#' },
-    { name: 'Status Page', href: '#' },
-    { name: 'Changelog', href: '#' },
-    { name: 'System Status', href: '#' },
-  ],
-  legal: [
-    { name: 'Privacy Policy', href: '#' },
-    { name: 'Terms of Service', href: '#' },
-    { name: 'Cookie Policy', href: '#' },
-    { name: 'GDPR', href: '#' },
-    { name: 'Security', href: '#' },
-    { name: 'Compliance', href: '#' },
-  ],
-}
 
 const social = [
   {
-    name: 'Twitter',
-    href: '#',
+    name: 'Twitter Project',
+    href: 'https://x.com/uptimematrix',
+    icon: Twitter,
+  },
+  {
+    name: 'Twitter Founder',
+    href: 'https://x.com/AtulMaurya5242',
     icon: Twitter,
   },
   {
     name: 'GitHub',
-    href: '#',
+    href: 'https://github.com/atul-5242/uptimematrix.in',
     icon: Github,
   },
   {
-    name: 'LinkedIn',
-    href: '#',
-    icon: Linkedin,
-  },
-  {
     name: 'Email',
-    href: 'mailto:hello@uptimematrix.com',
+    href: 'mailto:atul.fzdlko2002@gmail.com',
     icon: Mail,
   },
+]
+
+const quickLinks = [
+  { name: 'GitHub Repository', href: 'https://github.com/atul-5242/uptimematrix.in' },
+  { name: 'Documentation', href: 'https://github.com/atul-5242/uptimematrix.in#readme' },
+  { name: 'Issues & Bugs', href: 'https://github.com/atul-5242/uptimematrix.in/issues' },
+  { name: 'Feature Requests', href: 'https://github.com/atul-5242/uptimematrix.in/issues' },
 ]
 
 export function Footer() {
   return (
     <footer className="bg-muted/30 border-t">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Logo and Description */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <Logo className="mb-4" />
             <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
-              UptimeMatrix provides comprehensive monitoring for your entire infrastructure. Monitor everything, break nothing, fix instantly.
+              Free, open-source monitoring tool for your infrastructure. Self-hosted, no limits, complete control.
             </p>
             
             {/* Contact Info */}
@@ -88,25 +57,20 @@ export function Footer() {
                 <Mail className="h-4 w-4 mr-2" />
                 atul.fzdlko2002@gmail.com
               </div>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Phone className="h-4 w-4 mr-2" />
-                +1 (555) 123-4567
-              </div>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <MapPin className="h-4 w-4 mr-2" />
-                San Francisco, CA
-              </div>
             </div>
             
             {/* Social Links */}
             <div className="flex space-x-4">
-              {social.map((item) => {
+              {social.map((item, index) => {
                 const Icon = item.icon
                 return (
                   <a
-                    key={item.name}
+                    key={index}
                     href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-lg hover:bg-muted"
+                    title={item.name}
                   >
                     <span className="sr-only">{item.name}</span>
                     <Icon className="h-5 w-5" />
@@ -116,14 +80,16 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Quick Links */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">Product</h3>
+            <h3 className="text-sm font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-3">
-              {navigation.product.map((item) => (
+              {quickLinks.map((item) => (
                 <li key={item.name}>
                   <a
                     href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {item.name}
@@ -133,51 +99,15 @@ export function Footer() {
             </ul>
           </div>
 
+          {/* Open Source Info */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">Company</h3>
-            <ul className="space-y-3">
-              {navigation.company.map((item) => (
-                <li key={item.name}>
-                  <a
-                    href={item.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {item.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold mb-4">Resources</h3>
-            <ul className="space-y-3">
-              {navigation.resources.map((item) => (
-                <li key={item.name}>
-                  <a
-                    href={item.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {item.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold mb-4">Legal</h3>
-            <ul className="space-y-3">
-              {navigation.legal.map((item) => (
-                <li key={item.name}>
-                  <a
-                    href={item.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {item.name}
-                  </a>
-                </li>
-              ))}
+            <h3 className="text-sm font-semibold mb-4">Open Source</h3>
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <li>✅ MIT License</li>
+              <li>✅ Self-hosted</li>
+              <li>✅ No usage limits</li>
+              <li>✅ Full source code</li>
+              <li>✅ Community driven</li>
             </ul>
           </div>
         </div>
@@ -186,11 +116,11 @@ export function Footer() {
 
         <div className="flex flex-col sm:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 UptimeMatrix. All rights reserved.
+            © 2025 UptimeMatrix. Open source under MIT License.
           </p>
-          <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-            <span className="text-xs text-muted-foreground">
-              Built with ❤️ for developers and DevOps teams - Atul Maurya
+          <div className="flex items-center space-x-2 mt-4 sm:mt-0">
+            <span className="text-xs text-muted-foreground flex items-center">
+              Built with <Heart className="h-3 w-3 mx-1 text-red-500" /> by Atul Maurya
             </span>
           </div>
         </div>

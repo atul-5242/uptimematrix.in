@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/middleware.js';
 import { requirePermission } from '../middlewares/authorization.js';
-import { getMonitorsForStatusPage, createStatusPage, getAllStatusPages, getStatusPageByDomain, provisionCustomDomain } from '../controllers/statusPageControl.js';
+import { getMonitorsForStatusPage, createStatusPage, getAllStatusPages, getStatusPageByDomain, provisionCustomDomain, deleteStatusPage } from '../controllers/statusPageControl.js';
 
 const router = Router();
 
@@ -18,5 +18,8 @@ router.get('/by-domain', getStatusPageByDomain); // No auth needed - public rout
 
 // Add domain provisioning endpoint
 router.post('/:id/provision-domain', authMiddleware, requirePermission('status_page:edit'), provisionCustomDomain);
+
+// Delete status page
+router.delete('/:id', authMiddleware, requirePermission('status_page:delete'), deleteStatusPage);
 
 export default router;

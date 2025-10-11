@@ -16,15 +16,25 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { 
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
+import { 
   Plus, 
   Search, 
   Filter, 
   MoreHorizontal, 
   Edit, 
-  Copy, 
   Trash2, 
-  Power, 
-  PowerOff,
   Clock,
   Users,
   AlertTriangle,
@@ -71,6 +81,33 @@ export default function EscalationPoliciesListPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all')
   const [triggerFilter, setTriggerFilter] = useState<'all' | 'recent' | 'never'>('all')
+  const [availableMonitors, setAvailableMonitors] = useState<any[]>([])
+  const [selectedPolicy, setSelectedPolicy] = useState<EscalationPolicy | null>(null)
+  const [isPolicyDetailOpen, setIsPolicyDetailOpen] = useState(false)
+  const [policyMonitors, setPolicyMonitors] = useState<any[]>([])
+  const [loadingMonitors, setLoadingMonitors] = useState(false)
+
+  // Fetch available monitors
+  useEffect(() => {
+    const fetchMonitors = async () => {
+      try {
+        const res = await fetch('/api/uptime/getallmonitors', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableMonitors(data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching monitors:', error);
+      }
+    };
+    fetchMonitors();
+  }, []);
 
   // Fetch policies from API
   useEffect(() => {
@@ -85,16 +122,99 @@ export default function EscalationPoliciesListPage() {
           },
         });
         const data = await res.json();
-        setPolicies(data.policies || [])
-        setFilteredPolicies(data.policies || [])
+        const policies = data.policies || [];
+        
+        // Process policies from backend with real monitor assignments and incident data
+        const processedPolicies = await Promise.all(policies.map(async (policy: any) => {
+          // Get monitors assigned to this policy
+          const assignedMonitors = availableMonitors
+            .filter(monitor => monitor.escalationPolicyId === policy.id)
+            .map(monitor => monitor.name);
+
+          // Get incident data for this policy
+          let incidentData: {
+            lastTriggered: string | null,
+            triggeredCount: number,
+            avgResponseTime: number | null
+          } = {
+            lastTriggered: null,
+            triggeredCount: 0,
+            avgResponseTime: null
+          };
+
+          try {
+            // Fetch incidents for monitors using this policy
+            const monitorIds = availableMonitors
+              .filter(monitor => monitor.escalationPolicyId === policy.id)
+              .map(monitor => monitor.id);
+
+            if (monitorIds.length > 0) {
+              const orgId = localStorage.getItem('organizationId') || 'default';
+              const incidentRes = await fetch(`/api/incidents/${orgId}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+                },
+              });
+              
+              if (incidentRes.ok) {
+                const incidentResponse = await incidentRes.json();
+                const incidents = incidentResponse.incidents || [];
+                
+                // Filter incidents for monitors using this policy
+                const policyIncidents = incidents.filter((incident: any) => 
+                  monitorIds.includes(incident.websiteId)
+                );
+
+                if (policyIncidents.length > 0) {
+                  incidentData.triggeredCount = policyIncidents.length;
+                  
+                  // Get most recent incident
+                  const sortedIncidents = policyIncidents.sort((a: any, b: any) => 
+                    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+                  );
+                  incidentData.lastTriggered = sortedIncidents[0].startTime;
+                  
+                  // Calculate average response time for resolved incidents
+                  const resolvedIncidents = policyIncidents.filter((inc: any) => inc.endTime);
+                  if (resolvedIncidents.length > 0) {
+                    const totalResponseTime = resolvedIncidents.reduce((sum: number, inc: any) => {
+                      const start = new Date(inc.startTime).getTime();
+                      const end = new Date(inc.endTime).getTime();
+                      return sum + Math.round((end - start) / (1000 * 60)); // minutes
+                    }, 0);
+                    incidentData.avgResponseTime = Math.round(totalResponseTime / resolvedIncidents.length);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching incident data for policy:', policy.id, error);
+          }
+
+          return {
+            ...policy,
+            assignedMonitors,
+            triggerConditions: policy.triggerConditions || ['Monitor down'],
+            alertMethods: policy.alertMethods || ['email'],
+            ...incidentData
+          };
+        }));
+        
+        setPolicies(processedPolicies);
+        setFilteredPolicies(processedPolicies);
       } catch (error) {
-        console.error('Error fetching policies:', error)
+        console.error('Error fetching policies:', error);
+        // Show empty state instead of mock data - backend should always have default policy
+        setPolicies([]);
+        setFilteredPolicies([]);
       } finally {
         setLoading(false)
       }
     }
     fetchPolicies()
-  }, [])
+  }, [availableMonitors]) // Re-fetch when monitors are available
 
   useEffect(() => {
     let filtered = policies
@@ -135,31 +255,7 @@ export default function EscalationPoliciesListPage() {
     setFilteredPolicies(filtered)
   }, [policies, searchTerm, statusFilter, severityFilter, triggerFilter])
 
-  // Replace handleToggleActive, handleDeletePolicy, handleDuplicatePolicy with API calls
-  const handleToggleActive = async (policyId: string, currentStatus: boolean) => {
-    try {
-      setLoading(true)
-      const policy = policies.find(p => p.id === policyId)
-      if (!policy) return
-      const res = await fetch(API_URL, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify({ ...policy, isActive: !currentStatus }),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setPolicies(prev => prev.map(p => p.id === policyId ? updated.policy : p))
-      }
-    } catch (error) {
-      console.error('Error toggling policy status:', error)
-      alert('Failed to update policy status')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // API calls for policy management
 
   const handleDeletePolicy = async (policyId: string) => {
     if (!confirm('Are you sure you want to delete this escalation policy? This action cannot be undone.')) {
@@ -186,35 +282,7 @@ export default function EscalationPoliciesListPage() {
     }
   }
 
-  const handleDuplicatePolicy = async (policyId: string) => {
-    try {
-      setLoading(true)
-      const originalPolicy = policies.find(p => p.id === policyId)
-      if (!originalPolicy) return
-      const newPolicy = {
-        ...originalPolicy,
-        id: undefined,
-        name: `${originalPolicy.name} (Copy)`
-      }
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-        body: JSON.stringify(newPolicy),
-      })
-      if (res.ok) {
-        const created = await res.json()
-        setPolicies(prev => [created.policy, ...prev])
-      }
-    } catch (error) {
-      console.error('Error duplicating policy:', error)
-      alert('Failed to duplicate policy')
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   const getSeverityColor = (severity: EscalationPolicy['severity']) => {
     switch (severity) {
@@ -270,7 +338,92 @@ export default function EscalationPoliciesListPage() {
   }
 
   const handleEditPolicy = (policyId: string) => {
-    alert(`Navigate to edit policy: ${policyId}`)
+    // TODO(stagewise): Implement edit functionality - for now redirect to create new policy
+    router.push('/dashboard/escalations-policies/new')
+  }
+
+  const handleViewPolicyDetails = async (policy: EscalationPolicy) => {
+    setSelectedPolicy(policy)
+    setIsPolicyDetailOpen(true)
+    
+    // Fetch monitors for this policy
+    setLoadingMonitors(true)
+    try {
+      const res = await fetch(`/api/escalation-policies/${policy.id}/monitors`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPolicyMonitors(data.monitors || []);
+      } else {
+        console.error('Failed to fetch policy monitors');
+        setPolicyMonitors([]);
+      }
+    } catch (error) {
+      console.error('Error fetching policy monitors:', error);
+      setPolicyMonitors([]);
+    } finally {
+      setLoadingMonitors(false)
+    }
+  }
+
+  const handleToggleMonitorPolicy = async (monitorId: string, isEnabled: boolean) => {
+    if (!selectedPolicy) return;
+    
+    try {
+      const res = await fetch('/api/escalation-policies/toggle-monitor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+        body: JSON.stringify({
+          policyId: selectedPolicy.id,
+          monitorId: monitorId,
+          enabled: isEnabled
+        })
+      });
+      
+      if (res.ok) {
+        // Update the local state
+        setPolicyMonitors(prev => 
+          prev.map(monitor => 
+            monitor.id === monitorId 
+              ? { ...monitor, isPolicyEnabled: isEnabled, escalationPolicyId: isEnabled ? selectedPolicy.id : null }
+              : monitor
+          )
+        );
+        
+        // Also update the main policies list
+        setPolicies(prev => 
+          prev.map(policy => {
+            if (policy.id === selectedPolicy.id) {
+              const monitor = policyMonitors.find(m => m.id === monitorId);
+              if (monitor) {
+                const updatedMonitors = isEnabled 
+                  ? [...policy.assignedMonitors, monitor.name]
+                  : policy.assignedMonitors.filter(name => name !== monitor.name);
+                return { ...policy, assignedMonitors: updatedMonitors };
+              }
+            }
+            return policy;
+          })
+        );
+        
+        console.log(`Successfully ${isEnabled ? 'enabled' : 'disabled'} policy for monitor ${monitorId}`);
+      } else {
+        console.error('Failed to toggle monitor policy');
+        alert('Failed to update monitor policy assignment');
+      }
+    } catch (error) {
+      console.error('Error toggling monitor policy:', error);
+      alert('Failed to update monitor policy assignment');
+    }
   }
 
   if (loading) {
@@ -516,8 +669,8 @@ export default function EscalationPoliciesListPage() {
                             {policy.isActive ? 'Active' : 'Inactive'}
                           </span>
                         </div>
-                        <Badge variant={getSeverityBadgeVariant(policy.severity)} className="capitalize text-xs">
-                          {policy.severity}
+                        <Badge variant={getSeverityBadgeVariant(policy.severity || 'medium')} className="capitalize text-xs">
+                          {policy.severity || 'medium'}
                         </Badge>
                       </div>
                     </div>
@@ -531,28 +684,13 @@ export default function EscalationPoliciesListPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Policy Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleViewPolicyDetails(policy)}>
+                          <Activity className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditPolicy(policy.id)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Policy
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicatePolicy(policy.id)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleToggleActive(policy.id, policy.isActive)}
-                        >
-                          {policy.isActive ? (
-                            <>
-                              <PowerOff className="h-4 w-4 mr-2" />
-                              Disable
-                            </>
-                          ) : (
-                            <>
-                              <Power className="h-4 w-4 mr-2" />
-                              Enable
-                            </>
-                          )}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
@@ -574,38 +712,48 @@ export default function EscalationPoliciesListPage() {
                       <Globe className="h-4 w-4 text-gray-400" />
                       <span className="text-sm font-medium text-gray-700">Monitors:</span>
                     </div>
-                    {/* <div className="flex flex-wrap gap-1">
-                      {policy.assignedMonitors.slice(0, 2).map((monitor, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {monitor}
-                        </Badge>
-                      ))}
-                      {policy.assignedMonitors.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{policy.assignedMonitors.length - 2} more
-                        </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {policy.assignedMonitors && policy.assignedMonitors.length > 0 ? (
+                        <>
+                          {policy.assignedMonitors.slice(0, 2).map((monitor, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {monitor}
+                            </Badge>
+                          ))}
+                          {policy.assignedMonitors.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{policy.assignedMonitors.length - 2} more
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">No monitors assigned</span>
                       )}
-                    </div> */}
+                    </div>
                   </div>
 
-                  {/* Trigger Conditions */}
+                  {/* Recent Incidents/Triggers */}
                   <div>
                     <div className="flex items-center gap-1 mb-2">
                       <Zap className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-700">Triggers:</span>
+                      <span className="text-sm font-medium text-gray-700">Recent Triggers:</span>
                     </div>
-                    {/* <div className="flex flex-wrap gap-1">
-                      {policy.triggerConditions.slice(0, 2).map((condition, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {condition}
-                        </Badge>
-                      ))}
-                      {policy.triggerConditions.length > 2 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{policy.triggerConditions.length - 2}
-                        </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {policy.triggeredCount > 0 ? (
+                        <>
+                          <Badge variant="destructive" className="text-xs">
+                            {policy.triggeredCount} incidents
+                          </Badge>
+                          {policy.lastTriggered && (
+                            <Badge variant="outline" className="text-xs">
+                              Last: {formatDate(policy.lastTriggered)}
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">No recent triggers</span>
                       )}
-                    </div> */}
+                    </div>
                   </div>
 
                   {/* Alert Methods */}
@@ -614,17 +762,23 @@ export default function EscalationPoliciesListPage() {
                       <Bell className="h-4 w-4 text-gray-400" />
                       <span className="text-sm font-medium text-gray-700">Alerts via:</span>
                     </div>
-                    {/* <div className="flex items-center gap-2">
-                      {policy.alertMethods.slice(0, 4).map((method, index) => (
-                        <div key={index} className="flex items-center gap-1 text-gray-600">
-                          {getAlertMethodIcon(method)}
-                          <span className="text-xs capitalize">{method}</span>
-                        </div>
-                      ))}
-                      {policy.alertMethods.length > 4 && (
-                        <span className="text-xs text-gray-500">+{policy.alertMethods.length - 4}</span>
+                    <div className="flex items-center gap-2">
+                      {policy.alertMethods && policy.alertMethods.length > 0 ? (
+                        <>
+                          {policy.alertMethods.slice(0, 4).map((method, index) => (
+                            <div key={index} className="flex items-center gap-1 text-gray-600">
+                              {getAlertMethodIcon(method)}
+                              <span className="text-xs capitalize">{method}</span>
+                            </div>
+                          ))}
+                          {policy.alertMethods.length > 4 && (
+                            <span className="text-xs text-gray-500">+{policy.alertMethods.length - 4}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-500">Email notifications</span>
                       )}
-                    </div> */}
+                    </div>
                   </div>
 
                   {/* Performance Stats */}
@@ -632,7 +786,9 @@ export default function EscalationPoliciesListPage() {
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-gray-400" />
                       <div>
-                        {/* <p className="font-medium text-gray-900">{JSON.stringify(policy.steps)}</p> */}
+                        <p className="font-medium text-gray-900">
+                          {Array.isArray(policy.steps) ? policy.steps.length : (typeof policy.steps === 'number' ? policy.steps : 1)}
+                        </p>
                         <p className="text-xs text-gray-600">Steps</p>
                       </div>
                     </div>
@@ -700,6 +856,18 @@ export default function EscalationPoliciesListPage() {
                       <span>{formatDate(policy.updatedAt)}</span>
                     </div>
                   </div>
+
+                  {/* View Details Button */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => handleViewPolicyDetails(policy)}
+                    >
+                      View Full Details
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -726,6 +894,270 @@ export default function EscalationPoliciesListPage() {
             </Card>
           </div>
         )}
+
+        {/* Policy Details Dialog */}
+        <Dialog open={isPolicyDetailOpen} onOpenChange={setIsPolicyDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-blue-600" />
+                {selectedPolicy?.name}
+                <Badge variant={getSeverityBadgeVariant(selectedPolicy?.severity || 'medium')} className="ml-2">
+                  {selectedPolicy?.severity}
+                </Badge>
+                <div className="flex items-center gap-1 ml-2">
+                  {selectedPolicy?.isActive ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  )}
+                  <span className="text-sm font-medium">
+                    {selectedPolicy?.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedPolicy && (
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="monitors">Active Monitors</TabsTrigger>
+                  <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="overview" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Basic Info */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Policy Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Description</label>
+                          <p className="text-sm text-gray-600 mt-1">{selectedPolicy.description}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Trigger Conditions</label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedPolicy.triggerConditions.map((condition, index) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {condition}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Alert Methods</label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {selectedPolicy.alertMethods.map((method, index) => (
+                              <div key={index} className="flex items-center gap-1 text-gray-600">
+                                {getAlertMethodIcon(method)}
+                                <span className="text-xs capitalize">{method}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Stats */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Performance Stats</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="text-center p-3 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">{selectedPolicy.triggeredCount}</div>
+                            <div className="text-xs text-blue-600">Total Triggers</div>
+                          </div>
+                          <div className="text-center p-3 bg-green-50 rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                              {selectedPolicy.avgResponseTime || 'N/A'}
+                            </div>
+                            <div className="text-xs text-green-600">Avg Response (min)</div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Last Triggered</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.lastTriggered)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Last Updated</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.updatedAt)}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="monitors" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Globe className="h-5 w-5" />
+                        Monitor Policy Assignments
+                      </CardTitle>
+                      <p className="text-sm text-gray-600">
+                        Toggle individual monitors on/off for this escalation policy. When enabled, this policy will be triggered when the monitor goes down.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      {loadingMonitors ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                          <p className="text-gray-600">Loading monitors...</p>
+                        </div>
+                      ) : policyMonitors.length > 0 ? (
+                        <div className="space-y-3">
+                          {policyMonitors.map((monitor) => (
+                            <div key={monitor.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  monitor.status === 'online' ? 'bg-green-500' : 
+                                  monitor.status === 'offline' ? 'bg-red-500' : 'bg-gray-400'
+                                }`} />
+                                <div>
+                                  <h4 className="font-medium">{monitor.name}</h4>
+                                  <p className="text-sm text-gray-600">{monitor.url}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {monitor.method || 'GET'}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {monitor.interval}s interval
+                                    </Badge>
+                                    {monitor.monitorType && (
+                                      <Badge variant="outline" className="text-xs capitalize">
+                                        {monitor.monitorType}
+                                      </Badge>
+                                    )}
+                                    {monitor.regions && monitor.regions.length > 0 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {monitor.regions.length} regions
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className={`text-sm font-medium ${
+                                    monitor.isPolicyEnabled ? 'text-green-600' : 'text-gray-500'
+                                  }`}>
+                                    {monitor.isPolicyEnabled ? 'Policy Enabled' : 'Policy Disabled'}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {monitor.isPolicyEnabled ? 'Will trigger alerts' : 'No alerts'}
+                                  </p>
+                                </div>
+                                <Switch
+                                  checked={monitor.isPolicyEnabled}
+                                  onCheckedChange={(checked) => handleToggleMonitorPolicy(monitor.id, checked)}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          
+                          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-900">Policy Summary</span>
+                            </div>
+                            <p className="text-sm text-blue-700 mt-1">
+                              {policyMonitors.filter(m => m.isPolicyEnabled).length} of {policyMonitors.length} monitors will trigger this escalation policy when they go down.
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">
+                            No monitors found
+                          </h3>
+                          <p className="text-gray-600 mb-4">
+                            No monitors are available in your organization. Create monitors first to assign them to escalation policies.
+                          </p>
+                          <Button variant="outline" onClick={() => router.push('/dashboard/monitoring')}>
+                            Create Monitor
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="settings" className="space-y-4 mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Policy Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Policy ID</label>
+                          <p className="text-sm text-gray-600 mt-1 font-mono">{selectedPolicy.id}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Escalation Steps</label>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {Array.isArray(selectedPolicy.steps) ? selectedPolicy.steps.length : selectedPolicy.steps} steps configured
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Created</label>
+                          <p className="text-sm text-gray-600 mt-1">{formatDate(selectedPolicy.createdAt)}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-700">Tags</label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedPolicy.tags && selectedPolicy.tags.length > 0 ? (
+                              selectedPolicy.tags.map((tag, index) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  #{tag}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-gray-500">No tags</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-gray-200">
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => {
+                              setIsPolicyDetailOpen(false)
+                              handleEditPolicy(selectedPolicy.id)
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit Policy
+                          </Button>
+                          <Button 
+                            variant="destructive"
+                            onClick={() => {
+                              setIsPolicyDetailOpen(false)
+                              handleDeletePolicy(selectedPolicy.id)
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete Policy
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

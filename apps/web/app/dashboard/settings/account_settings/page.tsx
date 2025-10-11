@@ -43,6 +43,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
+import { handleApiError, handleApiSuccess } from '@/lib/errorHandler';
 
 // Types
 interface UserProfile {

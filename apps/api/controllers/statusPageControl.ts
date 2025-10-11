@@ -755,4 +755,96 @@ export const provisionCustomDomain = async (req: Request, res: Response) => {
     console.error('Error in domain provisioning:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
-}
+};
+
+export const deleteStatusPage = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'Status page ID is required' });
+    }
+
+    // First, find the status page to get domain information
+    const statusPage = await prismaClient.statusPage.findFirst({
+      where: {
+        id,
+        organizationId: req.user.organizationId
+      },
+      select: {
+        id: true,
+        name: true,
+        customDomain: true,
+        subdomain: true
+      }
+    });
+    
+    if (!statusPage) {
+      return res.status(404).json({ success: false, message: 'Status page not found' });
+    }
+    
+    // Clean up nginx configurations before deleting from database
+    const domainsToClean = [];
+    
+    if (statusPage.customDomain) {
+      domainsToClean.push(statusPage.customDomain);
+    }
+    
+    if (statusPage.subdomain) {
+      domainsToClean.push(`${statusPage.subdomain}.status.uptimematrix.atulmaurya.in`);
+    }
+    
+    // Execute nginx cleanup for each domain
+    for (const domain of domainsToClean) {
+      try {
+        console.log(`🗑️  Cleaning up nginx config for domain: ${domain}`);
+        
+        // Remove nginx configurations
+        await execAsync(`sudo rm -f /etc/nginx/sites-enabled/${domain}.conf`);
+        await execAsync(`sudo rm -f /etc/nginx/sites-available/${domain}.conf`);
+        
+        console.log(`✅ Removed nginx configs for: ${domain}`);
+      } catch (nginxError) {
+        console.error(`⚠️  Warning: Failed to remove nginx config for ${domain}:`, nginxError);
+        // Continue with deletion even if nginx cleanup fails
+      }
+    }
+    
+    // Test and reload nginx configuration
+    try {
+      const { stdout: testOutput } = await execAsync('sudo nginx -t');
+      console.log('✅ Nginx configuration test passed:', testOutput);
+      
+      const { stdout: reloadOutput } = await execAsync('sudo systemctl reload nginx');
+      console.log('✅ Nginx reloaded successfully:', reloadOutput);
+    } catch (nginxError) {
+      console.error('⚠️  Warning: Nginx test/reload failed:', nginxError);
+      // Continue with database deletion even if nginx reload fails
+    }
+    
+    // Delete the status page from database (cascade will handle related records)
+    await prismaClient.statusPage.delete({
+      where: { id }
+    });
+    
+    console.log(`✅ Status page '${statusPage.name}' deleted successfully`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Status page deleted successfully',
+      data: {
+        id: statusPage.id,
+        name: statusPage.name,
+        domainsCleanedUp: domainsToClean
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error deleting status page:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete status page',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};

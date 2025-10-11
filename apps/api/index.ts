@@ -23,7 +23,7 @@ const app = express();
 // Allowed origins
 const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',')
-  : ["https://uptimematrix.atulmaurya.in", "http://localhost:3000"];
+  : ["https://uptimematrix.atulmaurya.in", "http://localhost:3000", "http://localhost:3100"];
 
 console.log('CORS Configuration:');
 console.log('CORS_ORIGIN env var:', process.env.CORS_ORIGIN);

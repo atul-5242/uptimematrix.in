@@ -135,7 +135,7 @@ export default function TeamMemberModal({
         if (result.success) {
           results.push(result.data);
         } else {
-          errors.push({ user: user.name, error: result.error });
+          errors.push({ user: user.name, error: result.error || 'Unknown error occurred' });
         }
       }
 

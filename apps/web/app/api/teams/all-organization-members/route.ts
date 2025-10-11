@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;;
 
 export async function GET(req: NextRequest) {
@@ -12,7 +14,9 @@ export async function GET(req: NextRequest) {
     const response = await fetch(`${API_BASE_URL}/api/teams/all-organization-members`, {
       headers: {
         'Authorization': token,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
       },
+      cache: 'no-store'
     });
 
     if (!response.ok) {
@@ -29,7 +33,9 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    const nextResponse = NextResponse.json(data);
+    nextResponse.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return nextResponse;
   } catch (error) {
     console.error('Error proxying GET /api/teams/all-organization-members:', error);
     return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

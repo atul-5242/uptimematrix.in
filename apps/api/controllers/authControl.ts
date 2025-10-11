@@ -32,9 +32,16 @@ function mapPriorityToIncidentSeverity(priority: Priority): IncidentSeverity {
 
 // Helper function to create a default escalation policy
 async function createDefaultEscalationPolicy(organizationId: string, createdById: string, adminEmail: string): Promise<EscalationPolicy> {
+    console.log(`[API] Creating default escalation policy for organization ${organizationId}, createdBy: ${createdById}, email: ${adminEmail}`);
+    
     const defaultPolicyName = "Default Admin Notification Policy";
     const defaultPolicyDescription = "Automatically generated policy to notify the organization admin via email.";
 
+    // Validate inputs before creating
+    if (!organizationId || !createdById || !adminEmail) {
+        throw new Error(`Invalid parameters for escalation policy creation: organizationId=${organizationId}, createdById=${createdById}, adminEmail=${adminEmail}`);
+    }
+    
     const defaultPolicy = await prismaClient.escalationPolicy.create({
         data: {
             name: defaultPolicyName,
@@ -63,6 +70,18 @@ async function createDefaultEscalationPolicy(organizationId: string, createdById
         include: { steps: true },
     });
     console.log(`[API] Default escalation policy created for organization ${organizationId}: ${defaultPolicy.id}`);
+    
+    // Verify the policy was created by querying it
+    const verifyPolicy = await prismaClient.escalationPolicy.findUnique({
+        where: { id: defaultPolicy.id },
+        include: { steps: true }
+    });
+    
+    if (!verifyPolicy) {
+        throw new Error(`Failed to verify escalation policy creation for organization ${organizationId}`);
+    }
+    
+    console.log(`[API] Verified escalation policy exists with ${verifyPolicy.steps.length} steps`);
     return defaultPolicy;
 }
 
@@ -104,6 +123,8 @@ export const setSelectedOrganization = async (req: Request, res: Response) => {
     const roleName = organizationMember.role.name;
     const permissions = organizationMember.role.permissions.map(p => p.name);
 
+    console.log(`[API] setSelectedOrganization - User ${userId} selecting org ${organizationId}, role: ${roleName}, permissions: ${permissions.join(', ')}`);
+
     await prismaClient.user.update({
       where: { id: userId },
       data: {
@@ -113,7 +134,13 @@ export const setSelectedOrganization = async (req: Request, res: Response) => {
       },
     });
 
-    res.status(200).json({ message: 'Selected organization updated successfully' });
+    console.log(`[API] Successfully updated user ${userId} selected organization context`);
+
+    res.status(200).json({ 
+      message: 'Selected organization updated successfully',
+      role: roleName,
+      permissions: permissions
+    });
 
   } catch (error) {
     console.error('Error setting selected organization:', error);
@@ -189,7 +216,12 @@ export const signUp = async (req: Request, res: Response) => {
     });
     
     // Create the default escalation policy for the new organization
-    await createDefaultEscalationPolicy(organization.id, user.id, user.email);
+    try {
+      await createDefaultEscalationPolicy(organization.id, user.id, user.email);
+    } catch (escalationError) {
+      console.error(`[API] Failed to create default escalation policy for organization ${organization.id}:`, escalationError);
+      // Continue with user creation even if escalation policy fails
+    }
 
     // Create OrganizationMember for the user who signed up
     await prismaClient.organizationMember.create({
