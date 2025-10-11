@@ -822,7 +822,27 @@ export const deleteStatusPage = async (req: Request, res: Response) => {
       // Continue with database deletion even if nginx reload fails
     }
     
-    // Delete the status page from database (cascade will handle related records)
+    // Delete related records first to avoid foreign key constraint violations
+    
+    // First, get all service groups for this status page to delete their services
+    const serviceGroups = await prismaClient.serviceGroup.findMany({
+      where: { statusPageId: id },
+      include: { services: true }
+    });
+    
+    // Delete all services in each service group
+    for (const serviceGroup of serviceGroups) {
+      await prismaClient.service.deleteMany({
+        where: { serviceGroupId: serviceGroup.id }
+      });
+    }
+    
+    // Delete service groups associated with this status page
+    await prismaClient.serviceGroup.deleteMany({
+      where: { statusPageId: id }
+    });
+    
+    // Now delete the status page
     await prismaClient.statusPage.delete({
       where: { id }
     });
