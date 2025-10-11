@@ -140,3 +140,37 @@ export async function getStatusPages() {
     };
   }
 }
+
+export async function deleteStatusPage(id: string) {
+  try {
+    // Fetch token securely from the API route
+    const tokenResponse = await fetch('/api/auth/get-token');
+    const { token } = await tokenResponse.json();
+
+    if (!token) {
+      handleApiError('Authentication required', 'Delete Status Page');
+      return { success: false, error: 'Authentication token not found' };
+    }
+
+    const result = await apiRequest(`/api/status-pages/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    }, 'Delete Status Page');
+
+    if (result.success) {
+      handleApiSuccess('Status page deleted successfully', 'Delete Status Page');
+      revalidatePath('/dashboard/status-pages');
+      return { success: true, data: result.data };
+    } else {
+      return { success: false, error: result.error || 'Failed to delete status page' };
+    }
+  } catch (error) {
+    handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Delete Status Page');
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to delete status page' 
+    };
+  }
+}
