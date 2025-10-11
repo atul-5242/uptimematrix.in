@@ -1,4 +1,4 @@
-import { prismaClient, Priority, Severity } from "@uptimematrix/store";
+import { prismaClient, Priority, Severity, IncidentStatus } from "@uptimematrix/store";
 import type { Request, Response } from "express";
 
 /**
@@ -325,6 +325,99 @@ export const toggleMonitorPolicy = async (req: Request, res: Response) => {
         escalationPolicyId: enabled ? policyId : null
       }
     });
+    
+    // CRITICAL: Handle existing incidents when policy is toggled
+    if (!enabled) {
+      // TOGGLE OFF: Stop existing escalations
+      // Find any active incidents for this monitor
+      const activeIncidents = await prismaClient.incident.findMany({
+        where: {
+          websiteId: monitorId,
+          status: { in: [IncidentStatus.INVESTIGATING, IncidentStatus.MONITORING] },
+          endTime: null
+        }
+      });
+      
+      if (activeIncidents.length > 0) {
+        console.log(`Found ${activeIncidents.length} active incidents for monitor ${monitor.name}. Stopping escalations...`);
+        
+        // Stop escalations for all active incidents by setting nextEscalationTime to null
+        await prismaClient.incident.updateMany({
+          where: {
+            websiteId: monitorId,
+            status: { in: [IncidentStatus.INVESTIGATING, IncidentStatus.MONITORING] },
+            endTime: null
+          },
+          data: {
+            nextEscalationTime: null, // This stops further escalations
+            // Optionally acknowledge the incidents
+            Acknowledged: true,
+            status: IncidentStatus.MONITORING
+          }
+        });
+        
+        console.log(`✅ Stopped escalations for ${activeIncidents.length} incidents after policy removal`);
+      }
+    } else {
+      // TOGGLE ON: Handle existing incidents that might need escalation policy
+      const activeIncidents = await prismaClient.incident.findMany({
+        where: {
+          websiteId: monitorId,
+          status: { in: [IncidentStatus.INVESTIGATING, IncidentStatus.MONITORING] },
+          endTime: null,
+          nextEscalationTime: null // These were stopped when policy was disabled
+        }
+      });
+      
+      if (activeIncidents.length > 0) {
+        console.log(`Found ${activeIncidents.length} stopped incidents for monitor ${monitor.name}. Re-enabling escalations...`);
+        
+        // Get the escalation policy to determine first step
+        const escalationPolicy = await prismaClient.escalationPolicy.findUnique({
+          where: { id: policyId },
+          include: {
+            steps: {
+              orderBy: { stepOrder: "asc" }
+            }
+          }
+        });
+        
+        if (escalationPolicy && escalationPolicy.steps.length > 0) {
+          const firstStep = escalationPolicy.steps[0];
+          
+          if (firstStep) {
+            const now = new Date();
+            
+            // Re-start escalations from the first step with a short delay
+            const nextEscalationTime = new Date(now.getTime() + (2 * 60 * 1000)); // 2 minutes delay
+            
+            await prismaClient.incident.updateMany({
+              where: {
+                websiteId: monitorId,
+                status: { in: [IncidentStatus.INVESTIGATING, IncidentStatus.MONITORING] },
+                endTime: null,
+                nextEscalationTime: null
+              },
+              data: {
+                status: IncidentStatus.INVESTIGATING,
+                currentEscalationStepId: firstStep.id,
+                nextEscalationTime: nextEscalationTime,
+                currentRepeatCount: 0,
+                stepDelayCompleted: false,
+                escalationStepStartTime: null,
+                Acknowledged: false // Re-open for escalation
+              }
+            });
+            
+            console.log(`✅ Re-enabled escalations for ${activeIncidents.length} incidents. Next escalation at ${nextEscalationTime.toISOString()}`);
+          } else {
+            console.warn(`Escalation policy ${policyId} has no valid first step. Cannot re-enable escalations.`);
+          }
+        } else {
+          console.warn(`Escalation policy ${policyId} not found or has no steps. Cannot re-enable escalations.`);
+        }
+      }
+    }
 
     return res.json({ 
       message: enabled 

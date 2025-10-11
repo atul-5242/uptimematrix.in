@@ -154,13 +154,14 @@ export default function MonitorPage() {
     );
   }
 
-  if (!website) {
+  if (!website || !website.id) {
     return (
       <div className="p-8">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Website Not Found</h2>
-          <p className="text-gray-600 mb-4">The website you're looking for could not be found.</p>
+          <p className="text-gray-600 mb-4">The website you're looking for could not be found or has invalid data.</p>
           <p className="text-sm text-gray-500">Website ID: {websiteId}</p>
+          <p className="text-xs text-gray-400 mt-2">Debug: website = {JSON.stringify(website)}</p>
         </div>
       </div>
     );
@@ -175,14 +176,14 @@ export default function MonitorPage() {
             <CardTitle className="text-2xl font-semibold flex items-center gap-2">
               <span
                 className={`inline-block w-3 h-3 rounded-full ${
-                  website.status === "up" ? "bg-green-500" : "bg-red-500"
+                  website?.status === "up" ? "bg-green-500" : "bg-red-500"
                 }`}
               />
-              {website.url}
+              {website?.url || 'Unknown URL'}
             </CardTitle>
             <CardDescription>
-              {website.status === "up" ? "Online" : website.status === "down" ? "Offline" : "Unknown"} • 
-              Checked every {website.checkInterval ? Math.round(website.checkInterval / 1000) : 60} seconds
+              {website?.status === "up" ? "Online" : website?.status === "down" ? "Offline" : "Unknown"} • 
+              Checked every {website?.checkInterval ? Math.round(website.checkInterval / 1000) : 60} seconds
               {website.method && ` • ${website.method} method`}
               {website.monitorType && ` • ${website.monitorType.toUpperCase()}`}
             </CardDescription>
@@ -440,14 +441,14 @@ export default function MonitorPage() {
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Info</h4>
               <div className="text-xs text-gray-600 space-y-1">
-                <p>Website ID: {website.id}</p>
-                <p>Status: {website.status}</p>
-                <p>Check Interval: {website.checkInterval}ms</p>
-                <p>Method: {website.method}</p>
-                <p>Monitor Type: {website.monitorType}</p>
-                <p>Regions: {website.regions?.join(", ") || "None"}</p>
-                <p>Tags: {website.tags?.join(", ") || "None"}</p>
-                <p>Response Data Points: {website.responseData.length}</p>
+                <p>Website ID: {website?.id || 'Unknown'}</p>
+                <p>Status: {website?.status || 'Unknown'}</p>
+                <p>Check Interval: {website?.checkInterval || 0}ms</p>
+                <p>Method: {website?.method || 'Unknown'}</p>
+                <p>Monitor Type: {website?.monitorType || 'Unknown'}</p>
+                <p>Regions: {website?.regions?.join(", ") || "None"}</p>
+                <p>Tags: {website?.tags?.join(", ") || "None"}</p>
+                <p>Response Data Points: {website?.responseData?.length || 0}</p>
               </div>
             </div>
           )}

@@ -1,6 +1,9 @@
 import { prismaClient, WebsiteStatus, IncidentStatus, IncidentSeverity, EscalationStep, Priority } from "@uptimematrix/store";
 import { WebsiteEvent } from "@uptimematrix/redisstream";
 import { sendEmail } from "../notifications/email.js";
+import { sendSlack } from "../notifications/slack.js";
+import { sendSMS } from "../notifications/sms.js";
+import { sendWebhook } from "../notifications/webhook.js";
 import axios from "axios";
 
 const DEFAULT_REGION = "India";
@@ -186,19 +189,77 @@ export async function handleEscalation(
     }
 
     if (!escalationPolicy || !escalationPolicy.isActive) {
-        console.log(`No active escalation policy found for website ${site.url}. Sending generic notification.`);
-        const adminEmails = await getRecipientsEmails([site.createdById || ""], organizationId);
-        for (const email of adminEmails) {
-            await sendEmail(
-                email,
-                `[${status}] ${site.url} is ${status} - ${!escalationPolicy ? 'No Active Policy' : 'Inactive Policy'}`,
-                'generic',
-                { 
-                    websiteUrl: site.url,
-                    status: status,
-                }
-            );
+        console.log(`No active escalation policy found for website ${site.url}. Checking if generic notification needed.`);
+        
+        // Check if there's already an incident for this website (to avoid duplicate notifications)
+        let existingIncident = null;
+        if (currentIncidentId) {
+            existingIncident = await prismaClient.incident.findUnique({
+                where: { id: currentIncidentId }
+            });
         }
+        
+        if (!existingIncident) {
+            existingIncident = await prismaClient.incident.findFirst({
+                where: {
+                    websiteId: site.id,
+                    status: IncidentStatus.INVESTIGATING,
+                    // Look for incidents without escalation policy (generic incidents)
+                    currentEscalationStepId: null
+                }
+            });
+        }
+        
+        if (!existingIncident) {
+            // Create a generic incident to track that we sent the notification
+            const websiteDetails = await prismaClient.website.findUnique({ where: { id: site.id } });
+            if (!websiteDetails) {
+                console.error(`Website ${site.id} not found when trying to create generic incident.`);
+                return;
+            }
+            
+            existingIncident = await prismaClient.incident.create({
+                data: {
+                    website: { connect: { id: site.id } },
+                    organization: { connect: { id: websiteDetails.organizationId } },
+                    status: IncidentStatus.INVESTIGATING,
+                    severity: IncidentSeverity.MINOR, // Default to minor for no-policy incidents
+                    Acknowledged: false,
+                    startTime: now,
+                    title: `${site.url} is ${status} - No Escalation Policy`,
+                    serviceName: site.url,
+                    impact: "Service Outage (No Policy)",
+                    duration: "0",
+                    createdById: site.createdById || undefined,
+                    currentEscalationStepId: null, // No escalation steps
+                    nextEscalationTime: null, // No further escalations
+                    escalationStepStartTime: null,
+                    currentRepeatCount: 0,
+                    stepDelayCompleted: true // Mark as completed since no steps
+                }
+            });
+            
+            console.log(`Generic incident created for ${site.url}: ${existingIncident.id}`);
+            
+            // Send the generic notification ONLY when creating the incident (once per outage)
+            const adminEmails = await getRecipientsEmails([site.createdById || ""], organizationId);
+            for (const email of adminEmails) {
+                await sendEmail(
+                    email,
+                    `[${status}] ${site.url} is ${status} - ${!escalationPolicy ? 'No Active Policy' : 'Inactive Policy'}`,
+                    'generic',
+                    { 
+                        websiteUrl: site.url,
+                        status: status,
+                    }
+                );
+            }
+            
+            console.log(`✅ Generic notification sent for ${site.url} (No Policy) - will not repeat`);
+        } else {
+            console.log(`Generic incident already exists for ${site.url}: ${existingIncident.id} - no duplicate notification sent`);
+        }
+        
         return;
     }
 
@@ -496,22 +557,127 @@ export async function handleEscalation(
 async function sendStepNotification(incident: any, step: EscalationStep, websiteUrl: string, status: WebsiteStatus, organizationId: string, policyName: string) {
     const recipientEmails = await getRecipientsEmails(step.recipients, organizationId);
     
-    for (const email of recipientEmails) {
-        await sendEmail(
-            email,
-            `[${status}] ${websiteUrl} is ${status} - Escalation Step ${step.stepOrder}`,
-            'incidentEscalated',
-            {
-                recipientName: email,
-                websiteUrl: websiteUrl,
-                status: status,
-                incidentId: incident.id,
-                serviceName: websiteUrl,
-                escalationPolicyName: policyName,
-                escalationStep: step.stepOrder,
-                customMessage: step.customMessage || 'N/A',
-                ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+    // Combine all notification methods
+    const allMethods = [...step.primaryMethods, ...step.additionalMethods];
+    
+    // Common message data
+    const messageData = {
+        recipientName: 'User',
+        websiteUrl: websiteUrl,
+        status: status,
+        incidentId: incident.id,
+        serviceName: websiteUrl,
+        escalationPolicyName: policyName,
+        escalationStep: step.stepOrder,
+        customMessage: step.customMessage || 'Service is experiencing issues',
+        ctaLink: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+    };
+    
+    // Send notifications via all configured methods
+    for (const method of allMethods) {
+        switch (method.toLowerCase()) {
+            case 'email':
+                for (const email of recipientEmails) {
+                    try {
+                        await sendEmail(
+                            email,
+                            `[${status}] ${websiteUrl} is ${status} - Escalation Step ${step.stepOrder}`,
+                            'incidentEscalated',
+                            { ...messageData, recipientName: email }
+                        );
+                        console.log(`📧 Email notification sent to ${email} for incident ${incident.id}`);
+                    } catch (error) {
+                        console.error(`Failed to send email to ${email}:`, error);
+                    }
+                }
+                break;
+                
+            case 'slack':
+                try {
+                    // TODO(stagewise): Get Slack webhook URL from organization settings or integrations
+                    const slackWebhookUrl = process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL';
+                    const slackMessage = `🚨 *${policyName}* - Step ${step.stepOrder}\n` +
+                        `*Service:* ${websiteUrl}\n` +
+                        `*Status:* ${status}\n` +
+                        `*Incident ID:* ${incident.id}\n` +
+                        `*Custom Message:* ${step.customMessage || 'N/A'}\n` +
+                        `*Action Required:* Please investigate immediately\n` +
+                        `*Dashboard:* ${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`;
+                    
+                    await sendSlack(slackWebhookUrl, slackMessage);
+                    console.log(`💬 Slack notification sent for incident ${incident.id}`);
+                } catch (error) {
+                    console.error(`Failed to send Slack notification:`, error);
+                }
+                break;
+                
+            case 'sms':
+                try {
+                    // TODO(stagewise): Get phone numbers from user profiles or step configuration
+                    const phoneNumbers = recipientEmails.map(email => '+1234567890'); // Placeholder
+                    const smsMessage = `🚨 ${policyName} Alert: ${websiteUrl} is ${status}. Incident ${incident.id}. Check dashboard: ${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`;
+                    
+                    for (const phone of phoneNumbers) {
+                        await sendSMS(phone, smsMessage);
+                    }
+                    console.log(`📱 SMS notifications sent for incident ${incident.id}`);
+                } catch (error) {
+                    console.error(`Failed to send SMS notifications:`, error);
+                }
+                break;
+                
+            case 'webhook':
+                try {
+                    // TODO(stagewise): Get webhook URLs from organization settings or integrations
+                    const webhookUrl = process.env.WEBHOOK_URL || 'https://your-webhook-endpoint.com/alerts';
+                    const webhookPayload = {
+                        event: 'incident.escalated',
+                        incident_id: incident.id,
+                        website_url: websiteUrl,
+                        status: status,
+                        escalation_policy: policyName,
+                        escalation_step: step.stepOrder,
+                        custom_message: step.customMessage,
+                        timestamp: new Date().toISOString(),
+                        dashboard_url: `${process.env.FRONTEND_URL}/dashboard/incidents/${incident.id}`,
+                        recipients: recipientEmails
+                    };
+                    
+                    await sendWebhook(webhookUrl, webhookPayload);
+                    console.log(`🔗 Webhook notification sent for incident ${incident.id}`);
+                } catch (error) {
+                    console.error(`Failed to send webhook notification:`, error);
+                }
+                break;
+                
+            case 'teams':
+            case 'discord':
+            case 'phone':
+                // TODO(stagewise): Implement these notification methods
+                console.log(`🔔 ${method.toUpperCase()} notification would be sent for incident ${incident.id} (not implemented yet)`);
+                break;
+                
+            default:
+                console.warn(`Unknown notification method: ${method}`);
+                break;
+        }
+    }
+    
+    // If no methods specified, default to email
+    if (allMethods.length === 0 && recipientEmails.length > 0) {
+        console.log(`No notification methods specified for step ${step.stepOrder}, defaulting to email`);
+        for (const email of recipientEmails) {
+            try {
+                await sendEmail(
+                    email,
+                    `[${status}] ${websiteUrl} is ${status} - Escalation Step ${step.stepOrder}`,
+                    'incidentEscalated',
+                    { ...messageData, recipientName: email }
+                );
+                console.log(`📧 Default email notification sent to ${email} for incident ${incident.id}`);
+            } catch (error) {
+                console.error(`Failed to send default email to ${email}:`, error);
             }
-        );
+        }
     }
 }

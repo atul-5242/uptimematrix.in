@@ -121,32 +121,38 @@ export async function getWebsiteStatusAction(websiteId: string) {
     }
 
     const data = result.data;
-    console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------", data.data);
+    console.log("data>>>>>>>>>>>>>>>>>>>>>>>>>>--------------", data);
     
-    // Transform API -> UI format
+    // Validate the response structure (backend returns data directly, not nested)
+    if (!data || !data.id) {
+      console.error('Invalid API response structure:', data);
+      throw new Error('Invalid website data received from server');
+    }
+    
+    // Transform API -> UI format (backend returns data directly)
     return {
-      id: data.data.id,
-      incidents: data.data.incidents || 0,
-      lastChecked: data.data.lastChecked || null,
-      responseData: data.data.ticks
-        ? data.data.ticks.map((tick: any) => ({
+      id: data.id,
+      incidents: data.incidents || 0,
+      lastChecked: data.lastChecked || null,
+      responseData: data.ticks
+        ? data.ticks.map((tick: any) => ({
             time: new Date(tick.createdAt).toISOString(),
             ms: tick.response_time_ms,
           }))
         : [],
-      status: data.data.status?.toLowerCase() === "online"
+      status: data.status?.toLowerCase() === "online"
         ? "up"
-        : data.data.status?.toLowerCase() === "offline"
+        : data.status?.toLowerCase() === "offline"
           ? "down"
           : "unknown",
       uptimeDuration: "3 days 4 hrs", // backend doesn't send yet → static placeholder
-      url: data.data.url,
+      url: data.url,
       // Add new fields that backend now provides
-      checkInterval: data.data.checkInterval,
-      method: data.data.method,
-      monitorType: data.data.monitorType,
-      regions: data.data.regions,
-      tags: data.data.tags,
+      checkInterval: data.checkInterval,
+      method: data.method,
+      monitorType: data.monitorType,
+      regions: data.regions,
+      tags: data.tags,
     };
   } catch (error) {
     console.error('Error in getWebsiteStatusAction:', error);
