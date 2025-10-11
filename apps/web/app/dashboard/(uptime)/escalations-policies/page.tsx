@@ -84,6 +84,8 @@ export default function EscalationPoliciesListPage() {
   const [availableMonitors, setAvailableMonitors] = useState<any[]>([])
   const [selectedPolicy, setSelectedPolicy] = useState<EscalationPolicy | null>(null)
   const [isPolicyDetailOpen, setIsPolicyDetailOpen] = useState(false)
+  const [policyMonitors, setPolicyMonitors] = useState<any[]>([])
+  const [loadingMonitors, setLoadingMonitors] = useState(false)
 
   // Fetch available monitors
   useEffect(() => {
@@ -336,15 +338,88 @@ export default function EscalationPoliciesListPage() {
     router.push('/dashboard/escalations-policies/new')
   }
 
-  const handleViewPolicyDetails = (policy: EscalationPolicy) => {
+  const handleViewPolicyDetails = async (policy: EscalationPolicy) => {
     setSelectedPolicy(policy)
     setIsPolicyDetailOpen(true)
+    
+    // Fetch monitors for this policy
+    setLoadingMonitors(true)
+    try {
+      const res = await fetch(`/api/escalation-policies/${policy.id}/monitors`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPolicyMonitors(data.monitors || []);
+      } else {
+        console.error('Failed to fetch policy monitors');
+        setPolicyMonitors([]);
+      }
+    } catch (error) {
+      console.error('Error fetching policy monitors:', error);
+      setPolicyMonitors([]);
+    } finally {
+      setLoadingMonitors(false)
+    }
   }
 
   const handleToggleMonitorPolicy = async (monitorId: string, isEnabled: boolean) => {
-    // TODO(stagewise): This will be implemented when backend is ready
-    console.log(`Toggle monitor ${monitorId} policy to ${isEnabled}`)
-    // For now, just update the local state
+    if (!selectedPolicy) return;
+    
+    try {
+      const res = await fetch('/api/escalation-policies/toggle-monitor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+        },
+        body: JSON.stringify({
+          policyId: selectedPolicy.id,
+          monitorId: monitorId,
+          enabled: isEnabled
+        })
+      });
+      
+      if (res.ok) {
+        // Update the local state
+        setPolicyMonitors(prev => 
+          prev.map(monitor => 
+            monitor.id === monitorId 
+              ? { ...monitor, isPolicyEnabled: isEnabled, escalationPolicyId: isEnabled ? selectedPolicy.id : null }
+              : monitor
+          )
+        );
+        
+        // Also update the main policies list
+        setPolicies(prev => 
+          prev.map(policy => {
+            if (policy.id === selectedPolicy.id) {
+              const monitor = policyMonitors.find(m => m.id === monitorId);
+              if (monitor) {
+                const updatedMonitors = isEnabled 
+                  ? [...policy.assignedMonitors, monitor.name]
+                  : policy.assignedMonitors.filter(name => name !== monitor.name);
+                return { ...policy, assignedMonitors: updatedMonitors };
+              }
+            }
+            return policy;
+          })
+        );
+        
+        console.log(`Successfully ${isEnabled ? 'enabled' : 'disabled'} policy for monitor ${monitorId}`);
+      } else {
+        console.error('Failed to toggle monitor policy');
+        alert('Failed to update monitor policy assignment');
+      }
+    } catch (error) {
+      console.error('Error toggling monitor policy:', error);
+      alert('Failed to update monitor policy assignment');
+    }
   }
 
   if (loading) {
@@ -605,6 +680,10 @@ export default function EscalationPoliciesListPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Policy Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleViewPolicyDetails(policy)}>
+                          <Activity className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditPolicy(policy.id)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit Policy
@@ -915,24 +994,26 @@ export default function EscalationPoliciesListPage() {
                     <CardHeader>
                       <CardTitle className="text-lg flex items-center gap-2">
                         <Globe className="h-5 w-5" />
-                        Monitors Using This Policy
+                        Monitor Policy Assignments
                       </CardTitle>
                       <p className="text-sm text-gray-600">
-                        Toggle individual monitors on/off for this escalation policy
+                        Toggle individual monitors on/off for this escalation policy. When enabled, this policy will be triggered when the monitor goes down.
                       </p>
                     </CardHeader>
                     <CardContent>
-                      {availableMonitors.filter(monitor => 
-                        selectedPolicy.assignedMonitors.includes(monitor.name)
-                      ).length > 0 ? (
+                      {loadingMonitors ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                          <p className="text-gray-600">Loading monitors...</p>
+                        </div>
+                      ) : policyMonitors.length > 0 ? (
                         <div className="space-y-3">
-                          {availableMonitors
-                            .filter(monitor => selectedPolicy.assignedMonitors.includes(monitor.name))
-                            .map((monitor) => (
-                            <div key={monitor.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          {policyMonitors.map((monitor) => (
+                            <div key={monitor.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                               <div className="flex items-center gap-3">
                                 <div className={`w-3 h-3 rounded-full ${
-                                  monitor.status === 'up' ? 'bg-green-500' : 'bg-red-500'
+                                  monitor.status === 'online' ? 'bg-green-500' : 
+                                  monitor.status === 'offline' ? 'bg-red-500' : 'bg-gray-400'
                                 }`} />
                                 <div>
                                   <h4 className="font-medium">{monitor.name}</h4>
@@ -944,32 +1025,59 @@ export default function EscalationPoliciesListPage() {
                                     <Badge variant="outline" className="text-xs">
                                       {monitor.interval}s interval
                                     </Badge>
+                                    {monitor.monitorType && (
+                                      <Badge variant="outline" className="text-xs capitalize">
+                                        {monitor.monitorType}
+                                      </Badge>
+                                    )}
+                                    {monitor.regions && monitor.regions.length > 0 && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {monitor.regions.length} regions
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-600">
-                                  Policy {monitor.escalationPolicyId === selectedPolicy.id ? 'ON' : 'OFF'}
-                                </span>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className={`text-sm font-medium ${
+                                    monitor.isPolicyEnabled ? 'text-green-600' : 'text-gray-500'
+                                  }`}>
+                                    {monitor.isPolicyEnabled ? 'Policy Enabled' : 'Policy Disabled'}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    {monitor.isPolicyEnabled ? 'Will trigger alerts' : 'No alerts'}
+                                  </p>
+                                </div>
                                 <Switch
-                                  checked={monitor.escalationPolicyId === selectedPolicy.id}
+                                  checked={monitor.isPolicyEnabled}
                                   onCheckedChange={(checked) => handleToggleMonitorPolicy(monitor.id, checked)}
                                 />
                               </div>
                             </div>
                           ))}
+                          
+                          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-blue-900">Policy Summary</span>
+                            </div>
+                            <p className="text-sm text-blue-700 mt-1">
+                              {policyMonitors.filter(m => m.isPolicyEnabled).length} of {policyMonitors.length} monitors will trigger this escalation policy when they go down.
+                            </p>
+                          </div>
                         </div>
                       ) : (
                         <div className="text-center py-8">
                           <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                           <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            No monitors assigned
+                            No monitors found
                           </h3>
                           <p className="text-gray-600 mb-4">
-                            This policy is not currently assigned to any monitors.
+                            No monitors are available in your organization. Create monitors first to assign them to escalation policies.
                           </p>
-                          <Button variant="outline">
-                            Assign Monitors
+                          <Button variant="outline" onClick={() => router.push('/dashboard/monitoring')}>
+                            Create Monitor
                           </Button>
                         </div>
                       )}
