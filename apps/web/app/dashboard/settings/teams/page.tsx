@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,6 +39,10 @@ import {
 } from "@/app/all-actions/team-section/members/actions";
 import { getRoles, createRoleAction, updateRoleAction, deleteRoleAction, assignRoleAction } from "@/app/all-actions/team-section/roles/actions";
 import { useAppSelector } from "@/store";
+import { handleApiError, handleApiSuccess } from '@/lib/errorHandler';
+import { PermissionGate } from '@/components/permissions/PermissionGate';
+import { usePermissions } from '@/hooks/usePermissions';
+import { TEAM_PERMISSIONS, MEMBER_PERMISSIONS, ROLE_PERMISSIONS } from '@/lib/permissions';
 
 // Types
 interface Team {
@@ -149,6 +154,7 @@ const initialSettings: NotificationSettings = {
 };
 
 export default function TeamsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("teams");
   const [teams, setTeams] = useState<Team[]>([]);
@@ -183,6 +189,7 @@ export default function TeamsPage() {
   const [rolePermissionOpen, setRolePermissionOpen] = useState(false);
   const [rolePermissionSearch, setRolePermissionSearch] = useState("");
   const { currentOrganizationId } = useAppSelector(state => state.organization);
+  const { hasPermission } = usePermissions();
 
   // Utility functions
   const getInitials = (name: string) => {
@@ -196,8 +203,11 @@ export default function TeamsPage() {
   const generateId = () => Math.random().toString(36).slice(2, 11);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    // In a real app, you'd use a proper toast library
-    console.log(`${type.toUpperCase()}: ${message}`);
+    if (type === 'error') {
+      handleApiError(message);
+    } else {
+      handleApiSuccess(message);
+    }
   };
 
   // Handle client-side mounting
@@ -220,7 +230,9 @@ export default function TeamsPage() {
           getRoles()
         ]);
         
+        console.log('Teams result from backend:', teamsResult);
         if (teamsResult.success && teamsResult.data) {
+          console.log('Teams data:', teamsResult.data);
           setTeams(teamsResult.data);
         } else {
           console.error('Failed to load teams:', teamsResult.error);
@@ -414,10 +426,7 @@ export default function TeamsPage() {
         showToast('Please select a role', 'error');
         return;
       }
-      if (newMember.team.length === 0) {
-        showToast('Please select at least one team', 'error');
-        return;
-      }
+      // Team assignment is optional - members can exist without teams
     } else {
       // Invite mode: full validations
       if (!newMember.name.trim()) {
@@ -437,10 +446,7 @@ export default function TeamsPage() {
         showToast('Please select a role', 'error');
         return;
       }
-      if (newMember.team.length === 0) {
-        showToast('Please select at least one team', 'error');
-        return;
-      }
+      // Team assignment is optional - members can exist without teams
       if (newMember.phone && newMember.phone.trim() !== '' && !/^[\+]?[- 0-9()]{10,}$/.test(newMember.phone as string)) {
         showToast('Please enter a valid phone number', 'error');
         return;
@@ -534,18 +540,57 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDeleteMember = async (memberId: string) => {
+  // Remove member from specific team (used in Teams tab)
+  const handleRemoveMemberFromTeam = async (memberId: string, teamName: string) => {
+    try {
+      const team = teams.find(t => t.name === teamName);
+      if (!team) {
+        showToast('Team not found', 'error');
+        return;
+      }
+
+      const res = await removeMemberFromTeam(team.id, memberId);
+      if (!res.success) {
+        showToast(res.error || 'Failed to remove member from team', 'error');
+        return;
+      }
+      
+      // Refresh members and teams data
+      const [membersResult, teamsResult] = await Promise.all([
+        getMembers(currentOrganizationId!),
+        getTeams()
+      ]);
+      
+      if (membersResult.success && membersResult.data) {
+        setMembers(membersResult.data.members);
+      }
+      
+      if (teamsResult.success && teamsResult.data) {
+        setTeams(teamsResult.data);
+      }
+      
+      showToast(`Member removed from ${teamName} team`);
+    } catch (error) {
+      console.error('Error removing member from team:', error);
+      showToast('An error occurred while removing the member from team', 'error');
+    }
+  };
+
+  // Remove member from organization (used in Members tab)
+  const handleDeleteMemberFromOrganization = async (memberId: string) => {
     try {
       const res = await deleteMemberFromOrganization(memberId);
       if (!res.success) {
         showToast(res.error || 'Failed to remove member from organization', 'error');
         return;
       }
+      
       // Refresh members
       const membersResult = await getMembers(currentOrganizationId!);
       if (membersResult.success && membersResult.data) {
         setMembers(membersResult.data.members);
       }
+      
       showToast('Member removed from organization');
     } catch (error) {
       console.error('Error removing member from organization:', error);
@@ -716,25 +761,70 @@ export default function TeamsPage() {
     if (!selectedTeamForMembers || selectedMembersForTeam.length === 0) return;
 
     try {
-      const promises = selectedMembersForTeam.map(member => {
+      const promises = selectedMembersForTeam.map(async (member) => {
         const role = roles.find(r => r.name === member.role);
         if (!role) {
           showToast(`Role '${member.role}' not found for member '${member.name}'`, 'error');
-          return { success: false, error: 'Role not found' };
+          return { success: false, error: 'Role not found', member };
         }
-          return addMemberToTeam(selectedTeamForMembers.id, {
+        
+        try {
+          const result = await addMemberToTeam(selectedTeamForMembers.id, {
             userId: member.id,
             roleId: role.id
           });
+          return { ...result, member };
+        } catch (error: any) {
+          console.error(`Error adding ${member.name} to team:`, error);
+          return { success: false, error: error.message || 'Unknown error', member };
+        }
       });
 
       const results = await Promise.all(promises);
-      const failedCount = results.filter(r => !r.success).length;
+      const failedResults = results.filter(r => !r.success);
+      const successCount = results.length - failedResults.length;
       
-      if (failedCount === 0) {
-    showToast(`Added ${selectedMembersForTeam.length} member(s) to ${selectedTeamForMembers.name}`);
+      // Check for specific permission errors
+      const permissionErrors = failedResults.filter(r => 
+        r.error && (
+          r.error.toLowerCase().includes('permission') ||
+          r.error.toLowerCase().includes('unauthorized') ||
+          r.error.toLowerCase().includes('forbidden') ||
+          r.error.toLowerCase().includes('access denied')
+        )
+      );
+      
+      if (successCount === results.length) {
+        showToast(`Successfully added ${successCount} member(s) to ${selectedTeamForMembers.name}`);
+      } else if (successCount > 0) {
+        if (permissionErrors.length > 0) {
+          showToast(`Added ${successCount} member(s). ${permissionErrors.length} failed due to insufficient permissions`, 'error');
+        } else {
+          showToast(`Added ${successCount} member(s), ${failedResults.length} failed`, 'error');
+        }
       } else {
-        showToast(`Added ${selectedMembersForTeam.length - failedCount} member(s), ${failedCount} failed`, 'error');
+        // All failed
+        if (permissionErrors.length === failedResults.length) {
+          showToast(`Failed to add members: You don't have permission to add members to this team`, 'error');
+        } else if (permissionErrors.length > 0) {
+          showToast(`Failed to add members: ${permissionErrors.length} failed due to insufficient permissions`, 'error');
+        } else {
+          showToast(`Failed to add all ${failedResults.length} member(s) to the team`, 'error');
+        }
+      }
+
+      // Show detailed error for permission issues
+      if (permissionErrors.length > 0) {
+        const memberNames = permissionErrors
+          .map(r => r.member?.name)
+          .filter(name => name)
+          .join(', ');
+        
+        if (memberNames) {
+          setTimeout(() => {
+            showToast(`Permission denied for: ${memberNames}. Contact your administrator for team management permissions.`, 'error');
+          }, 2000);
+        }
       }
 
       // Refresh members and teams data
@@ -751,9 +841,20 @@ export default function TeamsPage() {
       if (teamsResult.success && teamsResult.data) {
         setTeams(teamsResult.data);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding members to team:', error);
-      showToast("An error occurred while adding members to team", 'error');
+      
+      // Check if it's a permission error
+      if (error.message && (
+        error.message.toLowerCase().includes('permission') ||
+        error.message.toLowerCase().includes('unauthorized') ||
+        error.message.toLowerCase().includes('forbidden') ||
+        error.message.toLowerCase().includes('access denied')
+      )) {
+        showToast("Permission denied: You don't have permission to add members to teams. Contact your administrator.", 'error');
+      } else {
+        showToast("An error occurred while adding members to team", 'error');
+      }
     }
     
     setSelectedMembersForTeam([]);
@@ -825,22 +926,52 @@ export default function TeamsPage() {
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {activeTab === "teams" && (
-              <Button onClick={openCreateTeam} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
+              <PermissionGate 
+                permission={TEAM_PERMISSIONS.CREATE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to create teams">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Team
+                  </Button>
+                }
+              >
+                <Button onClick={openCreateTeam} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Team
+                </Button>
+              </PermissionGate>
             )}
             {activeTab === "members" && (
-              <Button onClick={openCreateMember} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Invite Member
-              </Button>
+              <PermissionGate 
+                permission={MEMBER_PERMISSIONS.INVITE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to invite members">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Invite Member
+                  </Button>
+                }
+              >
+                <Button onClick={() => router.push('/dashboard/settings/invites')} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Invite Member
+                </Button>
+              </PermissionGate>
             )}
             {activeTab === "roles" && (
-              <Button onClick={openCreateRole} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Role
-              </Button>
+              <PermissionGate 
+                permission={ROLE_PERMISSIONS.CREATE}
+                fallback={
+                  <Button disabled className="bg-gray-400 cursor-not-allowed w-full sm:w-auto opacity-50" title="You don't have permission to create roles">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Role
+                  </Button>
+                }
+              >
+                <Button onClick={openCreateRole} className="bg-gray-900 hover:bg-gray-800 w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Role
+                </Button>
+              </PermissionGate>
             )}
           </div>
         </div>
@@ -862,7 +993,16 @@ export default function TeamsPage() {
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No teams yet</h3>
                   <p className="text-gray-600 mb-4">Create your first team to get started</p>
-                  <Button onClick={openCreateTeam}>Create Team</Button>
+                  <PermissionGate 
+                    permission={TEAM_PERMISSIONS.CREATE}
+                    fallback={
+                      <Button disabled className="opacity-50 cursor-not-allowed" title="You don't have permission to create teams">
+                        Create Team
+                      </Button>
+                    }
+                  >
+                    <Button onClick={openCreateTeam}>Create Team</Button>
+                  </PermissionGate>
                 </CardContent>
               </Card>
             ) : (
@@ -977,11 +1117,11 @@ export default function TeamsPage() {
                                         Edit Member
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        onClick={() => handleDeleteMember(member.id)}
+                                        onClick={() => handleRemoveMemberFromTeam(member.id, team.name)}
                                         className="text-red-600"
                                       >
                                         <Trash2 className="h-4 w-4 mr-2" />
-                                        Remove Member
+                                        Remove from Team
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -1019,7 +1159,7 @@ export default function TeamsPage() {
                   <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No members yet</h3>
                   <p className="text-gray-600 mb-4">Invite your first member to get started</p>
-                  <Button onClick={openCreateMember}>Invite Member</Button>
+                  <Button onClick={() => router.push('/dashboard/settings/invites')}>Invite Member</Button>
                 </div>
               ) : (
                 members.map((member) => (
@@ -1076,20 +1216,21 @@ export default function TeamsPage() {
                             Edit Member
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDeleteMember(member.id)}
+                            onClick={() => handleDeleteMemberFromOrganization(member.id)}
                             className="text-red-600"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Remove Member
+                            Remove from Organization
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </div>
-                )).concat(
-                  // Desktop Layout
-                  members.map((member) => (
-                    <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
+                ))
+              )}
+              {/* Desktop Layout - separate map to avoid hydration issues */}
+              {members.length > 0 && members.map((member) => (
+                <div key={`desktop-${member.id}`} className="hidden sm:grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_0.5fr] gap-4 p-4 border-b last:border-b-0 hover:bg-gray-50">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-orange-500 text-white text-sm">
@@ -1139,19 +1280,17 @@ export default function TeamsPage() {
                               Edit Member
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDeleteMember(member.id)}
+                              onClick={() => handleDeleteMemberFromOrganization(member.id)}
                               className="text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
-                              Remove Member
+                              Remove from Organization
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </div>
-                  ))
-                )
-              )}
+                </div>
+              ))}
             </Card>
           </TabsContent>
 
@@ -1487,34 +1626,20 @@ export default function TeamsPage() {
               </p>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="memberName">Full Name *</Label>
-                <Input
-                  id="memberName"
-                  value={newMember.name}
-                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="memberEmail">Email Address *</Label>
-                <Input
-                  id="memberEmail"
-                  type="email"
-                  value={newMember.email}
-                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                  placeholder="john@company.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="memberPhone">Phone Number</Label>
-                <Input
-                  id="memberPhone"
-                  value={newMember.phone}
-                  onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
-                  placeholder="+91 98765 43210"
-                />
-              </div>
+
+              {!editingMemberId && (
+                <div className="space-y-2">
+                  <Label htmlFor="memberEmail">Email Address *</Label>
+                  <Input
+                    id="memberEmail"
+                    type="email"
+                    value={newMember.email}
+                    onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                    placeholder="john@company.com"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="memberRole">Role *</Label>
                 <Select value={newMember.role} onValueChange={(value) => setNewMember({ ...newMember, role: value || "" })}>
@@ -1531,7 +1656,7 @@ export default function TeamsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="memberTeam">Teams *</Label>
+                <Label htmlFor="memberTeam">Teams (Optional)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -1545,7 +1670,7 @@ export default function TeamsPage() {
                               {teamName}
                             </Badge>
                           ))
-                        : "Select teams..."}
+                        : "Select teams (optional)..."}
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>

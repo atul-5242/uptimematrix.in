@@ -1,8 +1,13 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useSelector } from 'react-redux'
+import { useAppSelector } from '@/store'
+import { usePermissions } from '@/hooks/usePermissions'
+import { SYSTEM_PERMISSIONS } from '@/lib/permissions'
+import { PermissionGate } from '@/components/permissions/PermissionGate'
 import { formatDistanceToNow } from 'date-fns';
-import { getIncidentAnalytics, updateIncidentStatus, createIncidentUpdate, getIncidentUpdates } from "@/app/all-actions/incidents/actions";
+import { getIncidentAnalytics, updateIncidentStatus, createIncidentUpdate, getIncidentUpdates, acknowledgeIncident, resolveIncident } from "@/app/all-actions/incidents/actions";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { AlertTriangle, Clock, CheckCircle, XCircle, ArrowLeft, MessageSquare, Users, Calendar, Activity, Globe, Zap, Bell, Send, Edit3, Save, X, Plus, TrendingUp, AlertCircle, Eye, FileText, Link2, BookOpen } from 'lucide-react'
+import { AlertTriangle, Clock, CheckCircle, XCircle, ArrowLeft, MessageSquare, Users, Calendar, Activity, Globe, Zap, Bell, Send, Edit3, Save, X, Plus, TrendingUp, AlertCircle, Eye, FileText, Link2, BookOpen, Bot } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 type IncidentStatus = 'open' | 'acknowledged' | 'investigating' | 'resolved' | 'closed'
@@ -37,6 +42,8 @@ type Incident = {
   acknowledgedAt?: string
   resolvedAt?: string
   assignee?: string
+  acknowledgedBy?: string
+  resolvedBy?: string
   responseTime: number
   downtime: number
   impactedUsers: number
@@ -54,7 +61,11 @@ export default function IncidentDetailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const incidentId = searchParams.get('incidentId')
+  const currentUser = useSelector((state: any) => state.user)
+  const authToken = useAppSelector((state) => state.auth.token)
+  const { hasPermission } = usePermissions()
   
+  // State declarations
   const [incident, setIncident] = useState<Incident | null>(null)
   const [loading, setLoading] = useState(true)
   // NOTE: two separate loading states to keep action button UI and posting UI independent
@@ -66,6 +77,35 @@ export default function IncidentDetailPage() {
   const [editedTitle, setEditedTitle] = useState('')
   const [editedDescription, setEditedDescription] = useState('')
   const [activeTab, setActiveTab] = useState('timeline')
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Analytics Page Debug:', {
+      authToken: authToken ? 'Present' : 'Missing',
+      hasIncidentPermission: hasPermission(SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT),
+      currentUser: currentUser?.fullName || currentUser?.email || 'Unknown',
+      userRole: currentUser?.selectedOrganizationRole
+    });
+  }, [authToken, hasPermission, currentUser])
+  
+  // Debug incident state
+  useEffect(() => {
+    if (incident) {
+      console.log('🔍 Incident State Debug:', {
+        id: incident.id,
+        status: incident.status,
+        acknowledgedAt: incident.acknowledgedAt ? 'Present' : 'Missing',
+        resolvedAt: incident.resolvedAt ? 'Present' : 'Missing',
+        acknowledgedBy: incident.acknowledgedBy || 'Missing',
+        resolvedBy: incident.resolvedBy || 'Missing',
+        shouldShowAcknowledge: !incident.resolvedAt && !incident.acknowledgedAt,
+        shouldShowResolve: !incident.resolvedAt && incident.acknowledgedAt,
+        shouldShowNoButtons: !!incident.resolvedAt,
+        rawResolvedAt: incident.resolvedAt,
+        rawAcknowledgedAt: incident.acknowledgedAt
+      });
+    }
+  }, [incident])
 
   useEffect(() => {
     const fetchIncident = async () => {
@@ -119,7 +159,9 @@ export default function IncidentDetailPage() {
           createdAt: data.createdAt,
           acknowledgedAt: data.acknowledgedAt,
           resolvedAt: data.resolvedAt,
-          assignee: data.acknowledgedBy?.name || data.resolvedBy?.name,
+          assignee: data.acknowledgedBy?.name || data.acknowledgedBy?.email || data.resolvedBy?.name || data.resolvedBy?.email,
+          acknowledgedBy: data.acknowledgedBy?.name || data.acknowledgedBy?.email || (typeof data.acknowledgedBy === 'string' ? data.acknowledgedBy : null),
+          resolvedBy: data.resolvedBy?.name || data.resolvedBy?.email || (typeof data.resolvedBy === 'string' ? data.resolvedBy : null),
           responseTime: responseTimeMs ? Math.floor(responseTimeMs / 60000) : 0,
           downtime: resolutionTimeMs ? Math.floor(resolutionTimeMs / 60000) : 0,
           impactedUsers: 0,
@@ -228,54 +270,174 @@ export default function IncidentDetailPage() {
     }
   }
 
-  const handleActionClick = async () => {
+  const handleAcknowledge = async () => {
     if (!incident || !incidentId) return
     setActionLoading(true)
     try {
-      let newStatus = '';
+      await acknowledgeIncident(incidentId, authToken || undefined);
       
-      // Determine the next status based on current status
-      if (incident.status === 'open') {
-        newStatus = 'INVESTIGATING'; // Move from open to investigating
-      } else if (incident.status === 'acknowledged' || incident.status === 'investigating') {
-        newStatus = 'RESOLVED'; // Move from acknowledged/investigating to resolved
-      } else if (incident.status === 'resolved') {
-        newStatus = 'CLOSED'; // Move from resolved to closed
+      // Add acknowledgment update to timeline via API
+      const currentUserName = currentUser?.fullName || currentUser?.email || 'Current User';
+      try {
+        await createIncidentUpdate(incidentId, `Incident acknowledged by ${currentUserName}. Escalations have been stopped.`, 'status_change');
+      } catch (updateError) {
+        console.error('Error creating acknowledgment update:', updateError);
       }
-
-      if (newStatus) {
-        await updateIncidentStatus(incidentId, newStatus);
-        
-        // Refresh the incident data after status update
-        const updatedData = await getIncidentAnalytics(incidentId);
-        const transformedIncident: Incident = {
-          id: updatedData.id,
-          title: updatedData.title,
-          description: updatedData.description,
-          status: updatedData.status.toLowerCase() as IncidentStatus,
-          severity: updatedData.severity.toLowerCase() as IncidentSeverity,
-          affectedServices: [updatedData.service?.name || 'Unknown Service'],
-          createdAt: updatedData.createdAt,
-          acknowledgedAt: updatedData.acknowledgedAt,
-          resolvedAt: updatedData.resolvedAt,
-          assignee: updatedData.acknowledgedBy?.name || updatedData.resolvedBy?.name,
-          responseTime: updatedData.metrics.responseTimeMs ? Math.floor(updatedData.metrics.responseTimeMs / 60000) : 0,
-          downtime: updatedData.metrics.resolutionTimeMs ? Math.floor(updatedData.metrics.resolutionTimeMs / 60000) : 0,
-          impactedUsers: 0,
-          escalationLevel: 1,
-          tags: ['incident'],
-          updates: [],
-          metrics: {
-            responseTimeMs: [],
-            errorRate: [],
-            timestamps: []
-          }
-        };
-        
-        setIncident(transformedIncident);
+      
+      // Refresh both incident data and updates
+      const [updatedData, updatesResponse] = await Promise.all([
+        getIncidentAnalytics(incidentId),
+        getIncidentUpdates(incidentId)
+      ]);
+      
+      console.log('🔄 After Acknowledge - API Response:', {
+        status: updatedData.status,
+        acknowledgedAt: updatedData.acknowledgedAt,
+        resolvedAt: updatedData.resolvedAt,
+        acknowledgedBy: updatedData.acknowledgedBy,
+        resolvedBy: updatedData.resolvedBy
+      });
+      
+      console.log('🔄 After Resolve - API Response:', {
+        status: updatedData.status,
+        acknowledgedAt: updatedData.acknowledgedAt,
+        resolvedAt: updatedData.resolvedAt,
+        acknowledgedBy: updatedData.acknowledgedBy,
+        resolvedBy: updatedData.resolvedBy,
+        rawAcknowledgedBy: JSON.stringify(updatedData.acknowledgedBy),
+        rawResolvedBy: JSON.stringify(updatedData.resolvedBy)
+      });
+      
+      // Extract updates data properly
+      let updatesData = [];
+      if (Array.isArray(updatesResponse)) {
+        updatesData = updatesResponse;
+      } else if (updatesResponse && updatesResponse.data && Array.isArray(updatesResponse.data)) {
+        updatesData = updatesResponse.data;
+      } else if (updatesResponse && updatesResponse.success && Array.isArray(updatesResponse.data)) {
+        updatesData = updatesResponse.data;
       }
+      
+      // Transform updates to match frontend interface
+      const transformedUpdates = updatesData.map((update: any) => ({
+        id: update.id,
+        message: update.message,
+        type: update.type,
+        author: typeof update.author === 'string' ? update.author : 
+                (update.author?.name || update.author?.email || 'Unknown'),
+        timestamp: update.createdAt || update.timestamp
+      }));
+      
+      const transformedIncident: Incident = {
+        id: updatedData.id,
+        title: updatedData.title,
+        description: updatedData.description,
+        status: updatedData.status.toLowerCase() as IncidentStatus,
+        severity: updatedData.severity.toLowerCase() as IncidentSeverity,
+        affectedServices: [updatedData.service?.name || 'Unknown Service'],
+        createdAt: updatedData.createdAt,
+        acknowledgedAt: updatedData.acknowledgedAt,
+        resolvedAt: updatedData.resolvedAt,
+        assignee: updatedData.acknowledgedBy?.name || updatedData.acknowledgedBy?.email || updatedData.resolvedBy?.name || updatedData.resolvedBy?.email,
+        acknowledgedBy: updatedData.acknowledgedBy?.name || updatedData.acknowledgedBy?.email || (typeof updatedData.acknowledgedBy === 'string' ? updatedData.acknowledgedBy : null),
+        resolvedBy: updatedData.resolvedBy?.name || updatedData.resolvedBy?.email || (typeof updatedData.resolvedBy === 'string' ? updatedData.resolvedBy : null),
+        responseTime: updatedData.metrics?.responseTimeMs ? Math.floor(updatedData.metrics.responseTimeMs / 60000) : 0,
+        downtime: updatedData.metrics?.resolutionTimeMs ? Math.floor(updatedData.metrics.resolutionTimeMs / 60000) : 0,
+        impactedUsers: 0,
+        escalationLevel: 1,
+        tags: ['incident'],
+        updates: transformedUpdates,
+        metrics: {
+          responseTimeMs: [],
+          errorRate: [],
+          timestamps: []
+        }
+      };
+      
+      console.log('🚀 Transformed Incident After Resolve:', {
+        resolvedAt: transformedIncident.resolvedAt,
+        resolvedBy: transformedIncident.resolvedBy,
+        status: transformedIncident.status,
+        shouldShowButtons: !transformedIncident.resolvedAt
+      });
+      
+      setIncident(transformedIncident);
     } catch (error) {
-      console.error('Error performing action:', error)
+      console.error('Error acknowledging incident:', error)
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleResolve = async () => {
+    if (!incident || !incidentId) return
+    setActionLoading(true)
+    try {
+      await resolveIncident(incidentId, 'Incident resolved via dashboard', authToken || undefined);
+      
+      // Add resolution update to timeline via API
+      const currentUserName = currentUser?.fullName || currentUser?.email || 'Current User';
+      try {
+        await createIncidentUpdate(incidentId, `Incident manually resolved by ${currentUserName}. All affected services are now operational.`, 'status_change');
+      } catch (updateError) {
+        console.error('Error creating resolution update:', updateError);
+      }
+      
+      // Refresh both incident data and updates
+      const [updatedData, updatesResponse] = await Promise.all([
+        getIncidentAnalytics(incidentId),
+        getIncidentUpdates(incidentId)
+      ]);
+      
+      // Extract updates data properly
+      let updatesData = [];
+      if (Array.isArray(updatesResponse)) {
+        updatesData = updatesResponse;
+      } else if (updatesResponse && updatesResponse.data && Array.isArray(updatesResponse.data)) {
+        updatesData = updatesResponse.data;
+      } else if (updatesResponse && updatesResponse.success && Array.isArray(updatesResponse.data)) {
+        updatesData = updatesResponse.data;
+      }
+      
+      // Transform updates to match frontend interface
+      const transformedUpdates = updatesData.map((update: any) => ({
+        id: update.id,
+        message: update.message,
+        type: update.type,
+        author: typeof update.author === 'string' ? update.author : 
+                (update.author?.name || update.author?.email || 'Unknown'),
+        timestamp: update.createdAt || update.timestamp
+      }));
+      
+      const transformedIncident: Incident = {
+        id: updatedData.id,
+        title: updatedData.title,
+        description: updatedData.description,
+        status: updatedData.status.toLowerCase() as IncidentStatus,
+        severity: updatedData.severity.toLowerCase() as IncidentSeverity,
+        affectedServices: [updatedData.service?.name || 'Unknown Service'],
+        createdAt: updatedData.createdAt,
+        acknowledgedAt: updatedData.acknowledgedAt,
+        resolvedAt: updatedData.resolvedAt,
+        assignee: updatedData.acknowledgedBy?.name || updatedData.acknowledgedBy?.email || updatedData.resolvedBy?.name || updatedData.resolvedBy?.email,
+        acknowledgedBy: updatedData.acknowledgedBy?.name || updatedData.acknowledgedBy?.email || (typeof updatedData.acknowledgedBy === 'string' ? updatedData.acknowledgedBy : null),
+        resolvedBy: updatedData.resolvedBy?.name || updatedData.resolvedBy?.email || (typeof updatedData.resolvedBy === 'string' ? updatedData.resolvedBy : null),
+        responseTime: updatedData.metrics.responseTimeMs ? Math.floor(updatedData.metrics.responseTimeMs / 60000) : 0,
+        downtime: updatedData.metrics.resolutionTimeMs ? Math.floor(updatedData.metrics.resolutionTimeMs / 60000) : 0,
+        impactedUsers: 0,
+        escalationLevel: 1,
+        tags: ['incident'],
+        updates: transformedUpdates,
+        metrics: {
+          responseTimeMs: [],
+          errorRate: [],
+          timestamps: []
+        }
+      };
+      
+      setIncident(transformedIncident);
+    } catch (error) {
+      console.error('Error resolving incident:', error)
     } finally {
       setActionLoading(false)
     }
@@ -312,7 +474,45 @@ export default function IncidentDetailPage() {
     
     if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
     if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    return 'Just now'
+  }
+
+  const formatUserFriendlyDate = (dateString: string | null) => {
+    if (!dateString) return 'Just now'
+    
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+    
+    // If less than 1 hour ago, show "X minutes ago"
+    if (hours === 0) {
+      if (minutes <= 0) return 'Just now'
+      return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    }
+    
+    // If less than 24 hours ago, show "X hours ago"
+    if (days === 0) {
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    }
+    
+    // If more than 24 hours, show friendly date
+    if (days === 1) return 'Yesterday'
+    if (days < 7) return `${days} days ago`
+    
+    // For older dates, show formatted date
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    }) + ' at ' + date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
   }
 
   const formatDuration = (minutes: number) => {
@@ -405,46 +605,135 @@ export default function IncidentDetailPage() {
               </div>
             </div>
 
-            {/* Action Button and acknowledgements/resolution info */}
-            <div className="flex flex-col items-end gap-2">
-              {incident.status !== 'resolved' && incident.status !== 'closed' && (
-                incident.status === 'acknowledged' || incident.status === 'investigating' ? (
-                  <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
-                    <CheckCircle className="h-4 w-4 mr-1" /> 
-                    {actionLoading ? 'Resolving...' : 'Resolve'}
-                  </Button>
+            {/* Action Buttons and acknowledgements/resolution info */}
+            <div className="flex flex-col items-end gap-3">
+              {/* Action Buttons */}
+              <PermissionGate 
+                permissions={[SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT]}
+                fallback={
+                  <div className="flex gap-2">
+                    {/* Show disabled buttons only if incident is not resolved */}
+                    {(!incident.resolvedAt && incident.status !== 'resolved') && (
+                      <>
+                        {/* Show disabled Acknowledge button only if not acknowledged yet */}
+                        {!incident.acknowledgedAt && (
+                          <Button 
+                            size="sm" 
+                            disabled 
+                            className="opacity-50 cursor-not-allowed"
+                            title="You don't have permission to acknowledge incidents"
+                          >
+                            <Clock className="h-4 w-4 mr-1" />
+                            Acknowledge
+                          </Button>
+                        )}
+                        
+                        {/* Show disabled Resolve button only if acknowledged */}
+                        {incident.acknowledgedAt && (
+                          <Button 
+                            size="sm" 
+                            disabled 
+                            variant="default" 
+                            className="opacity-50 cursor-not-allowed"
+                            title="You don't have permission to resolve incidents"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Resolve
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                }
+              >
+                <div className="flex gap-2">
+                  {/* Button Logic: Only show buttons if NOT resolved (check both resolvedAt and status) */}
+                  {(!incident.resolvedAt && incident.status !== 'resolved') && (
+                    <>
+                      {/* Acknowledge button: Show only if NOT acknowledged */}
+                      {!incident.acknowledgedAt && (
+                        <Button size="sm" onClick={handleAcknowledge} disabled={actionLoading}>
+                          <Clock className="h-4 w-4 mr-1" />
+                          {actionLoading ? 'Acknowledging...' : 'Acknowledge'}
+                        </Button>
+                      )}
+                      
+                      {/* Resolve button: Show only if acknowledged */}
+                      {incident.acknowledgedAt && (
+                        <Button size="sm" onClick={handleResolve} disabled={actionLoading} variant="default">
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          {actionLoading ? 'Resolving...' : 'Resolve'}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  
+
+                </div>
+              </PermissionGate>
+
+              {/* Status Information */}
+              <div className="text-right space-y-2">
+                {/* Priority: Show resolved status first if resolved (check both resolvedAt and status) */}
+                {(incident.resolvedAt || incident.status === 'resolved') ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-green-800 font-bold mb-2">
+                      <CheckCircle className="h-5 w-5" />
+                      ✅ INCIDENT RESOLVED
+                    </div>
+                    <div className="text-sm text-green-700 font-medium">
+                      Resolved by: {(() => {
+                        // If API provides resolver info, use it (could be from manual or auto resolution)
+                        if (incident.resolvedBy) {
+                          return incident.resolvedBy;
+                        }
+                        // If incident is resolved but no resolvedBy, check if it was manual (recent) or auto
+                        if (incident.status === 'resolved') {
+                          // If resolvedAt is null/recent, likely manual by current user
+                          if (!incident.resolvedAt) {
+                            return currentUser?.fullName || currentUser?.email || 'Current User';
+                          }
+                          // If has resolvedAt but no resolvedBy, could be auto-resolution
+                          return 'System (Auto-resolved)';
+                        }
+                        return 'System';
+                      })()} 
+                    </div>
+                    <div className="text-xs text-green-600 mt-1">
+                      🕒 {formatUserFriendlyDate(incident.resolvedAt || null)}
+                    </div>
+                    {incident.acknowledgedAt && (
+                      <div className="text-xs text-gray-600 mt-3 pt-2 border-t border-green-200">
+                        💡 Previously acknowledged by {incident.acknowledgedBy || 'Unknown User'}<br/>
+                        🕒 {formatUserFriendlyDate(incident.acknowledgedAt)}
+                      </div>
+                    )}
+                  </div>
+                ) : incident.acknowledgedAt && incident.status !== 'closed' ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-yellow-800 font-bold mb-2">
+                      <Clock className="h-5 w-5" />
+                      ⏳ ACKNOWLEDGED - AWAITING RESOLUTION
+                    </div>
+                    <div className="text-sm text-yellow-700 font-medium">
+                      Acknowledged by: {incident.acknowledgedBy || (
+                        incident.status === 'acknowledged' && !incident.acknowledgedBy ? 'System (Auto-acknowledged)' : 'Unknown User'
+                      )}
+                    </div>
+                    <div className="text-xs text-yellow-600 mt-1">
+                      🕒 {formatUserFriendlyDate(incident.acknowledgedAt)}
+                    </div>
+                  </div>
                 ) : (
-                  <Button size="sm" onClick={handleActionClick} disabled={actionLoading}>
-                    {actionLoading ? 'Acknowledging...' : 'Acknowledge'}
-                  </Button>
-                )
-              )}
-
-              {incident.status === 'resolved' && (
-                <Button size="sm" onClick={handleActionClick} disabled={actionLoading} variant="outline">
-                  {actionLoading ? 'Closing...' : 'Close Incident'}
-                </Button>
-              )}
-
-              {/* Permanent label after resolve / acknowledged */}
-              {incident.status === 'resolved' && (
-                <div className="inline-flex items-center gap-2 bg-green-600 text-white text-sm px-3 py-1 rounded">
-                  <CheckCircle className="h-4 w-4" /> Resolved
-                </div>
-              )}
-
-              {incident.status === 'acknowledged' && !incident.resolvedAt && (
-                <div className="inline-flex items-center gap-2 bg-yellow-500 text-white text-sm px-3 py-1 rounded">
-                  <Clock className="h-4 w-4" /> Acknowledged
-                </div>
-              )}
-
-              <div className="text-sm text-gray-600">
-                {incident.acknowledgedAt && (
-                  <div>Acknowledged by Current User at {new Date(incident.acknowledgedAt).toLocaleString()}</div>
-                )}
-                {incident.resolvedAt && (
-                  <div>Resolved by Current User at {new Date(incident.resolvedAt).toLocaleString()}</div>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-red-800 font-bold mb-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      🚨 AWAITING ACKNOWLEDGMENT
+                    </div>
+                    <div className="text-sm text-red-700">
+                      This incident requires immediate acknowledgment
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -603,9 +892,54 @@ export default function IncidentDetailPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Assignee</label>
-                    <p className="mt-1 text-sm text-gray-900">{incident.assignee || 'Unassigned'}</p>
+                    <label className="text-sm font-medium text-gray-500">Current Handler</label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {incident.resolvedBy ? (
+                        <span className="text-green-700 font-medium">Resolved by {incident.resolvedBy}</span>
+                      ) : incident.acknowledgedBy ? (
+                        <span className="text-yellow-700 font-medium">Acknowledged by {incident.acknowledgedBy}</span>
+                      ) : incident.assignee ? (
+                        incident.assignee
+                      ) : (
+                        'Unassigned'
+                      )}
+                    </p>
                   </div>
+
+                  {incident.acknowledgedAt && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Acknowledged</label>
+                      <p className="mt-1 text-sm text-gray-900 font-medium">{formatUserFriendlyDate(incident.acknowledgedAt)}</p>
+                      <p className="mt-1 text-xs text-gray-600">
+                        by {incident.acknowledgedBy || 'System'}
+                      </p>
+                    </div>
+                  )}
+
+                  {(incident.resolvedAt || incident.status === 'resolved') && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Resolved</label>
+                      <p className="mt-1 text-sm text-gray-900 font-medium">{formatUserFriendlyDate(incident.resolvedAt || null)}</p>
+                      <p className="mt-1 text-xs text-gray-600">
+                        by {(() => {
+                          // If API provides resolver info, use it
+                          if (incident.resolvedBy) {
+                            return incident.resolvedBy;
+                          }
+                          // If incident is resolved but no resolvedBy
+                          if (incident.status === 'resolved') {
+                            // If resolvedAt is null, likely manual by current user
+                            if (!incident.resolvedAt) {
+                              return currentUser?.fullName || currentUser?.email || 'Current User';
+                            }
+                            // If has resolvedAt but no resolvedBy, could be auto-resolution
+                            return 'System';
+                          }
+                          return 'System';
+                        })()} 
+                      </p>
+                    </div>
+                  )}
 
                   <div>
                     <label className="text-sm font-medium text-gray-500">Response Time</label>

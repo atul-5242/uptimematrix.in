@@ -1,6 +1,8 @@
 'use client';
 import { AppDispatch } from '@/store';
 import { setAuthState } from '@/store/authSlice';
+import { fetchUserDetails } from '@/store/userSlice';
+import { setCurrentOrganizationId } from '@/store/organizationSlice';
 
 export async function signInAction(
   dispatch: AppDispatch,
@@ -57,6 +59,10 @@ export async function signInAction(
     userId: user?.id || null,
     isAuthenticated: true
   }));
+
+  // Fetch user details immediately after signin to get the latest organization info
+  // This will ensure that if user just accepted an invitation, the selectedOrganizationId is up to date
+  await dispatch(fetchUserDetails());
 
   return token;
 }

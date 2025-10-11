@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppSelector } from "@/store";
+import { ALL_PERMISSIONS, getPermissionDescription, formatPermissionName } from "@/lib/permissions";
 
 /**
  * usePermissions: read the current user's role and permissions for the selected org
@@ -28,6 +29,16 @@ export function usePermissions() {
 
   const isRole = (role: string) => selectedOrganizationRole === role;
 
+  const isAdmin = () => selectedOrganizationRole === "Admin";
+
+  const getPermissionDescriptionWrapper = (permission: string) => {
+    return getPermissionDescription(permission);
+  };
+
+  const formatPermission = (permission: string) => {
+    return formatPermissionName(permission);
+  };
+
   return {
     role: selectedOrganizationRole,
     permissions: selectedOrganizationPermissions,
@@ -35,5 +46,8 @@ export function usePermissions() {
     hasAny,
     hasAll,
     isRole,
+    isAdmin,
+    getPermissionDescription: getPermissionDescriptionWrapper,
+    formatPermission,
   };
 }

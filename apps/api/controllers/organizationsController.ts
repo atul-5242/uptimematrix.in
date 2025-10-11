@@ -1,6 +1,61 @@
 
 import { Request, Response } from 'express';
-import { prismaClient } from '@uptimematrix/store';
+import { prismaClient, EscalationPolicy, Priority } from '@uptimematrix/store';
+
+// Helper function to create a default escalation policy
+async function createDefaultEscalationPolicy(organizationId: string, createdById: string, adminEmail: string): Promise<EscalationPolicy> {
+    console.log(`[API] Creating default escalation policy for organization ${organizationId}, createdBy: ${createdById}, email: ${adminEmail}`);
+    
+    const defaultPolicyName = "Default Admin Notification Policy";
+    const defaultPolicyDescription = "Automatically generated policy to notify the organization admin via email when monitors fail.";
+
+    // Validate inputs before creating
+    if (!organizationId || !createdById || !adminEmail) {
+        throw new Error(`Invalid parameters for escalation policy creation: organizationId=${organizationId}, createdById=${createdById}, adminEmail=${adminEmail}`);
+    }
+    
+    const defaultPolicy = await prismaClient.escalationPolicy.create({
+        data: {
+            name: defaultPolicyName,
+            description: defaultPolicyDescription,
+            priorityLevel: Priority.medium, // Default priority
+            isActive: true,
+            organization: { connect: { id: organizationId } },
+            createdBy: { connect: { id: createdById } },
+            terminationCondition: "stop_after_last_step",
+            repeatLastStepIntervalMinutes: 30,
+            steps: {
+                create: [
+                    {
+                        stepOrder: 1,
+                        primaryMethods: ["email"],
+                        additionalMethods: [],
+                        recipients: [adminEmail],
+                        delayMinutes: 0,
+                        repeatCount: 1,
+                        escalateAfter: 5, // Escalate after 5 minutes without acknowledgment
+                        customMessage: "Website is down. Please investigate.",
+                    },
+                ],
+            },
+        },
+        include: { steps: true },
+    });
+    console.log(`[API] Default escalation policy created for organization ${organizationId}: ${defaultPolicy.id}`);
+    
+    // Verify the policy was created by querying it
+    const verifyPolicy = await prismaClient.escalationPolicy.findUnique({
+        where: { id: defaultPolicy.id },
+        include: { steps: true }
+    });
+    
+    if (!verifyPolicy) {
+        throw new Error(`Failed to verify escalation policy creation for organization ${organizationId}`);
+    }
+    
+    console.log(`[API] Verified escalation policy exists with ${verifyPolicy.steps.length} steps`);
+    return defaultPolicy;
+}
 
 export const getOrganizationDetails = async (req: Request, res: Response) => {
   try {
@@ -41,6 +96,11 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
                 avatar: true,
                 phone: true,
                 memberOfTeamEntries: {
+                  where: {
+                    team: {
+                      organizationId: organizationId // Only include teams from current organization
+                    }
+                  },
                   select: {
                     team: {
                       select: {
@@ -110,6 +170,141 @@ export const getOrganizationDetails = async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('Error fetching organization details:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const createOrganization = async (req: Request, res: Response) => {
+  try {
+    const { name, description } = req.body;
+    const userId = req.user?.id;
+
+    console.log(`[Backend] POST /organizations - UserId: ${userId}, Name: ${name}`);
+
+    if (!userId) {
+      console.warn(`[Backend] Unauthorized: User ID not found for POST /organizations`);
+      return res.status(401).json({ message: 'Unauthorized: User ID not found' });
+    }
+
+    // Get user details for organization member creation
+    const userDetails = await prismaClient.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true, email: true }
+    });
+
+    if (!userDetails) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validate required fields
+    if (!name || !description) {
+      return res.status(400).json({ message: 'Organization name and description are required' });
+    }
+
+    // Validate name length
+    if (name.length < 2 || name.length > 100) {
+      return res.status(400).json({ message: 'Organization name must be between 2 and 100 characters' });
+    }
+
+    // Check if organization with same name already exists for this user
+    const existingOrg = await prismaClient.organization.findFirst({
+      where: {
+        name: name.trim(),
+        members: {
+          some: {
+            userId: userId
+          }
+        }
+      }
+    });
+
+    if (existingOrg) {
+      return res.status(409).json({ message: 'You already have an organization with this name' });
+    }
+
+    // Find or create Admin role
+    let adminRole = await prismaClient.role.findUnique({ 
+      where: { name: "Admin" },
+      include: { permissions: true }
+    });
+    if (!adminRole) {
+      // TODO(stagewise): Create proper permissions instead of mock data
+      adminRole = await prismaClient.role.create({ 
+        data: { 
+          name: "Admin", 
+          description: "Administrator with full access"
+        },
+        include: { permissions: true }
+      });
+    }
+
+    // Create organization with the user as owner
+    const newOrganization = await prismaClient.organization.create({
+      data: {
+        name: name.trim(),
+        description: description.trim(),
+        status: 'ACTIVE',
+        totalMembers: 1,
+        members: {
+          create: {
+            userId: userId,
+            roleId: adminRole.id,
+            isVerified: true,
+            name: userDetails.fullName || userDetails.email || 'Admin',
+            email: userDetails.email || ''
+          }
+        }
+      },
+      include: {
+        members: {
+          include: {
+            user: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    // Update user's selectedOrganizationId to the new organization
+    await prismaClient.user.update({
+      where: { id: userId },
+      data: {
+        selectedOrganizationId: newOrganization.id,
+        selectedOrganizationRole: adminRole.name,
+        selectedOrganizationPermissions: adminRole.permissions.map(p => p.name)
+      },
+    });
+
+    // Create the default escalation policy for the new organization
+    try {
+      await createDefaultEscalationPolicy(newOrganization.id, userId, userDetails.email);
+    } catch (escalationError) {
+      console.error(`[API] Failed to create default escalation policy for organization ${newOrganization.id}:`, escalationError);
+      // Continue with organization creation even if escalation policy fails
+    }
+
+    console.log(`[Backend] Successfully created organization ${newOrganization.id} and set as selected for user ${userId}`);
+
+    // Return the created organization data
+    const responseData = {
+      id: newOrganization.id,
+      name: newOrganization.name,
+      description: newOrganization.description,
+      status: newOrganization.status,
+      totalMembers: newOrganization.totalMembers,
+      createdOn: newOrganization.createdOn,
+      role: adminRole.name,
+      permissions: adminRole.permissions.map(p => p.name),
+      isVerified: true
+    };
+
+    res.status(201).json({ 
+      message: 'Organization created successfully',
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error('Error creating organization:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

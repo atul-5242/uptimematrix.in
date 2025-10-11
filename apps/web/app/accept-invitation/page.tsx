@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { useAppDispatch } from '@/store';
+import { setCurrentOrganizationId } from '@/store/organizationSlice';
+import { fetchUserDetails } from '@/store/userSlice';
 
 interface InvitationData {
   email: string;
@@ -20,6 +23,7 @@ interface InvitationData {
 export default function AcceptInvitationPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const token = searchParams.get('token');
 
   const [step, setStep] = useState<'loading' | 'confirm' | 'password' | 'success' | 'error'>('loading');
@@ -29,6 +33,7 @@ export default function AcceptInvitationPage() {
   const [fullName, setFullName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!token) {
@@ -37,19 +42,29 @@ export default function AcceptInvitationPage() {
       return;
     }
 
+    console.log('[Accept Invitation] Starting verification for token:', token?.substring(0, 20) + '...');
     // Verify invitation token
     verifyInvitation();
   }, [token]);
 
   const verifyInvitation = async () => {
     try {
+      console.log('[Accept Invitation] Making verification request...');
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch('/api/auth/verify-invitation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ token }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      console.log('[Accept Invitation] Verification response status:', response.status);
 
       const data = await response.json();
 
@@ -60,9 +75,23 @@ export default function AcceptInvitationPage() {
         setStep('error');
         setError(data.message || 'Invalid or expired invitation link.');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Invitation verification error:', error);
+      
+      // Auto-retry once if it's a network error and we haven't retried yet
+      if (retryCount === 0 && (error.name === 'AbortError' || error.message?.includes('fetch'))) {
+        console.log('[Accept Invitation] Retrying verification...');
+        setRetryCount(1);
+        setTimeout(() => verifyInvitation(), 2000); // Retry after 2 seconds
+        return;
+      }
+      
       setStep('error');
-      setError('Failed to verify invitation. Please try again.');
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to verify invitation. Please try again.');
+      }
     }
   };
 
@@ -80,6 +109,10 @@ export default function AcceptInvitationPage() {
     setError('');
 
     try {
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
       const response = await fetch('/api/auth/accept-invitation', {
         method: 'POST',
         headers: {
@@ -89,12 +122,23 @@ export default function AcceptInvitationPage() {
           token,
           // No password or fullName needed for existing users
         }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
       if (response.ok) {
         setStep('success');
+        
+        // If organizationId is returned, set it in Redux store for when user logs in
+        if (data.organizationId) {
+          dispatch(setCurrentOrganizationId(data.organizationId));
+          // Also refresh user details to get updated organization info
+          dispatch(fetchUserDetails());
+        }
+        
         // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
           router.push('/signin');
@@ -102,8 +146,13 @@ export default function AcceptInvitationPage() {
       } else {
         setError(data.message || 'Failed to accept invitation. Please try again.');
       }
-    } catch (error) {
-      setError('Failed to accept invitation. Please try again.');
+    } catch (error: any) {
+      console.error('Accept invitation error:', error);
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to accept invitation. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -131,6 +180,10 @@ export default function AcceptInvitationPage() {
     setError('');
 
     try {
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
       const response = await fetch('/api/auth/accept-invitation', {
         method: 'POST',
         headers: {
@@ -141,12 +194,23 @@ export default function AcceptInvitationPage() {
           password,
           fullName: fullName.trim(),
         }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
       if (response.ok) {
         setStep('success');
+        
+        // If organizationId is returned, set it in Redux store for when user logs in
+        if (data.organizationId) {
+          dispatch(setCurrentOrganizationId(data.organizationId));
+          // Also refresh user details to get updated organization info
+          dispatch(fetchUserDetails());
+        }
+        
         // Redirect to sign in after 2 seconds so user can log in
         setTimeout(() => {
           router.push('/signin');
@@ -154,8 +218,13 @@ export default function AcceptInvitationPage() {
       } else {
         setError(data.message || 'Failed to accept invitation. Please try again.');
       }
-    } catch (error) {
-      setError('Failed to accept invitation. Please try again.');
+    } catch (error: any) {
+      console.error('Accept invitation error:', error);
+      if (error.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to accept invitation. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -167,7 +236,15 @@ export default function AcceptInvitationPage() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center p-8">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
-            <p className="text-gray-600">Verifying invitation...</p>
+            <p className="text-gray-600 mb-6">Verifying invitation...</p>
+            <p className="text-sm text-gray-500 mb-4">This should only take a few seconds</p>
+            <Button 
+              onClick={() => router.push('/signin')} 
+              variant="outline"
+              size="sm"
+            >
+              Go to Sign In Instead
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -186,13 +263,25 @@ export default function AcceptInvitationPage() {
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-            <Button 
-              onClick={() => router.push('/signin')} 
-              className="w-full mt-4"
-              variant="outline"
-            >
-              Go to Sign In
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button 
+                onClick={() => {
+                  setStep('loading');
+                  setRetryCount(0);
+                  verifyInvitation();
+                }}
+                className="flex-1"
+              >
+                Try Again
+              </Button>
+              <Button 
+                onClick={() => router.push('/signin')} 
+                className="flex-1"
+                variant="outline"
+              >
+                Go to Sign In
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -20,10 +20,13 @@ export const useAppInitialization = () => {
 
   useEffect(() => {
     // Set current organization ID from user data if not already set
-    if (selectedOrganizationId && !currentOrganizationId) {
+    // Priority: currentOrganizationId (from invitation) > selectedOrganizationId (from user profile)
+    if (!currentOrganizationId && selectedOrganizationId) {
       dispatch(setCurrentOrganizationId(selectedOrganizationId));
     }
   }, [selectedOrganizationId, currentOrganizationId, dispatch]);
+
+
 
   return {
     isInitialized: isAuthenticated && !!userId && !userLoading,

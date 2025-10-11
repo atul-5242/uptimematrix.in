@@ -12,6 +12,16 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Frontend API] Verifying invitation token with backend...');
+    console.log('[Frontend API] Backend URL:', process.env.NEXT_PUBLIC_API_URL);
+
+    // Check if API URL is configured
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      console.error('[Frontend API] NEXT_PUBLIC_API_URL is not configured!');
+      return NextResponse.json(
+        { message: 'API configuration error. Please contact support.' },
+        { status: 500 }
+      );
+    }
 
     // Make API call to backend to verify invitation
     const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-invitation`, {

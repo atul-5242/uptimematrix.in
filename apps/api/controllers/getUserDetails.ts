@@ -27,8 +27,7 @@ export const getUserDetails = async (req: Request, res: Response) => {
         lastLogin: true,
         isEmailVerified: true,
         selectedOrganizationId: true,
-        selectedOrganizationRole: true,
-        selectedOrganizationPermissions: true,
+        // Don't use cached role data - we'll fetch fresh data below
         organizationMembers: {
           where: organizationId ? { organizationId: organizationId } : undefined,
           include: {
@@ -47,6 +46,42 @@ export const getUserDetails = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Get fresh role and permissions for the selected organization
+    let currentRole = null;
+    let currentPermissions: string[] = [];
+    
+    if (user.selectedOrganizationId) {
+      const currentMembership = await prismaClient.organizationMember.findFirst({
+        where: {
+          userId: userId,
+          organizationId: user.selectedOrganizationId
+        },
+        include: {
+          role: {
+            include: {
+              permissions: true
+            }
+          }
+        }
+      });
+      
+      if (currentMembership) {
+        currentRole = currentMembership.role.name;
+        currentPermissions = currentMembership.role.permissions.map(p => p.name);
+        
+        console.log(`[API] getUserDetails - Fresh role data for user ${userId} in org ${user.selectedOrganizationId}: ${currentRole}, permissions: ${currentPermissions.join(', ')}`);
+        
+        // Update the user's cached role data to keep it in sync
+        await prismaClient.user.update({
+          where: { id: userId },
+          data: {
+            selectedOrganizationRole: currentRole,
+            selectedOrganizationPermissions: currentPermissions
+          }
+        });
+      }
+    }
+
     res.json({
       id: user.id,
       fullName: user.fullName,
@@ -61,8 +96,8 @@ export const getUserDetails = async (req: Request, res: Response) => {
       lastLogin: user.lastLogin,
       isEmailVerified: user.isEmailVerified,
       selectedOrganizationId: user.selectedOrganizationId,
-      selectedOrganizationRole: user.selectedOrganizationRole,
-      selectedOrganizationPermissions: user.selectedOrganizationPermissions,
+      selectedOrganizationRole: currentRole,
+      selectedOrganizationPermissions: currentPermissions,
       organizations: user.organizationMembers.map((member) => ({
         id: member.organization.id,
         name: member.organization.name,

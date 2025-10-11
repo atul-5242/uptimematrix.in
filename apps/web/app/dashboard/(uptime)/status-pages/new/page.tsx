@@ -428,7 +428,7 @@ export default function CreateStatusPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, subdomain: e.target.value }))}
                         className={errors.subdomain ? 'border-red-500' : ''}
                       />
-                      <span className="text-sm text-gray-500">.uptimematrix.atulmaurya.in</span>
+                      <span className="text-sm text-gray-500">status.uptimematrix.atulmaurya.in</span>
                     </div>
                     {errors.subdomain && <p className="text-sm text-red-600">{errors.subdomain}</p>}
                   </div>

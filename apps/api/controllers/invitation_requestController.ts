@@ -152,19 +152,33 @@ export const acceptInvitation = async (req: Request, res: Response) => {
       
           if (existingUser) {
             // User exists - activate the membership
-            await prismaClient.organizationMember.update({
+            const updatedMembership = await prismaClient.organizationMember.update({
               where: { id: inactiveMembership.id },
               data: {
                 userId: existingUser.id,
                 name: existingUser.fullName || existingUser.email.split('@')[0] || existingUser.email,
                 isVerified: true
+              },
+              include: {
+                role: { include: { permissions: true } }
               }
             });
+
+            // Update the user's selectedOrganizationId and role information
+            await prismaClient.user.update({
+              where: { id: existingUser.id },
+              data: {
+                selectedOrganizationId: decoded.organizationId,
+                selectedOrganizationRole: updatedMembership.role?.name || 'Member',
+                selectedOrganizationPermissions: updatedMembership.role?.permissions.map(p => p.name) || []
+              },
+            });
       
-            console.log(`[API] Existing user ${existingUser.email} joined organization via invitation`);
+            console.log(`[API] Existing user ${existingUser.email} joined organization via invitation and selectedOrganizationId updated to ${decoded.organizationId}`);
       
             return res.json({
               message: 'Invitation accepted successfully',
+              organizationId: decoded.organizationId,
               user: {
                 id: existingUser.id,
                 email: existingUser.email,
@@ -189,12 +203,13 @@ export const acceptInvitation = async (req: Request, res: Response) => {
           // Hash the password
           const hashedPassword = hashPassword(password);
       
-          // Create the user
+          // Create the user with selectedOrganizationId already set
           const user = await prismaClient.user.create({
             data: {
               email: decoded.email,
               password: hashedPassword,
               fullName: fullName.trim(),
+              selectedOrganizationId: decoded.organizationId,
             },
             select: {
               id: true,
@@ -204,19 +219,32 @@ export const acceptInvitation = async (req: Request, res: Response) => {
           });
       
           // Activate the membership
-          await prismaClient.organizationMember.update({
+          const updatedMembership = await prismaClient.organizationMember.update({
             where: { id: inactiveMembership.id },
             data: {
               userId: user.id,
               name: fullName.trim(),
               isVerified: true
+            },
+            include: {
+              role: { include: { permissions: true } }
             }
           });
+
+          // Update user with role information
+          await prismaClient.user.update({
+            where: { id: user.id },
+            data: {
+              selectedOrganizationRole: updatedMembership.role?.name || 'Member',
+              selectedOrganizationPermissions: updatedMembership.role?.permissions.map(p => p.name) || []
+            },
+          });
       
-          console.log(`[API] New user ${user.email} accepted invitation and joined organization`);
+          console.log(`[API] New user ${user.email} accepted invitation, joined organization, and selectedOrganizationId updated to ${decoded.organizationId}`);
       
           res.json({
             message: 'Invitation accepted successfully',
+            organizationId: decoded.organizationId,
             user: {
               id: user.id,
               email: user.email,

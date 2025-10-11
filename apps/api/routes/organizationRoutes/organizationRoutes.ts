@@ -1,13 +1,17 @@
 
 import express from 'express';
-import { getOrganizationDetails, deleteOrganization } from '../../controllers/organizationsController.js';
+import { getOrganizationDetails, createOrganization, deleteOrganization } from '../../controllers/organizationsController.js';
 import { getAllOrganizationMembers, removeMemberFromOrganization } from '../../controllers/teamsSectionController.js';
+import { updateOrganizationMember } from '../../controllers/organizationMemberController.js';
 import { getPendingInvitations } from '../../controllers/invitationController.js';
 import { authMiddleware } from '../../middlewares/middleware.js';
 import { acceptInvitation } from '../../controllers/invitationController.js';
 import { requirePermission } from '../../middlewares/authorization.js';
 
 const router = express.Router();
+
+// Route to create a new organization
+router.post('/', authMiddleware, createOrganization);
 
 // Route to get details of a single organization
 router.get('/:id', authMiddleware, requirePermission('member:view'), getOrganizationDetails);

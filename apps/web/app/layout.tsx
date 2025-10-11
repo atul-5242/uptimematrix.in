@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/(landingpage)/theme-provider';
 import { Providers } from './providers';
+import { Toaster } from '@/components/ui/toaster';
 import { cookies } from 'next/headers';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -73,6 +74,7 @@ export default function RootLayout({
         <Providers initialToken={initialToken} initialUserId={initialUserId}>
           <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
             {children}
+            <Toaster />
           </ThemeProvider>
         </Providers>
       </body>

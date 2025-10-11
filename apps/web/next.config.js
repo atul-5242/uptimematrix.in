@@ -4,11 +4,14 @@ const nextConfig = {
   // output: 'export', // removed because static export does not support middleware or API routes
   experimental: {
     serverActions: true,
+    instrumentationHook: false,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
   images: { unoptimized: true },
+  // Disable telemetry to avoid file permission issues on Windows
+  telemetry: false,
 };
 
 module.exports = nextConfig;

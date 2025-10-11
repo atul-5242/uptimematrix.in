@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { Plus, Trash2, Clock, Users, AlertTriangle, ArrowLeft, Globe, Zap, Webhook, Bell, Phone, Mail, MessageSquare, X, Info, Settings } from 'lucide-react'
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from 'sonner'
+import { handleApiError, handleApiSuccess, apiRequest } from '@/lib/errorHandler'
 
 type EscalationStep = {
   id: number;
@@ -49,6 +50,7 @@ type EscalationPolicyFormData = {
   tags: string[];
   terminationCondition: 'stop_after_last_step' | 'repeat_last_step' | ''; // New field
   repeatLastStepIntervalMinutes?: number; // New field for configurable interval
+  assignedMonitors: string[]; // New field for monitor assignment
 }
 
 type ErrorState = {
@@ -83,7 +85,7 @@ export default function EscalationPolicyCreatePage() {
       {
         id: 1,
         alertMethod: {
-          primary: [],
+          primary: [], // All alert methods start UNSELECTED - user must choose
           additional: []
         },
         recipients: [],
@@ -95,7 +97,8 @@ export default function EscalationPolicyCreatePage() {
     ],
     tags: [],
     terminationCondition: '',
-    repeatLastStepIntervalMinutes: 30 // Default to 30 minutes
+    repeatLastStepIntervalMinutes: 30, // Default to 30 minutes
+    assignedMonitors: [] // Initialize empty
   })
 
   const [loading, setLoading] = useState(false)
@@ -106,11 +109,13 @@ export default function EscalationPolicyCreatePage() {
   const [onCallSchedules, setOnCallSchedules] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState<boolean>(true);
   const [membersLoading, setMembersLoading] = useState<boolean>(true);
+  const [availableMonitors, setAvailableMonitors] = useState<any[]>([]);
+  const [selectedMonitors, setSelectedMonitors] = useState<string[]>([]);
 
   const primaryAlertMethods = [
-    { value: 'email', label: 'Email Notification', icon: Mail },
-    { value: 'sms', label: 'SMS Alert', icon: MessageSquare },
-    { value: 'phone', label: 'Phone Call', icon: Phone }
+    { value: 'email', label: 'Email Notification', icon: Mail, disabled: false },
+    { value: 'sms', label: 'SMS Alert', icon: MessageSquare, disabled: true },
+    { value: 'phone', label: 'Phone Call', icon: Phone, disabled: true }
   ]
 
   // Fetch all necessary data: teams, organization members, on-call schedules
@@ -154,21 +159,11 @@ export default function EscalationPolicyCreatePage() {
             if (!response.ok) {
               const errorText = await response.text();
               console.error('Failed to fetch organization members:', errorText);
-              // Handle different error responses from the backend
-              if (response.status === 401) {
-                toast.error('Unauthorized', {
-                  description: 'Your session has expired. Please log in again.',
-                });
-                router.push('/signin');
-              } else if (response.status === 403) {
-                toast.error('Forbidden', {
-                  description: 'You do not have permission to view organization members.',
-                });
-              } else {
-                toast.error('Error', {
-                  description: `Failed to fetch organization members: ${response.statusText}`,
-                });
-              }
+              // Use centralized error handling
+              handleApiError({
+                error: errorText || response.statusText,
+                status: response.status
+              }, 'Load Organization Members');
               return;
             }
 
@@ -176,9 +171,7 @@ export default function EscalationPolicyCreatePage() {
             setOrganizationMembers(data.data || []);
           } catch (error) {
             console.error('Error fetching organization members:', error);
-            toast.error('Network Error', {
-              description: 'Unable to connect to the server. Please check your internet connection.',
-            });
+            handleApiError(error instanceof Error ? error.message : 'Network error occurred', 'Load Organization Members');
           } finally {
             setMembersLoading(false);
           }
@@ -194,6 +187,17 @@ export default function EscalationPolicyCreatePage() {
           setOnCallSchedules(data || []);
         } else {
           console.error("Failed to fetch on-call schedules:", await onCallRes.text());
+        }
+
+        // Fetch Available Monitors
+        const monitorsRes = await fetch('/api/uptime/getallmonitors', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (monitorsRes.ok) {
+          const data = await monitorsRes.json();
+          setAvailableMonitors(data.data || []);
+        } else {
+          console.error("Failed to fetch monitors:", await monitorsRes.text());
         }
       } catch (error) {
         console.error("Error fetching escalation recipients data:", error);
@@ -460,6 +464,7 @@ export default function EscalationPolicyCreatePage() {
       const payload = {
         ...rest,
         monitorsDown: triggerConditions.monitorsDown, // Flatten monitorsDown
+        assignedMonitors: selectedMonitors, // Include selected monitor IDs
         steps: steps.map((s, index) => ({
           stepOrder: index + 1, // Prisma requires stepOrder
           primaryMethods: s.alertMethod.primary,
@@ -682,6 +687,72 @@ export default function EscalationPolicyCreatePage() {
                 <p className="text-xs text-gray-500">Define what happens when all escalation steps have been exhausted if no one acknowledges the escalation.</p>
               </div>
 
+              {/* Monitor Assignment */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Assign to Monitors</Label>
+                  <p className="text-xs text-gray-500">Select which monitors should use this escalation policy</p>
+                </div>
+                
+                {availableMonitors.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto border rounded-lg p-4">
+                    {availableMonitors.map((monitor) => (
+                      <div key={monitor.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`monitor-${monitor.id}`}
+                          checked={selectedMonitors.includes(monitor.id)}
+                          onCheckedChange={(checked: boolean) => {
+                            if (checked) {
+                              setSelectedMonitors(prev => [...prev, monitor.id]);
+                              setFormData(prev => ({
+                                ...prev,
+                                assignedMonitors: [...prev.assignedMonitors, monitor.name || monitor.url]
+                              }));
+                            } else {
+                              setSelectedMonitors(prev => prev.filter(id => id !== monitor.id));
+                              setFormData(prev => ({
+                                ...prev,
+                                assignedMonitors: prev.assignedMonitors.filter(name => name !== (monitor.name || monitor.url))
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`monitor-${monitor.id}`} className="text-sm cursor-pointer">
+                          <div className="flex flex-col">
+                            <span className="font-medium">{monitor.name || 'Unnamed Monitor'}</span>
+                            <span className="text-xs text-gray-500">{monitor.url}</span>
+                          </div>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border rounded-lg bg-gray-50">
+                    <Globe className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">No monitors found</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open('/dashboard/monitoring/new', '_blank')}
+                    >
+                      Create Your First Monitor
+                    </Button>
+                  </div>
+                )}
+                
+                {selectedMonitors.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.assignedMonitors.map((monitorName, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {monitorName}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="active"
@@ -850,15 +921,23 @@ export default function EscalationPolicyCreatePage() {
                       <Label className="text-sm font-medium text-gray-700">Primary Methods</Label>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {primaryAlertMethods.map((method) => (
-                          <div key={method.value} className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg bg-white/80">
+                          <div key={method.value} className={`flex items-center space-x-2 p-3 border border-gray-200 rounded-lg ${
+                            method.disabled ? 'bg-gray-50 opacity-60' : 'bg-white/80'
+                          }`}>
                             <Checkbox
                               id={`${step.id}-${method.value}`}
                               checked={step.alertMethod.primary.includes(method.value)}
+                              disabled={method.disabled}
                               onCheckedChange={(checked: boolean) => updatePrimaryAlertMethod(step.id, method.value, checked)}
                             />
-                            <method.icon className="h-4 w-4 text-gray-600" />
-                            <Label htmlFor={`${step.id}-${method.value}`} className="text-sm font-medium cursor-pointer">
+                            <method.icon className={`h-4 w-4 ${
+                              method.disabled ? 'text-gray-400' : 'text-gray-600'
+                            }`} />
+                            <Label htmlFor={`${step.id}-${method.value}`} className={`text-sm font-medium ${
+                              method.disabled ? 'cursor-not-allowed text-gray-400' : 'cursor-pointer'
+                            }`}>
                               {method.label}
+                              {method.disabled && <span className="ml-2 text-xs">(Coming Soon)</span>}
                             </Label>
                           </div>
                         ))}
@@ -868,9 +947,7 @@ export default function EscalationPolicyCreatePage() {
                     {/* Additional Methods (Dropdown) */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-gray-700">Additional Integrated Methods</Label>
-                      <Select
-                        onValueChange={(value) => addAdditionalAlertMethod(step.id, value)}
-                      >
+                      <Select>
                         <SelectTrigger>
                           <SelectValue placeholder="Add more notification methods" />
                         </SelectTrigger>
@@ -890,11 +967,11 @@ export default function EscalationPolicyCreatePage() {
                             </Button>
                           </div>
                           {availableIntegrations.filter(method => method.integrated).map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              <div className="flex items-center gap-2">
+                            <SelectItem key={method.value} value={method.value} disabled>
+                              <div className="flex items-center gap-2 opacity-60">
                                 <method.icon className="h-4 w-4" />
                                 {method.label}
-                                <Badge variant="outline" className="text-xs">Integrated</Badge>
+                                <Badge variant="outline" className="text-xs">Coming Soon</Badge>
                               </div>
                             </SelectItem>
                           ))}
@@ -903,7 +980,7 @@ export default function EscalationPolicyCreatePage() {
                               <div className="flex items-center gap-2 opacity-50">
                                 <method.icon className="h-4 w-4" />
                                 {method.label}
-                                <Badge variant="secondary" className="text-xs">Not Integrated</Badge>
+                                <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                               </div>
                             </SelectItem>
                           ))}

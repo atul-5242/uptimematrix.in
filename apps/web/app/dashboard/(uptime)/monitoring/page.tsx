@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
+import { PermissionGate } from '@/components/permissions/PermissionGate'
+import { usePermissions } from '@/hooks/usePermissions'
 import { 
   Plus, 
   Search, 
