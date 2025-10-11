@@ -1,6 +1,5 @@
 'use client'
 
-import { revalidatePath } from 'next/cache'
 import { apiRequest, handleApiError, handleApiSuccess } from '@/lib/errorHandler'
 
 export type StatusPageFormData = {
@@ -54,7 +53,7 @@ export async function createStatusPage(data: StatusPageFormData) {
 
     if (result.success) {
       handleApiSuccess('Status page created successfully', 'Create Status Page');
-      revalidatePath('/dashboard/status-pages');
+      // revalidatePath removed - should be handled by the component after successful action
       return { success: true, data: result.data };
     } else {
       return { success: false, error: result.error || 'Failed to create status page' };
@@ -161,7 +160,7 @@ export async function deleteStatusPage(id: string) {
 
     if (result.success) {
       handleApiSuccess('Status page deleted successfully', 'Delete Status Page');
-      revalidatePath('/dashboard/status-pages');
+      // revalidatePath removed - should be handled by the component after successful action
       return { success: true, data: result.data };
     } else {
       return { success: false, error: result.error || 'Failed to delete status page' };
