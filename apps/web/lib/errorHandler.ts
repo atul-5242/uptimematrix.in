@@ -117,6 +117,7 @@ export async function apiRequest<T = any>(
 ): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(url, {
+      credentials: 'include', // Important for authentication cookies
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,

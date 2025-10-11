@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertTriangle, Clock, CheckCircle, XCircle, Search, Plus, TrendingUp, Globe, Users } from 'lucide-react'
-import { getIncidents, getIncidentStats } from '@/app/all-actions/incidents/actions'
+import { getIncidents, getIncidentStats, acknowledgeIncident, resolveIncident } from '@/app/all-actions/incidents/actions'
 import { Incident, IncidentStatus, IncidentSeverity, IncidentStats } from '@/types/incident'
 import { formatTimeAgo, formatDuration } from '@/lib/time'
 import { useAppSelector } from '@/store'
@@ -34,10 +34,52 @@ export default function IncidentsPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('active')
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const selectedOrganizationId = useAppSelector((state) => state.user.selectedOrganizationId);
   const authToken = useAppSelector((state) => state.auth.token);
   const { hasPermission } = usePermissions();
+
+  // Handle incident actions
+  const handleAcknowledgeIncident = async (incidentId: string) => {
+    try {
+      setActionLoading(incidentId);
+      await acknowledgeIncident(incidentId, authToken || undefined);
+      
+      // Update the incident in local state
+      setIncidents(prev => 
+        prev.map(incident => 
+          incident.id === incidentId 
+            ? { ...incident, status: 'MONITORING' as IncidentStatus, Acknowledged: true }
+            : incident
+        )
+      );
+    } catch (error) {
+      console.error('Error acknowledging incident:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResolveIncident = async (incidentId: string) => {
+    try {
+      setActionLoading(incidentId);
+      await resolveIncident(incidentId, undefined, authToken || undefined);
+      
+      // Update the incident in local state
+      setIncidents(prev => 
+        prev.map(incident => 
+          incident.id === incidentId 
+            ? { ...incident, status: 'RESOLVED' as IncidentStatus, endTime: new Date().toISOString() }
+            : incident
+        )
+      );
+    } catch (error) {
+      console.error('Error resolving incident:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -357,8 +399,77 @@ export default function IncidentsPage() {
                         )}
                       </div>
 
-                      {/* View Button */}
+                      {/* Action Buttons */}
                       <div className="flex items-center gap-2">
+                        {/* Acknowledge/Resolve Buttons */}
+                        {incident.status !== 'RESOLVED' && (
+                          <PermissionGate 
+                            permissions={[SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT]}
+                            fallback={
+                              <div className="flex items-center gap-2">
+                                {!incident.Acknowledged && incident.status === 'INVESTIGATING' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    disabled
+                                    className="opacity-50 cursor-not-allowed"
+                                    title="You don't have permission to acknowledge incidents"
+                                  >
+                                    <Clock className="h-3.5 w-3.5" />
+                                    <span>Acknowledge</span>
+                                  </Button>
+                                )}
+                                {(incident.Acknowledged || incident.status === 'MONITORING') && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    disabled
+                                    className="opacity-50 cursor-not-allowed"
+                                    title="You don't have permission to resolve incidents"
+                                  >
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                    <span>Resolve</span>
+                                  </Button>
+                                )}
+                              </div>
+                            }
+                          >
+                            <div className="flex items-center gap-2">
+                              {!incident.Acknowledged && incident.status === 'INVESTIGATING' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleAcknowledgeIncident(incident.id)
+                                  }}
+                                  disabled={actionLoading === incident.id}
+                                  className="flex items-center gap-1.5 text-yellow-600 hover:text-yellow-700 border-yellow-200 hover:bg-yellow-50"
+                                >
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span>{actionLoading === incident.id ? 'Acknowledging...' : 'Acknowledge'}</span>
+                                </Button>
+                              )}
+                              {(incident.Acknowledged || incident.status === 'MONITORING') && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleResolveIncident(incident.id)
+                                  }}
+                                  disabled={actionLoading === incident.id}
+                                  className="flex items-center gap-1.5 text-green-600 hover:text-green-700 border-green-200 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <span>{actionLoading === incident.id ? 'Resolving...' : 'Resolve'}</span>
+                                </Button>
+                              )}
+                            </div>
+                          </PermissionGate>
+                        )}
+                        
+                        {/* Analytics Button */}
                         <PermissionGate 
                           permissions={[SYSTEM_PERMISSIONS.INCIDENT_MANAGEMENT, SYSTEM_PERMISSIONS.ANALYTICS]}
                           fallback={

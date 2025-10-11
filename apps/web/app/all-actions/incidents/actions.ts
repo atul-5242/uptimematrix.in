@@ -161,3 +161,66 @@ export async function getIncidentUpdates(incidentId: string) {
     return []; // Return empty array instead of throwing
   }
 }
+
+// Acknowledge an incident (stops escalations)
+export async function acknowledgeIncident(incidentId: string, authToken?: string) {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add Authorization header if token is provided
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    const result = await apiRequest(`/api/incidents/${incidentId}/acknowledge`, {
+      method: 'PATCH',
+      headers,
+    }, 'Acknowledge Incident');
+
+    if (result.success) {
+      handleApiSuccess('Incident acknowledged successfully. Escalations have been stopped.', 'Acknowledge Incident');
+      return result.data;
+    } else {
+      throw new Error(result.error || 'Failed to acknowledge incident');
+    }
+  } catch (error) {
+    if (!error.message.includes('Acknowledge Incident')) {
+      handleApiError(error instanceof Error ? error.message : 'Failed to acknowledge incident', 'Acknowledge Incident');
+    }
+    throw error;
+  }
+}
+
+// Resolve an incident
+export async function resolveIncident(incidentId: string, resolutionNote?: string, authToken?: string) {
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add Authorization header if token is provided
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    const result = await apiRequest(`/api/incidents/${incidentId}/resolve`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ resolutionNote }),
+    }, 'Resolve Incident');
+
+    if (result.success) {
+      handleApiSuccess('Incident resolved successfully.', 'Resolve Incident');
+      return result.data;
+    } else {
+      throw new Error(result.error || 'Failed to resolve incident');
+    }
+  } catch (error) {
+    if (!error.message.includes('Resolve Incident')) {
+      handleApiError(error instanceof Error ? error.message : 'Failed to resolve incident', 'Resolve Incident');
+    }
+    throw error;
+  }
+}
