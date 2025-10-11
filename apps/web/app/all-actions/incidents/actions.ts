@@ -24,7 +24,7 @@ export async function getIncidents(organizationId: string): Promise<Incident[]> 
 
     return result.data;
   } catch (error) {
-    if (!error.message.includes('Load Incidents')) {
+    if (!(error instanceof Error && error.message.includes('Load Incidents'))) {
       handleApiError(error instanceof Error ? error.message : 'Failed to fetch incidents', 'Load Incidents');
     }
     throw error instanceof Error ? error : new Error('Failed to fetch incidents');
@@ -90,7 +90,7 @@ export async function updateIncidentStatus(incidentId: string, status: string) {
       throw new Error(result.error || 'Failed to update incident status');
     }
   } catch (error) {
-    if (!error.message.includes('Update Incident Status')) {
+    if (!(error instanceof Error && error.message.includes('Update Incident Status'))) {
       handleApiError(error instanceof Error ? error.message : 'Failed to update incident status', 'Update Incident Status');
     }
     throw error;
@@ -186,7 +186,7 @@ export async function acknowledgeIncident(incidentId: string, authToken?: string
       throw new Error(result.error || 'Failed to acknowledge incident');
     }
   } catch (error) {
-    if (!error.message.includes('Acknowledge Incident')) {
+    if (!(error instanceof Error && error.message.includes('Acknowledge Incident'))) {
       handleApiError(error instanceof Error ? error.message : 'Failed to acknowledge incident', 'Acknowledge Incident');
     }
     throw error;
@@ -218,7 +218,7 @@ export async function resolveIncident(incidentId: string, resolutionNote?: strin
       throw new Error(result.error || 'Failed to resolve incident');
     }
   } catch (error) {
-    if (!error.message.includes('Resolve Incident')) {
+    if (!(error instanceof Error && error.message.includes('Resolve Incident'))) {
       handleApiError(error instanceof Error ? error.message : 'Failed to resolve incident', 'Resolve Incident');
     }
     throw error;

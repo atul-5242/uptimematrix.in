@@ -58,7 +58,7 @@ export async function fetchUserDetailsAction(organizationId?: string): Promise<U
 
     return result.data;
   } catch (error) {
-    if (!error.message.includes('Load User Details')) {
+    if (!(error instanceof Error && error.message.includes('Load User Details'))) {
       handleApiError(error instanceof Error ? error.message : 'Failed to fetch user details', 'Load User Details');
     }
     throw error instanceof Error ? error : new Error('Failed to fetch user details');

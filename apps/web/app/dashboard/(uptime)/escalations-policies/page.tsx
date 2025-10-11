@@ -132,7 +132,11 @@ export default function EscalationPoliciesListPage() {
             .map(monitor => monitor.name);
 
           // Get incident data for this policy
-          let incidentData = {
+          let incidentData: {
+            lastTriggered: string | null,
+            triggeredCount: number,
+            avgResponseTime: number | null
+          } = {
             lastTriggered: null,
             triggeredCount: 0,
             avgResponseTime: null

@@ -34,7 +34,7 @@ export async function updateOrganizationMember(memberId: string, memberData: {
       // Return additional information about whether current user was updated
       return {
         ...result,
-        needsUserRefresh: result.isCurrentUser || false
+        needsUserRefresh: result.data?.isCurrentUser || false
       };
     }
 

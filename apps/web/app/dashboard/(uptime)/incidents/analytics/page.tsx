@@ -700,7 +700,7 @@ export default function IncidentDetailPage() {
                       })()} 
                     </div>
                     <div className="text-xs text-green-600 mt-1">
-                      🕒 {formatUserFriendlyDate(incident.resolvedAt)}
+                      🕒 {formatUserFriendlyDate(incident.resolvedAt || null)}
                     </div>
                     {incident.acknowledgedAt && (
                       <div className="text-xs text-gray-600 mt-3 pt-2 border-t border-green-200">
@@ -709,7 +709,7 @@ export default function IncidentDetailPage() {
                       </div>
                     )}
                   </div>
-                ) : incident.acknowledgedAt && incident.status !== 'resolved' ? (
+                ) : incident.acknowledgedAt && incident.status !== 'closed' ? (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 text-yellow-800 font-bold mb-2">
                       <Clock className="h-5 w-5" />
@@ -919,7 +919,7 @@ export default function IncidentDetailPage() {
                   {(incident.resolvedAt || incident.status === 'resolved') && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Resolved</label>
-                      <p className="mt-1 text-sm text-gray-900 font-medium">{formatUserFriendlyDate(incident.resolvedAt)}</p>
+                      <p className="mt-1 text-sm text-gray-900 font-medium">{formatUserFriendlyDate(incident.resolvedAt || null)}</p>
                       <p className="mt-1 text-xs text-gray-600">
                         by {(() => {
                           // If API provides resolver info, use it

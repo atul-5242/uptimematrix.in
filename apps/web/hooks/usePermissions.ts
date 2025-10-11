@@ -31,7 +31,7 @@ export function usePermissions() {
 
   const isAdmin = () => selectedOrganizationRole === "Admin";
 
-  const getPermissionDescription = (permission: string) => {
+  const getPermissionDescriptionWrapper = (permission: string) => {
     return getPermissionDescription(permission);
   };
 
@@ -47,7 +47,7 @@ export function usePermissions() {
     hasAll,
     isRole,
     isAdmin,
-    getPermissionDescription,
+    getPermissionDescription: getPermissionDescriptionWrapper,
     formatPermission,
   };
 }

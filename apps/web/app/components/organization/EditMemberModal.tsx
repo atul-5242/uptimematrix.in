@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { updateOrganizationMember, getRoles } from '@/app/all-actions/organization/members/actions';
-import { useAppDispatch } from '@/hooks/redux';
+import { useAppDispatch } from '@/store';
 import { fetchUserDetails } from '@/store/userSlice';
 
 interface EditMemberModalProps {
@@ -91,7 +91,7 @@ export default function EditMemberModal({
         onClose();
         
         // If the current user's role was updated, refresh their data
-        if (result.needsUserRefresh) {
+        if ('needsUserRefresh' in result && result.needsUserRefresh) {
           // Refresh user data to get the latest role and permissions
           dispatch(fetchUserDetails());
           alert('Your role has been updated successfully! If you don\'t see all changes immediately, try switching to another organization and back.');
