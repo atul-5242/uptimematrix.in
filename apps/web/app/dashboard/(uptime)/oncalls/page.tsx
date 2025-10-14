@@ -151,15 +151,26 @@ function TeamDetailsModal({ team, isOpen, onClose }: { team: TeamData, isOpen: b
           if (!token) {
             throw new Error('No authentication token found.');
           }
-          const { data } = await fetchTeamMembers(team.id);
-          setFetchedMembers(data.data.map((member: any) => ({
-            id: member.userId,
-            fullName: member.name,
-            email: member.email,
-            phone: member.phone,
-            role: member.role,
-            isActive: member.status === 'active',
-          })));
+          const response = await fetchTeamMembers(team.id);
+          console.log('Team members response:', response);
+          
+          // Handle the API response structure { success: true, data: [...] }
+          const membersData = response.data || response;
+          
+          // Ensure membersData is an array before mapping
+          if (Array.isArray(membersData)) {
+            setFetchedMembers(membersData.map((member: any) => ({
+              id: member.userId,
+              fullName: member.name,
+              email: member.email,
+              phone: member.phone,
+              role: member.role,
+              isActive: member.status === 'active',
+            })));
+          } else {
+            console.error('Expected array but got:', typeof membersData, membersData);
+            setFetchedMembers([]);
+          }
         } catch (error) {
           console.error('Error fetching team members:', error);
         } finally {
@@ -482,17 +493,30 @@ export default function OnCallPage() {
         // Fetch members for each team in the active schedule
         const teamsWithMembers = await Promise.all(activeSchedule.teamAssignments.map(async (assignment) => {
           console.log('Fetching members for teamId:', assignment.teamId);
-          const { data: membersData } = await fetchTeamMembers(assignment.teamId);
-          console.log(`Members data for team ${assignment.teamId}:`, membersData);
-          const members: UserData[] = membersData.map((member: any) => ({
-            id: member.userId,
-            fullName: member.name,
-            email: member.email,
-            phone: member.phone,
-            role: member.role,
-            isActive: member.status === 'active',
-          }));
-          return { ...assignment.team, members: members, description: assignment.team.description || '' };
+          try {
+            const membersResponse = await fetchTeamMembers(assignment.teamId);
+            console.log(`Members response for team ${assignment.teamId}:`, membersResponse);
+            
+            // Handle the API response structure { success: true, data: [...] }
+            const membersData = membersResponse.data || membersResponse;
+            console.log(`Members data for team ${assignment.teamId}:`, membersData);
+            
+            // Ensure membersData is an array before mapping
+            const members: UserData[] = Array.isArray(membersData) ? membersData.map((member: any) => ({
+              id: member.userId,
+              fullName: member.name,
+              email: member.email,
+              phone: member.phone,
+              role: member.role,
+              isActive: member.status === 'active',
+            })) : [];
+            
+            return { ...assignment.team, members: members, description: assignment.team.description || '' };
+          } catch (error) {
+            console.error(`Error fetching members for team ${assignment.teamId}:`, error);
+            // Return team with empty members array if fetch fails
+            return { ...assignment.team, members: [], description: assignment.team.description || '' };
+          }
         }));
         console.log('Teams with members:', teamsWithMembers);
 
@@ -534,25 +558,41 @@ export default function OnCallPage() {
       const usersData = await fetchOrganizationMembers();
       console.log('Raw Available Users Data:', usersData);
       console.log('Fetched available users:', usersData.data);
-      setAvailablePersons(usersData.data.map((user: any) => ({
-        id: user.id,
-        fullName: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.organizationRole || 'Member', // Default role
-        isActive: true, // Assuming all fetched users are active
-      })));
+      
+      // Handle the API response structure
+      const usersArray = usersData.data || usersData;
+      if (Array.isArray(usersArray)) {
+        setAvailablePersons(usersArray.map((user: any) => ({
+          id: user.id,
+          fullName: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.organizationRole || 'Member', // Default role
+          isActive: true, // Assuming all fetched users are active
+        })));
+      } else {
+        console.error('Expected users array but got:', typeof usersArray, usersArray);
+        setAvailablePersons([]);
+      }
 
       // Fetch available teams (from team management API)
       const teamsData = await fetchAvailableTeams();
       console.log('Raw Available Teams Data:', teamsData);
       console.log('Fetched available teams:', teamsData.data);
-      setAvailableTeams(teamsData.data.map((team: any) => ({
-        id: team.id,
-        name: team.name,
-        description: team.description,
-        members: [], // Members will be fetched on demand for modal if needed
-      })));
+      
+      // Handle the API response structure
+      const teamsArray = teamsData.data || teamsData;
+      if (Array.isArray(teamsArray)) {
+        setAvailableTeams(teamsArray.map((team: any) => ({
+          id: team.id,
+          name: team.name,
+          description: team.description,
+          members: [], // Members will be fetched on demand for modal if needed
+        })));
+      } else {
+        console.error('Expected teams array but got:', typeof teamsArray, teamsArray);
+        setAvailableTeams([]);
+      }
 
     } catch (error) {
       console.error('Error fetching on-call data:', error);
